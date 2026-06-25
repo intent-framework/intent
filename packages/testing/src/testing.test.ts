@@ -68,4 +68,36 @@ describe("testScreen", () => {
       await expect(screen.answer("Fake", "value")).rejects.toThrow('Ask "Fake" not found.')
     })
   })
+
+  it("checks blocked reasons via toBeBlockedBy", async () => {
+    const LoginScreen = screen("BlockedByTest", $ => {
+      const email = $.state.text("email")
+      const password = $.state.text("password")
+      const emailAsk = $.ask("Email", email).required()
+      const passwordAsk = $.ask("Password", password).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+        .when(passwordAsk.valid, "Enter your password.")
+        .does(async () => {})
+      $.surface("main").contains(emailAsk, passwordAsk, login)
+    })
+
+    await testScreen(LoginScreen, async screen => {
+      // Both conditions fail: both reasons present
+      expect(() => screen.act("Log in").toBeBlockedBy("Enter your email.")).not.toThrow()
+      expect(() => screen.act("Log in").toBeBlockedBy("Enter your password.")).not.toThrow()
+      expect(() => screen.act("Log in").toBeBlockedBy("Enter your email.", "Enter your password.")).not.toThrow()
+
+      // Answer email — only password reason remains
+      await screen.answer("Email", "mahyar@example.com")
+      expect(() => screen.act("Log in").toBeBlockedBy("Enter your password.")).not.toThrow()
+      expect(() => screen.act("Log in").toBeBlockedBy("Enter your email.")).toThrow()
+
+      // Answer password — act is enabled
+      await screen.answer("Password", "secret")
+      expect(() => screen.act("Log in").toBeEnabled()).not.toThrow()
+      expect(() => screen.act("Log in").toBeBlockedBy("Enter your email.")).toThrow()
+    })
+  })
 })

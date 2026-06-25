@@ -21,6 +21,11 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
     if (button) {
       const unsub = act.enabled.subscribe(() => {
         button.disabled = !act.enabled.current
+        if (!act.enabled.current && act.blockedReasons.length > 0) {
+          button.title = act.blockedReasons[0]!
+        } else {
+          button.removeAttribute("title")
+        }
       })
       unsubscribers.push(unsub)
     }
@@ -115,6 +120,9 @@ function buildDom(screenDef: ScreenDefinition): HTMLElement {
 
     if (!act.enabled.current) {
       button.disabled = true
+      if (act.blockedReasons.length > 0) {
+        button.title = act.blockedReasons[0]!
+      }
     }
 
     form.appendChild(button)

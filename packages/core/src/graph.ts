@@ -16,6 +16,7 @@ export type InspectedScreen = {
     label: string
     primary: boolean
     enabled: boolean
+    blockedReasons: string[]
     status: string
     statusMessage: string | null
   }>
@@ -48,6 +49,7 @@ export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
       label: a.label,
       primary: a.primary,
       enabled: a.enabled.current,
+      blockedReasons: a.blockedReasons,
       status: a.status,
       statusMessage: a.statusMessage,
     })),
