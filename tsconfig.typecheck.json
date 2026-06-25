@@ -5,11 +5,11 @@
     "baseUrl": ".",
     "lib": ["ES2022", "DOM"],
     "paths": {
-      "@intent/core": ["packages/core/src/index.ts"],
-      "@intent/dom": ["packages/dom/src/index.ts"],
-      "@intent/router": ["packages/router/src/index.ts"],
-      "@intent/testing": ["packages/testing/src/index.ts"],
-      "@intent/server": ["packages/server/src/index.ts"]
+      "@intent-framework/core": ["packages/core/src/index.ts"],
+      "@intent-framework/dom": ["packages/dom/src/index.ts"],
+      "@intent-framework/router": ["packages/router/src/index.ts"],
+      "@intent-framework/testing": ["packages/testing/src/index.ts"],
+      "@intent-framework/server": ["packages/server/src/index.ts"]
     }
   },
   "include": [

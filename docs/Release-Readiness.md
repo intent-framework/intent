@@ -12,17 +12,17 @@ All five packages under `packages/*` are intended to be published:
 
 | Package | npm name | Purpose |
 |---|---|---|
-| `packages/core` | `@intent/core` | Platformless semantic graph and runtime |
-| `packages/dom` | `@intent/dom` | DOM materializer for screens and router |
-| `packages/router` | `@intent/router` | Typed route definitions and navigation |
-| `packages/testing` | `@intent/testing` | Semantic test harness |
-| `packages/server` | `@intent/server` | Early server-side package |
+| `packages/core` | `@intent-framework/core` | Platformless semantic graph and runtime |
+| `packages/dom` | `@intent-framework/dom` | DOM materializer for screens and router |
+| `packages/router` | `@intent-framework/router` | Typed route definitions and navigation |
+| `packages/testing` | `@intent-framework/testing` | Semantic test harness |
+| `packages/server` | `@intent-framework/server` | Early server-side package |
 
 Packages under `examples/` (e.g., `web-basic`) are private and must not be published.
 
 ## Package audit
 
-### `@intent/core`
+### `@intent-framework/core`
 
 | Field | Value | Status |
 |---|---|---|
@@ -40,7 +40,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 | Test harness | `vitest` | Tests pass |
 
-### `@intent/dom`
+### `@intent-framework/dom`
 
 | Field | Value | Status |
 |---|---|---|
@@ -53,10 +53,10 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
-| `dependencies` | `@intent/core`, `@intent/router` | Uses `workspace:*` — correct for monorepo |
+| `dependencies` | `@intent-framework/core`, `@intent-framework/router` | Uses `workspace:*` — correct for monorepo |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 
-### `@intent/router`
+### `@intent-framework/router`
 
 | Field | Value | Status |
 |---|---|---|
@@ -69,10 +69,10 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
-| `dependencies` | `@intent/core` | Uses `workspace:*` |
+| `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 
-### `@intent/testing`
+### `@intent-framework/testing`
 
 | Field | Value | Status |
 |---|---|---|
@@ -85,10 +85,10 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
-| `dependencies` | `@intent/core` | Uses `workspace:*` |
+| `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 
-### `@intent/server`
+### `@intent-framework/server`
 
 | Field | Value | Status |
 |---|---|---|
@@ -101,27 +101,21 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
-| `dependencies` | `@intent/core` | Uses `workspace:*` |
+| `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 | Note | Early stage | Server package has global registries and basic action/resource/policy types. Not yet production-ready. |
 
-## Package naming and npm scope risk
+## Package naming
 
-All five packages use the `@intent/*` npm scope.
+All five packages use the `@intent-framework/*` npm scope.
 
-**Before publishing, confirm ownership or availability of the `@intent` npm organization/scope.**
+The `intent-framework` npm organization has been created. The scope is:
 
-If `@intent` is unavailable, choose a different public scope (e.g., `@intent-framework/*`, `@intentjs/*`, or another unique name) before first release. Changing the scope after publishing is disruptive.
-
-Current package names:
-
-- `@intent/core`
-- `@intent/dom`
-- `@intent/router`
-- `@intent/testing`
-- `@intent/server`
-
-These names are descriptive and low-risk if the `@intent` scope is available. Scope availability has not been verified.
+- `@intent-framework/core`
+- `@intent-framework/dom`
+- `@intent-framework/router`
+- `@intent-framework/testing`
+- `@intent-framework/server`
 
 ## Build outputs
 
@@ -157,15 +151,15 @@ All packages expose a single entry point `"."` with three conditions:
 }
 ```
 
-This is correct for ESM-only packages. No package currently exposes sub-path exports (e.g., `@intent/core/internal`), which is fine for alpha.
+This is correct for ESM-only packages. No package currently exposes sub-path exports (e.g., `@intent-framework/core/internal`), which is fine for alpha.
 
 ## Type declarations
 
 All packages produce `dist/index.d.ts` with correct type declarations.
 
-The root `tsconfig.typecheck.json` maps `@intent/*` workspace packages to their source directories for type-checking without reading stale `dist/` output.
+The root `tsconfig.typecheck.json` maps `@intent-framework/*` workspace packages to their source directories for type-checking without reading stale `dist/` output.
 
-Package-level `tsconfig.json` files use `composite: true` (except `@intent/server`, which lacks it) and extend the root config.
+Package-level `tsconfig.json` files use `composite: true` (except `@intent-framework/server`, which lacks it) and extend the root config.
 
 ## Files included in npm packages
 
@@ -173,11 +167,11 @@ The `files` field in every package is `["dist"]`. Based on `npm pack --dry-run` 
 
 | Package | Files in tarball | Size |
 |---|---|---|
-| `@intent/core` | 13 `dist/*` files + `package.json` (14 total) | 38.5 kB unpacked |
-| `@intent/dom` | 4 `dist/*` files + `package.json` (4 total) | 10.9 kB unpacked |
-| `@intent/router` | 3 `dist/*` files + `package.json` (4 total) | 6.5 kB unpacked |
-| `@intent/testing` | 2 `dist/*` files + `package.json` (3 total) | 4.5 kB unpacked |
-| `@intent/server` | 2 `dist/*` files + `package.json` (3 total) | 4.2 kB unpacked |
+| `@intent-framework/core` | 13 `dist/*` files + `package.json` (14 total) | 38.5 kB unpacked |
+| `@intent-framework/dom` | 4 `dist/*` files + `package.json` (4 total) | 10.9 kB unpacked |
+| `@intent-framework/router` | 3 `dist/*` files + `package.json` (4 total) | 6.5 kB unpacked |
+| `@intent-framework/testing` | 2 `dist/*` files + `package.json` (3 total) | 4.5 kB unpacked |
+| `@intent-framework/server` | 2 `dist/*` files + `package.json` (3 total) | 4.2 kB unpacked |
 
 No unnecessary files (source maps, config files, tests, node_modules) leak into the tarball. The `files` policy is correct.
 
@@ -227,7 +221,7 @@ Do not manually create GitHub Releases.
 
 ## First alpha release checklist
 
-- [ ] Confirm npm scope/package names (verify `@intent` org ownership)
+- [x] npm scope is `@intent-framework/*` — `intent-framework` org created, packages renamed
 - [ ] Reconfirm MIT is the intended public license before publishing
 - [ ] Confirm package metadata (`repository` field in all packages)
 - [ ] Confirm package exports (all point to correct `dist/` paths — already correct)
@@ -245,10 +239,9 @@ Do not manually create GitHub Releases.
 Before first alpha release, the following must be resolved:
 
 1. **Missing `repository` fields** — Recommended for npm listing and source links.
-2. **`@intent` npm scope availability** — Must be verified. If unavailable, a fallback scope must be chosen before first release.
-3. **No release workflow** — Changesets and a GitHub Action must be added before publishing.
-4. **Server package is very early** — `@intent/server` has global registries and minimal API surface. Consider whether to publish it or mark it as private until more mature.
-5. **Version is `0.1.0` across all packages** — Consistent, but no pre-release tag (e.g., `0.1.0-alpha.0`) for the first publish.
+2. **No release workflow** — Changesets and a GitHub Action must be added before publishing.
+3. **Server package is very early** — `@intent-framework/server` has global registries and minimal API surface. Consider whether to publish it or mark it as private until more mature.
+4. **Version is `0.1.0` across all packages** — Consistent, but no pre-release tag (e.g., `0.1.0-alpha.0`) for the first publish.
 
 ## Do not do yet
 
@@ -256,7 +249,7 @@ Before first alpha release, the following must be resolved:
 - Do not create a GitHub Release.
 - Do not add Changesets yet — wait until the audit blockers are resolved.
 - Do not add a release GitHub Action yet.
-- Do not change package names, versions, or public APIs.
+- Do not change versions or public APIs.
 - Do not add new dependencies unless required for a specific task.
 
 ## Pack check command

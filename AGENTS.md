@@ -91,22 +91,22 @@ If implementation and docs disagree:
 The current MVP focuses on:
 
 ```txt
-@intent/core
-@intent/dom
-@intent/testing
-@intent/server
-@intent/router
+@intent-framework/core
+@intent-framework/dom
+@intent-framework/testing
+@intent-framework/server
+@intent-framework/router
 examples/web-basic
 ```
 
 Do not start these without explicit user direction:
 
 ```txt
-@intent/devtools
-@intent/openapi
-@intent/realtime
-@intent/react-native
-@intent/compiler
+@intent-framework/devtools
+@intent-framework/openapi
+@intent-framework/realtime
+@intent-framework/react-native
+@intent-framework/compiler
 complex SSR
 complex server adapters
 visual editor
@@ -123,7 +123,7 @@ Build the dagger before the cathedral.
 
 ### Core
 
-`@intent/core` must stay semantic and platformless.
+`@intent-framework/core` must stay semantic and platformless.
 
 It must not depend on:
 
@@ -171,11 +171,11 @@ React component
 
 ### DOM
 
-`@intent/dom` may depend on:
+`@intent-framework/dom` may depend on:
 
 ```txt
-@intent/core
-@intent/router
+@intent-framework/core
+@intent-framework/router
 ```
 
 It must not depend on React.
@@ -195,10 +195,10 @@ Browser DevTools should show real, inspectable DOM.
 
 ### Router
 
-`@intent/router` may depend on:
+`@intent-framework/router` may depend on:
 
 ```txt
-@intent/core
+@intent-framework/core
 ```
 
 It must preserve typed route params and service typing.
@@ -207,10 +207,10 @@ Do not make core depend on router.
 
 ### Server
 
-`@intent/server` may depend on:
+`@intent-framework/server` may depend on:
 
 ```txt
-@intent/core
+@intent-framework/core
 ```
 
 Prefer Web API concepts:

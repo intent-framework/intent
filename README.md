@@ -65,7 +65,7 @@ The renderer then materializes that graph.
 ## Tiny example
 
 ```ts
-import { screen, state } from "@intent/core"
+import { screen, state } from "@intent-framework/core"
 
 export const InviteScreen = screen("Invite", $ => {
   const email = $.state.text("email")
@@ -159,11 +159,11 @@ This repository currently contains:
 
 | Package           | Purpose                                 |
 | ----------------- | --------------------------------------- |
-| `@intent/core`    | Platformless semantic graph and runtime |
-| `@intent/dom`     | DOM materializer for screens and router |
-| `@intent/router`  | Typed route definitions and navigation  |
-| `@intent/testing` | Semantic test harness                   |
-| `@intent/server`  | Early server-side package               |
+| `@intent-framework/core`    | Platformless semantic graph and runtime |
+| `@intent-framework/dom`     | DOM materializer for screens and router |
+| `@intent-framework/router`  | Typed route definitions and navigation  |
+| `@intent-framework/testing` | Semantic test harness                   |
+| `@intent-framework/server`  | Early server-side package               |
 
 The core package must remain platformless. It should not import DOM, React, router internals, server framework code, or native APIs.
 

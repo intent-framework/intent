@@ -11,9 +11,9 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@intent/core": "workspace:*",
-    "@intent/dom": "workspace:*",
-    "@intent/router": "workspace:*"
+    "@intent-framework/core": "workspace:*",
+    "@intent-framework/dom": "workspace:*",
+    "@intent-framework/router": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

@@ -1,5 +1,8 @@
 {
-  "name": "@intent/testing",
+  "name": "@intent-framework/testing",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.1.0",
   "description": "Semantic test harness for Intent screens",
   "license": "MIT",
@@ -22,7 +25,7 @@
     "lint": "tsc -b"
   },
   "dependencies": {
-    "@intent/core": "workspace:*"
+    "@intent-framework/core": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "^0.3.0",

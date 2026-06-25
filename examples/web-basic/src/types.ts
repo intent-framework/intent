@@ -1,4 +1,4 @@
-import type { RouteContext, RouterServices, RoutesFromPaths } from "@intent/router"
+import type { RouteContext, RouterServices, RoutesFromPaths } from "@intent-framework/router"
 
 export const appPaths = {
   home: "/",

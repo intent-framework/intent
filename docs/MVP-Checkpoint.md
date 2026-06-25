@@ -54,11 +54,11 @@ It now has:
 
 ## Implemented packages
 
-- `@intent/core` — semantic graph and runtime ([packages/core](../packages/core))
-- `@intent/dom` — DOM materializer ([packages/dom](../packages/dom))
-- `@intent/router` — typed route definitions ([packages/router](../packages/router))
-- `@intent/testing` — semantic test harness ([packages/testing](../packages/testing))
-- `@intent/server` — early server package ([packages/server](../packages/server))
+- `@intent-framework/core` — semantic graph and runtime ([packages/core](../packages/core))
+- `@intent-framework/dom` — DOM materializer ([packages/dom](../packages/dom))
+- `@intent-framework/router` — typed route definitions ([packages/router](../packages/router))
+- `@intent-framework/testing` — semantic test harness ([packages/testing](../packages/testing))
+- `@intent-framework/server` — early server package ([packages/server](../packages/server))
 
 ## Implemented primitives
 
@@ -83,7 +83,7 @@ Demo limitations: manual DOM side panels, `MutationObserver`-driven diagnostics 
 
 - CI runs clean-dist validation on every PR and push to `main`.
 - Validation: `rm -rf packages/*/dist examples/*/dist` then `pnpm test && pnpm typecheck && pnpm build && pnpm lint`.
-- Tests assert semantic behavior via `@intent/testing` and core inspection APIs.
+- Tests assert semantic behavior via `@intent-framework/testing` and core inspection APIs.
 
 ## Architectural boundaries
 

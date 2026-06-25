@@ -1,4 +1,4 @@
-import { inspectScreen, type ScreenDefinition } from "@intent/core"
+import { inspectScreen, type ScreenDefinition } from "@intent-framework/core"
 import type { AppServices } from "./types.js"
 import { teams, teamVersions } from "./data.js"
 

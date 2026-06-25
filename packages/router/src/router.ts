@@ -1,4 +1,4 @@
-import type { ScreenDefinition, DefaultScreenServices } from "@intent/core"
+import type { ScreenDefinition, DefaultScreenServices } from "@intent-framework/core"
 
 export type RouteDefinition<TServices extends object = DefaultScreenServices> = {
   name: string

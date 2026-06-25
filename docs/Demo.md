@@ -144,11 +144,11 @@ Key patterns:
 See the MVP scope in `AGENTS.md`. The following are explicitly out of scope for
 the current MVP:
 
-- `@intent/devtools` — no DevTools extension or debugger UI
-- `@intent/openapi` — no OpenAPI contract generation
-- `@intent/realtime` — no WebSocket or SSE subscriptions
-- `@intent/react-native` — no native renderer
-- `@intent/compiler` — no build-time graph analysis
+- `@intent-framework/devtools` — no DevTools extension or debugger UI
+- `@intent-framework/openapi` — no OpenAPI contract generation
+- `@intent-framework/realtime` — no WebSocket or SSE subscriptions
+- `@intent-framework/react-native` — no native renderer
+- `@intent-framework/compiler` — no build-time graph analysis
 - Complex SSR, streaming hydration, or edge adapters
 - Visual editor or AI assistant
 - Design system or CSS framework integration

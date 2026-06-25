@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
-import { screen } from "@intent/core"
-import { createRouter } from "@intent/router"
-import type { RouterServices, RoutesFromPaths, RouteContext } from "@intent/router"
+import { screen } from "@intent-framework/core"
+import { createRouter } from "@intent-framework/router"
+import type { RouterServices, RoutesFromPaths, RouteContext } from "@intent-framework/router"
 import { renderRouter, renderDom } from "./index.js"
 
 function createMockWindow(location: string = "/") {
