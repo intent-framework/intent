@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "lib": ["ES2022", "DOM"],
+    "paths": {
+      "@intent/core": ["packages/core/src/index.ts"],
+      "@intent/dom": ["packages/dom/src/index.ts"],
+      "@intent/testing": ["packages/testing/src/index.ts"],
+      "@intent/server": ["packages/server/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/*.config.ts",
+    "examples/*/src/**/*.ts",
+    "examples/*/*.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "packages/*/dist",
+    "examples/*/dist"
+  ]
+}
