@@ -1,9 +1,9 @@
-import type { ScreenDefinition } from "@intent/core"
+import type { ScreenDefinition, DefaultScreenServices } from "@intent/core"
 
-export type RouteDefinition = {
+export type RouteDefinition<TServices extends object = DefaultScreenServices> = {
   name: string
   path: string
-  screen: ScreenDefinition
+  screen: ScreenDefinition<TServices>
 }
 
 export type RouteParamNames<Path extends string> =
@@ -25,20 +25,23 @@ export type RoutePathArgs<Path extends string> =
     ? []
     : [params: RouteParams<Path>]
 
-export type RouteMatch<Routes extends Record<string, { path: string }> = Record<string, { path: string }>> =
+export type RouteMatch<
+  Routes extends Record<string, { path: string }> = Record<string, { path: string }>,
+  TServices extends object = DefaultScreenServices
+> =
   | {
       found: true
       name: keyof Routes
       path: string
       params: Record<string, string>
-      screen: ScreenDefinition
+      screen: ScreenDefinition<TServices>
     }
   | {
       found: false
       pathname: string
     }
 
-type InternalRoute = RouteDefinition & {
+type InternalRoute<TServices extends object = DefaultScreenServices> = RouteDefinition<TServices> & {
   pattern: RegExp
   paramNames: string[]
 }
@@ -68,34 +71,37 @@ function compilePattern(path: string): { pattern: RegExp; paramNames: string[] }
   return { pattern, paramNames }
 }
 
-export type Router<Routes extends Record<string, { path: string }>> = {
+export type Router<
+  Routes extends Record<string, { path: string }> = {},
+  TServices extends object = DefaultScreenServices
+> = {
   route<Name extends string, Path extends string>(
     name: Name,
     path: Path,
-    screen: ScreenDefinition,
-  ): Router<Routes & Record<Name, { path: Path }>>
+    screen: ScreenDefinition<TServices>,
+  ): Router<Routes & Record<Name, { path: Path }>, TServices>
 
-  match(pathname: string): RouteMatch<Routes>
+  match(pathname: string): RouteMatch<Routes, TServices>
 
   path<Name extends Extract<keyof Routes, string>>(
     name: Name,
     ...args: RoutePathArgs<Routes[Name]["path"]>
   ): string
 
-  routes(): RouteDefinition[]
+  routes(): RouteDefinition<TServices>[]
 }
 
-export function createRouter(): Router<{}> {
+export function createRouter<TServices extends object = DefaultScreenServices>(): Router<{}, TServices> {
   const build = <Routes extends Record<string, { path: string }>>(
-    currentRoutes: InternalRoute[],
-    currentByName: Map<string, InternalRoute>,
+    currentRoutes: InternalRoute<TServices>[],
+    currentByName: Map<string, InternalRoute<TServices>>,
     currentByPath: Map<string, true>,
-  ): Router<Routes> => {
-    const router: Router<Routes> = {
+  ): Router<Routes, TServices> => {
+    const router: Router<Routes, TServices> = {
       route<Name extends string, Path extends string>(
         name: Name,
         path: Path,
-        screen: ScreenDefinition,
+        screen: ScreenDefinition<TServices>,
       ) {
         if (currentByName.has(name)) {
           throw new Error(`Route name "${name}" is already registered.`)
@@ -105,7 +111,7 @@ export function createRouter(): Router<{}> {
           throw new Error(`Route path "${normalized}" is already registered.`)
         }
         const { pattern, paramNames } = compilePattern(normalized)
-        const route: InternalRoute = { name, path: normalized, pattern, paramNames, screen }
+        const route: InternalRoute<TServices> = { name, path: normalized, pattern, paramNames, screen }
         const newByName = new Map(currentByName).set(name, route)
         const newByPath = new Map(currentByPath).set(normalized, true)
         const newRoutes = [...currentRoutes, route]

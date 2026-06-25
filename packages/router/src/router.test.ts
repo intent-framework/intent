@@ -383,3 +383,88 @@ describe("type-safe path params", () => {
     }
   })
 })
+
+describe("generic services", () => {
+  it("createRouter<AppServices>() accepts ScreenDefinition<AppServices>", () => {
+    type AppServices = {
+      analytics: { track(event: "home_clicked"): void }
+    }
+
+    const Screen = screen<AppServices>("Screen", $ => {
+      $.act("Track")
+        .does(({ analytics }) => {
+          analytics.track("home_clicked")
+          // @ts-expect-error wrong event
+          analytics.track("wrong")
+        })
+      $.surface("main").contains()
+    })
+
+    const router = createRouter<AppServices>()
+      .route("screen", "/", Screen)
+
+    expect(router.routes()).toHaveLength(1)
+    if (router.routes()[0]) {
+      expect(router.routes()[0]!.name).toBe("screen")
+    }
+  })
+
+  it("rejects a screen with incompatible required services", () => {
+    type ServicesA = {
+      analytics: { track(event: "a"): void }
+    }
+
+    type ServicesB = {
+      flags: { enabled(name: string): boolean }
+    }
+
+    const ScreenA = screen<ServicesA>("A", $ => {
+      $.surface("main")
+    })
+
+    // @ts-expect-error screen services do not match router services
+    createRouter<ServicesB>().route("a", "/", ScreenA)
+  })
+
+  it("router.match() returns a screen typed with AppServices", () => {
+    type AppServices = {
+      analytics: { track(event: string): void }
+    }
+
+    const Screen = screen<AppServices>("Screen", $ => {
+      $.act("Go").does(({ analytics }) => {
+        analytics.track("test")
+      })
+      $.surface("main").contains()
+    })
+
+    const router = createRouter<AppServices>()
+      .route("screen", "/", Screen)
+
+    const match = router.match("/")
+    expect(match.found).toBe(true)
+    if (match.found) {
+      expect(match.screen.acts[0]).toBeDefined()
+    }
+  })
+
+  it("existing typed path tests still work", () => {
+    const router = createRouter()
+      .route("home", "/", screen("Home", () => {}))
+      .route("user", "/users/:userId", screen("User", () => {}))
+
+    expect(router.path("home")).toBe("/")
+    expect(router.path("user", { userId: "abc" })).toBe("/users/abc")
+  })
+
+  it("default-service usage still works without generics", () => {
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+      .route("login", "/login", LoginScreen)
+
+    const match = router.match("/home")
+    expect(match.found).toBe(false)
+
+    expect(router.match("/").found).toBe(true)
+  })
+})

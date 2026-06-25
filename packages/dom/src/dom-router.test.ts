@@ -448,4 +448,126 @@ describe("renderRouter", () => {
 
     cleanup()
   })
+
+  it("renderRouter passes custom services into action handlers", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/")
+
+    type AppServices = {
+      analytics: { track(event: string): void }
+      navigate?: (name: string, params?: Record<string, string>) => void
+    }
+
+    const track = vi.fn()
+
+    const CustomScreen = screen<AppServices>("CustomScreen", $ => {
+      $.act("Do it")
+        .primary()
+        .when(true)
+        .does(({ analytics }) => {
+          analytics.track("routed_action")
+        })
+      $.surface("main").contains()
+    })
+
+    const router = createRouter<AppServices>()
+      .route("home", "/", CustomScreen)
+
+    const root = document.getElementById("root")!
+    renderRouter(router, {
+      target: root,
+      window: win,
+      services: { analytics: { track } },
+    })
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(track).toHaveBeenCalledWith("routed_action")
+  })
+
+  it("renderRouter passes custom services into notFound screen", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/unknown")
+
+    type AppServices = {
+      analytics: { track(event: string): void }
+      navigate?: (name: string, params?: Record<string, string>) => void
+    }
+
+    const track = vi.fn()
+
+    const NotFoundScr = screen<AppServices>("NotFound", $ => {
+      $.act("Not found action")
+        .primary()
+        .when(true)
+        .does(({ analytics }) => {
+          analytics.track("not_found")
+        })
+      $.surface("main").contains()
+    })
+
+    const router = createRouter<AppServices>()
+      .route("home", "/", NotFoundScr)
+
+    const root = document.getElementById("root")!
+    renderRouter(router, {
+      target: root,
+      window: win,
+      notFound: NotFoundScr,
+      services: { analytics: { track } },
+    })
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(track).toHaveBeenCalledWith("not_found")
+  })
+
+  it("renderRouter injects navigate into custom services", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/")
+
+    type AppServices = {
+      analytics: { track(event: string): void }
+      navigate?: (name: string, params?: Record<string, string>) => void
+    }
+
+    const track = vi.fn()
+
+    const ScreenWithNav = screen<AppServices>("Home", $ => {
+      $.act("Go to login")
+        .primary()
+        .when(true)
+        .does(({ navigate, analytics }) => {
+          analytics.track("navigated")
+          navigate?.("login")
+        })
+      $.surface("main").contains()
+    })
+
+    const router = createRouter<AppServices>()
+      .route("home", "/", ScreenWithNav)
+      .route("login", "/login", screen<AppServices>("Login", $ => {
+        $.act("Login action").primary()
+        $.surface("main").contains()
+      }))
+
+    const root = document.getElementById("root")!
+    renderRouter(router, {
+      target: root,
+      window: win,
+      services: { analytics: { track } },
+    })
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(track).toHaveBeenCalledWith("navigated")
+    expect(root.querySelector("button")?.textContent).toBe("Login action")
+    expect(win._getPathname()).toBe("/login")
+  })
 })

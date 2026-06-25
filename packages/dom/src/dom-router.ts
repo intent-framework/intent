@@ -12,15 +12,19 @@ export type RouterDomHandle<Routes extends Record<string, { path: string }>> = {
   dispose(): void
 }
 
-export type RenderRouterOptions = {
+export type RenderRouterOptions<TServices extends object = DefaultScreenServices> = {
   target: HTMLElement
   window?: Window
-  notFound?: ScreenDefinition | ((pathname: string) => ScreenDefinition)
+  notFound?: ScreenDefinition<TServices> | ((pathname: string) => ScreenDefinition<TServices>)
+  services?: Omit<TServices, "navigate">
 }
 
-export function renderRouter<Routes extends Record<string, { path: string }>>(
-  router: Router<Routes>,
-  options: RenderRouterOptions,
+export function renderRouter<
+  Routes extends Record<string, { path: string }>,
+  TServices extends object = DefaultScreenServices
+>(
+  router: Router<Routes, TServices>,
+  options: RenderRouterOptions<TServices>,
 ): RouterDomHandle<Routes> {
   const win = options.window ?? window
   let currentCleanup: (() => void) | undefined
@@ -39,11 +43,15 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
     const match = router.match(pathname)
 
     const navigateService: NavigationService = internalNavigate
+    const mergedServices = {
+      ...options.services,
+      navigate: navigateService,
+    } as TServices
 
     if (match.found) {
-      currentCleanup = renderDom<DefaultScreenServices>(match.screen as ScreenDefinition<DefaultScreenServices>, {
+      currentCleanup = renderDom<TServices>(match.screen as ScreenDefinition<TServices>, {
         target: options.target,
-        services: { navigate: navigateService },
+        services: mergedServices,
       })
       return
     }
@@ -52,9 +60,9 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
       const screen = typeof options.notFound === "function"
         ? options.notFound(pathname)
         : options.notFound
-      currentCleanup = renderDom<DefaultScreenServices>(screen as ScreenDefinition<DefaultScreenServices>, {
+      currentCleanup = renderDom<TServices>(screen as ScreenDefinition<TServices>, {
         target: options.target,
-        services: { navigate: navigateService },
+        services: mergedServices,
       })
     } else {
       options.target.textContent = "Not found"
