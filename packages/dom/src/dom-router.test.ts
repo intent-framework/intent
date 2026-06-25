@@ -1165,4 +1165,241 @@ describe("renderRouter", () => {
       expect(resource.status).toBe("ready")
     })
   })
+
+  describe("runtime resource isolation across navigation", () => {
+    const appPathsRW = {
+      "team.details": "/teams/:teamId",
+    } as const
+
+    type AppRoutesRW = RoutesFromPaths<typeof appPathsRW>
+    type AppServicesRW = RouterServices<AppRoutesRW, {
+      route: RouteContext<AppRoutesRW>
+    }>
+
+    it("shared screen definition with /teams/:teamId loads team_1 then team_2 after navigation", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1")
+
+      const calls: string[] = []
+
+      const TeamScreen = screen<AppServicesRW>("Team", $ => {
+        $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name !== "team.details") throw new Error("wrong route")
+            calls.push(route.params.teamId)
+            return { id: route.params.teamId }
+          },
+        })
+        $.act("View").primary().when(true).does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServicesRW>()
+        .route("team.details", "/teams/:teamId", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win })
+
+      const ref = TeamScreen.resourceConfigs[0]!.ref!
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(calls).toEqual(["team_1"])
+      expect(ref.value).toEqual({ id: "team_1" })
+
+      app.navigate("team.details", { teamId: "team_2" })
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(calls).toEqual(["team_1", "team_2"])
+      expect(ref.value).toEqual({ id: "team_2" })
+    })
+
+    it("second runtime resource instance has its own value and status", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1")
+
+      const calls: string[] = []
+
+      const TeamScreen = screen<AppServicesRW>("Team", $ => {
+        $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name !== "team.details") throw new Error("wrong route")
+            calls.push(route.params.teamId)
+            return { id: route.params.teamId }
+          },
+        })
+        $.act("View").primary().when(true).does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServicesRW>()
+        .route("team.details", "/teams/:teamId", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win })
+
+      const ref = TeamScreen.resourceConfigs[0]!.ref!
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(calls).toEqual(["team_1"])
+      expect(ref.value).toEqual({ id: "team_1" })
+      expect(ref.status).toBe("ready")
+
+      app.navigate("team.details", { teamId: "team_2" })
+      await new Promise(r => setTimeout(r, 50))
+
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(ref.value).toEqual({ id: "team_2" })
+      expect(ref.status).toBe("ready")
+
+      app.dispose()
+
+      expect(ref.status).toBe("idle")
+      expect(ref.value).toBeUndefined()
+    })
+
+    it("pending first load cannot overwrite second runtime's resource state after navigation", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1")
+
+      let resolveFirst!: () => void
+      const firstBlocker = new Promise<void>(resolve => { resolveFirst = resolve })
+
+      const calls: string[] = []
+
+      const TeamScreen = screen<AppServicesRW>("Team", $ => {
+        $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name !== "team.details") throw new Error("wrong route")
+            calls.push(route.params.teamId)
+            if (route.params.teamId === "team_1") {
+              await firstBlocker
+            }
+            return { id: route.params.teamId }
+          },
+        })
+        $.act("View").primary().when(true).does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServicesRW>()
+        .route("team.details", "/teams/:teamId", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win })
+
+      await new Promise(r => setTimeout(r, 10))
+
+      const ref = TeamScreen.resourceConfigs[0]!.ref!
+      expect(ref.status).toBe("pending")
+
+      app.navigate("team.details", { teamId: "team_2" })
+      await new Promise(r => setTimeout(r, 10))
+
+      resolveFirst()
+      await new Promise(r => setTimeout(r, 10))
+
+      if (ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(calls).toEqual(["team_1", "team_2"])
+      expect(ref.value).toEqual({ id: "team_2" })
+      expect(ref.status).toBe("ready")
+    })
+
+    it("navigating away disconnects old ref without disconnecting new runtime's ref", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1")
+
+      const calls: string[] = []
+
+      const TeamScreen = screen<AppServicesRW>("Team", $ => {
+        $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name !== "team.details") throw new Error("wrong route")
+            calls.push(route.params.teamId)
+            return { id: route.params.teamId }
+          },
+        })
+        $.act("View").primary().when(true).does(() => {})
+        $.surface("main").contains()
+      })
+
+      const ref = TeamScreen.resourceConfigs[0]!.ref!
+
+      const router = createRouter<AppServicesRW>()
+        .route("team.details", "/teams/:teamId", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win })
+
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(ref.value).toEqual({ id: "team_1" })
+
+      app.navigate("team.details", { teamId: "team_2" })
+
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(ref.value).toEqual({ id: "team_2" })
+
+      app.dispose()
+
+      expect(ref.status).toBe("idle")
+      expect(ref.value).toBeUndefined()
+    })
+  })
 })
