@@ -1,8 +1,6 @@
 {
   "name": "@intent-framework/server",
-  "publishConfig": {
-    "access": "public"
-  },
+  "private": true,
   "version": "0.1.0",
   "description": "Early server-side package for Intent",
   "license": "MIT",

@@ -6,9 +6,11 @@ Intent is in early experimental development. No packages have been published to 
 
 The repository has five workspace packages under `packages/*`, all at version `0.1.0`, all using `workspace:*` dependency references. The codebase is functional and validated by CI, but several metadata and workflow steps are missing before a first alpha release.
 
+Four packages are intended for first-alpha publishing. `packages/server` is a private workspace package for now.
+
 ## Intended publishable packages
 
-All five packages under `packages/*` are intended to be published:
+The first alpha will publish four packages:
 
 | Package | npm name | Purpose |
 |---|---|---|
@@ -16,7 +18,8 @@ All five packages under `packages/*` are intended to be published:
 | `packages/dom` | `@intent-framework/dom` | DOM materializer for screens and router |
 | `packages/router` | `@intent-framework/router` | Typed route definitions and navigation |
 | `packages/testing` | `@intent-framework/testing` | Semantic test harness |
-| `packages/server` | `@intent-framework/server` | Early server-side package |
+
+`packages/server` remains a private workspace package until the server API matures.
 
 Packages under `examples/` (e.g., `web-basic`) are private and must not be published.
 
@@ -103,11 +106,12 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `repository` | Present | Points to `intent-framework/intent` (`packages/server`) |
 | `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
+| Publish? | No, private for first alpha | `"private": true` set; `publishConfig` removed |
 | Note | Early stage | Server package has global registries and basic action/resource/policy types. Not yet production-ready. |
 
 ## Package naming
 
-All five packages use the `@intent-framework/*` npm scope.
+All packages use the `@intent-framework/*` npm scope.
 
 The `intent-framework` npm organization has been created. The scope is:
 
@@ -115,7 +119,7 @@ The `intent-framework` npm organization has been created. The scope is:
 - `@intent-framework/dom`
 - `@intent-framework/router`
 - `@intent-framework/testing`
-- `@intent-framework/server`
+- `@intent-framework/server` (private workspace package for first alpha)
 
 ## Build outputs
 
@@ -163,7 +167,7 @@ Package-level `tsconfig.json` files use `composite: true` (except `@intent-frame
 
 ## Files included in npm packages
 
-The `files` field in every package is `["dist"]`. Based on `npm pack --dry-run` output:
+The `files` field in every package is `["dist"]`. Based on `npm pack --dry-run` output (pack:check now checks only publishable packages):
 
 | Package | Files in tarball | Size |
 |---|---|---|
@@ -171,7 +175,7 @@ The `files` field in every package is `["dist"]`. Based on `npm pack --dry-run` 
 | `@intent-framework/dom` | 4 `dist/*` files + `package.json` (4 total) | 10.9 kB unpacked |
 | `@intent-framework/router` | 3 `dist/*` files + `package.json` (4 total) | 6.5 kB unpacked |
 | `@intent-framework/testing` | 2 `dist/*` files + `package.json` (3 total) | 4.5 kB unpacked |
-| `@intent-framework/server` | 2 `dist/*` files + `package.json` (3 total) | 4.2 kB unpacked |
+| `@intent-framework/server` | 2 `dist/*` files + `package.json` (3 total) | 4.2 kB unpacked — not checked by pack:check since it is private |
 
 No unnecessary files (source maps, config files, tests, node_modules) leak into the tarball. The `files` policy is correct.
 
@@ -224,6 +228,7 @@ Do not manually create GitHub Releases.
 - [x] npm scope is `@intent-framework/*` — `intent-framework` org created, packages renamed
 - [ ] Reconfirm MIT is the intended public license before publishing
 - [x] Confirm package metadata (`repository` field in all packages)
+- [x] Server is private — not a publishing blocker
 - [ ] Confirm package exports (all point to correct `dist/` paths — already correct)
 - [ ] Confirm package files (`files: ["dist"]` — already correct)
 - [ ] Confirm declaration files (`dist/index.d.ts` exists — already correct)
@@ -238,7 +243,12 @@ Do not manually create GitHub Releases.
 
 - repository fields are present
 - GitHub repository home is https://github.com/intent-framework/intent
-- remaining blockers are release workflow, server maturity, alpha prerelease versioning, and human confirmation of MIT license if still listed
+- remaining first-alpha blockers: release workflow not yet added, alpha prerelease versioning not configured, and human confirmation that MIT is the intended public license
+
+## Future server-package decisions
+
+- Server maturity is no longer a first-alpha publishing blocker because server is private
+- When the server API matures, the package can be made public and published as a separate decision
 
 ## Do not do yet
 
@@ -251,10 +261,10 @@ Do not manually create GitHub Releases.
 
 ## Pack check command
 
-This PR adds a root pack-check command:
+The root `pack:check` command:
 
 ```sh
 pnpm pack:check
 ```
 
-It dry-runs `npm pack` for all five workspace packages after build. It does not publish, does not require network access, and does not create committed tarballs.
+dry-runs `npm pack` for the four publishable workspace packages (core, dom, router, testing). It excludes the private `@intent-framework/server` package. It does not publish, does not require network access, and does not create committed tarballs.
