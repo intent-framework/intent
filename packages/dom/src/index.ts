@@ -5,6 +5,14 @@ function getReasonId(actId: string): string {
   return `${actId}-reason`
 }
 
+function getEnterHintId(askId: string): string {
+  return `${askId}-enter-hint`
+}
+
+function sanitizeLabel(label: string): string {
+  return label.replace(/\.+$/, "")
+}
+
 function findDefaultAction<TServices extends object = DefaultScreenServices>(
   acts: ActNode<TServices>[]
 ): ActNode<TServices> | undefined {
@@ -90,6 +98,40 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
     }
   }
 
+  // Reactive hint for Enter key default action
+  const defaultActionForHint = findDefaultAction(screenDef.acts)
+  if (defaultActionForHint) {
+    const unsub = defaultActionForHint.enabled.subscribe(() => {
+      const isEnabled = defaultActionForHint.enabled.current
+      for (const ask of screenDef.asks) {
+        const input = form.querySelector(`#${ask.id}`) as HTMLElement | null
+        const hint = form.querySelector(`#${getEnterHintId(ask.id)}`) as HTMLElement | null
+        if (input && hint) {
+          const hintId = getEnterHintId(ask.id)
+          if (isEnabled) {
+            hint.style.display = ""
+            const existing = input.getAttribute("aria-describedby") || ""
+            const ids = existing.split(/\s+/).filter(Boolean)
+            if (!ids.includes(hintId)) {
+              ids.push(hintId)
+            }
+            input.setAttribute("aria-describedby", ids.join(" "))
+          } else {
+            hint.style.display = "none"
+            const existing = input.getAttribute("aria-describedby") || ""
+            const ids = existing.split(/\s+/).filter(Boolean).filter(id => id !== hintId)
+            if (ids.length > 0) {
+              input.setAttribute("aria-describedby", ids.join(" "))
+            } else {
+              input.removeAttribute("aria-describedby")
+            }
+          }
+        }
+      }
+    })
+    unsubscribers.push(unsub)
+  }
+
   // Enter key in an ask input triggers the default action
   for (const ask of screenDef.asks) {
     const input = form.querySelector(`#${ask.id}`) as HTMLElement | null
@@ -166,6 +208,27 @@ function buildDom<TServices extends object = DefaultScreenServices>(screenDef: S
       hint.id = `${ask.id}-hint`
       hint.textContent = ask.hintText
       container.appendChild(hint)
+    }
+
+    const defaultAction = findDefaultAction(screenDef.acts)
+    if (defaultAction) {
+      const hintId = getEnterHintId(ask.id)
+      const hint = document.createElement("p")
+      hint.id = hintId
+      hint.textContent = `Press Enter to ${sanitizeLabel(defaultAction.label)}.`
+      if (!defaultAction.enabled.current) {
+        hint.style.display = "none"
+      }
+      container.appendChild(hint)
+
+      if (defaultAction.enabled.current) {
+        const existing = input.getAttribute("aria-describedby")
+        if (existing) {
+          input.setAttribute("aria-describedby", `${existing} ${hintId}`)
+        } else {
+          input.setAttribute("aria-describedby", hintId)
+        }
+      }
     }
 
     form.appendChild(container)

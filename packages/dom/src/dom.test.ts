@@ -1147,5 +1147,240 @@ describe("DOM renderer", () => {
       expect(refreshed).toBe(true)
       expect(invited).toBe(false)
     })
+
+    describe("Enter key action hint", () => {
+      it("adds hint when there is exactly one primary action", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintSinglePrimary", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Submit")
+            .primary()
+            .when(true)
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const hint = document.getElementById("ask_name-enter-hint")
+        expect(hint).not.toBeNull()
+        expect(hint!.textContent).toBe("Press Enter to Submit.")
+        expect(hint!.style.display).not.toBe("none")
+      })
+
+      it("adds hint when there is exactly one action and it is not primary", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintSingleNonPrimary", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Save")
+            .when(true)
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const hint = document.getElementById("ask_name-enter-hint")
+        expect(hint).not.toBeNull()
+        expect(hint!.textContent).toBe("Press Enter to Save.")
+        expect(hint!.style.display).not.toBe("none")
+      })
+
+      it("does not add hint when multiple actions and no clear default", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintMultipleNoDefault", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const actA = $.act("Action A")
+            .when(ask.valid)
+            .does(async () => {})
+          const actB = $.act("Action B")
+            .when(ask.valid)
+            .does(async () => {})
+          $.surface("main").contains(ask, actA, actB)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const hint = document.getElementById("ask_name-enter-hint")
+        expect(hint).toBeNull()
+      })
+
+      it("does not add hint when multiple primary actions exist", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintMultiplePrimary", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const actA = $.act("Action A")
+            .primary()
+            .when(ask.valid)
+            .does(async () => {})
+          const actB = $.act("Action B")
+            .primary()
+            .when(ask.valid)
+            .does(async () => {})
+          $.surface("main").contains(ask, actA, actB)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const hint = document.getElementById("ask_name-enter-hint")
+        expect(hint).toBeNull()
+      })
+
+      it("hides hint when default action is blocked", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintBlocked", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Submit")
+            .primary()
+            .when(ask.valid, "Name is required.")
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const hint = document.getElementById("ask_name-enter-hint")
+        expect(hint).not.toBeNull()
+        expect(hint!.style.display).toBe("none")
+      })
+
+      it("includes hint id in aria-describedby on input", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintAriaDescribedby", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Submit")
+            .primary()
+            .when(true)
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const input = root.querySelector("input")!
+        const describedby = input.getAttribute("aria-describedby")!
+        expect(describedby).toContain("ask_name-enter-hint")
+      })
+
+      it("does not include hint id in aria-describedby when default action is blocked", () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintBlockedNoAria", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Submit")
+            .primary()
+            .when(ask.valid, "Name is required.")
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const input = root.querySelector("input")!
+        expect(input.hasAttribute("aria-describedby")).toBe(false)
+      })
+
+      it("preserves existing aria-describedby and appends hint id on reactive update", async () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintPreserveAria", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Submit")
+            .primary()
+            .when(ask.valid, "Name is required.")
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const input = root.querySelector("input")!
+
+        // Initially blocked — no aria-describedby
+        expect(input.hasAttribute("aria-describedby")).toBe(false)
+
+        // Simulate an existing aria-describedby set by other code
+        input.setAttribute("aria-describedby", "some-other-desc")
+
+        // Fill in the input — action becomes enabled, subscription should append
+        const state = Screen.asks[0]!.state as unknown as { set: (v: string) => void }
+        state.set("Alice")
+        await new Promise(r => setTimeout(r, 10))
+
+        const describedby = input.getAttribute("aria-describedby")!
+        expect(describedby).toContain("some-other-desc")
+        expect(describedby).toContain("ask_name-enter-hint")
+
+        // Clear — action blocked again, hint should be removed but other desc preserved
+        state.set("")
+        await new Promise(r => setTimeout(r, 10))
+
+        expect(input.getAttribute("aria-describedby")).toBe("some-other-desc")
+      })
+
+      it("shows and hides hint reactively when action enabled state changes", async () => {
+        document.body.innerHTML = '<div id="root"></div>'
+
+        const Screen = screen("HintReactive", $ => {
+          const text = $.state.text("name")
+          const ask = $.ask("Name", text).required()
+          const act = $.act("Submit")
+            .primary()
+            .when(ask.valid, "Name is required.")
+            .does(async () => {})
+          $.surface("main").contains(ask, act)
+        })
+
+        const root = document.getElementById("root")!
+        renderDom(Screen, { target: root })
+
+        const input = root.querySelector("input")!
+        const hint = document.getElementById("ask_name-enter-hint")!
+
+        // Initially blocked — hint hidden, no aria-describedby
+        expect(hint.style.display).toBe("none")
+        expect(input.hasAttribute("aria-describedby")).toBe(false)
+
+        // Fill in the input — action becomes enabled
+        const state = Screen.asks[0]!.state as unknown as { set: (v: string) => void }
+        state.set("Alice")
+
+        // Wait for reactive update
+        await new Promise(r => setTimeout(r, 10))
+
+        expect(hint.style.display).not.toBe("none")
+        expect(input.getAttribute("aria-describedby")).toContain("ask_name-enter-hint")
+
+        // Clear the state — action becomes blocked again
+        state.set("")
+
+        await new Promise(r => setTimeout(r, 10))
+
+        expect(hint.style.display).toBe("none")
+        expect(input.hasAttribute("aria-describedby")).toBe(false)
+      })
+    })
   })
 })
