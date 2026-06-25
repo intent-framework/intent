@@ -2016,4 +2016,353 @@ describe("resource loader context", () => {
     expect(ready.current).toBe(false) // disconnected, back to idle/not-ready
     expect(pending.current).toBe(false)
   })
+
+  describe("resource reload from action", () => {
+    it("ResourceRef.reload() inside an action reloads the connected runtime resource", async () => {
+      let loadCount = 0
+      const TestScreen = screen("ActionReloadOne", $ => {
+        const team = $.resource("team", {
+          load: async () => {
+            loadCount++
+            return `data${loadCount}`
+          },
+          autoLoad: false,
+        })
+
+        $.act("Refresh")
+          .when(true)
+          .does(async () => {
+            await team.reload()
+          })
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      const runtime = createScreenRuntime(TestScreen)
+      await runtime.start()
+      const actNode = TestScreen.acts[0]!
+
+      // Load resource manually
+      await runtime.resources[0]!.load(runtime.getExecutionContext())
+      expect(runtime.resources[0]!.value).toBe("data1")
+      expect(loadCount).toBe(1)
+
+      // Action calls team.reload() - should reload the connected runtime resource
+      await runtime.executeAct(actNode)
+      expect(runtime.resources[0]!.value).toBe("data2")
+      expect(loadCount).toBe(2)
+    })
+
+    it("reload from action receives the same runtime services used by autoload", async () => {
+      type TestServices = { value: string }
+      let contextLog: unknown[] = []
+
+      const TestScreen = screen<TestServices>("ActionReloadContext", $ => {
+        const team = $.resource("team", {
+          load: async (context) => {
+            contextLog.push(context)
+            return "ok"
+          },
+        })
+
+        $.act("Refresh")
+          .when(true)
+          .does(async () => {
+            await team.reload()
+          })
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      const runtime = createScreenRuntime<TestServices>(TestScreen, {
+        services: { value: "runtime-svc" },
+      })
+      await runtime.start()
+      expect(contextLog).toHaveLength(1)
+      expect(contextLog[0]).toHaveProperty("value", "runtime-svc")
+
+      const actNode = TestScreen.acts[0]!
+      await runtime.executeAct(actNode)
+
+      // Reload should receive the same runtime services
+      expect(contextLog).toHaveLength(2)
+      expect(contextLog[1]).toHaveProperty("value", "runtime-svc")
+    })
+
+    it("reload from an action that provides explicit context uses that context", async () => {
+      type TestServices = { value: string }
+      let contextLog: unknown[] = []
+
+      const TestScreen = screen<TestServices>("ActionExplicitContext", $ => {
+        const team = $.resource("team", {
+          load: async (context) => {
+            contextLog.push(context)
+            return "ok"
+          },
+          autoLoad: false,
+        })
+
+        $.act("Refresh")
+          .when(true)
+          .does(async (ctx) => {
+            await team.reload(ctx)
+          })
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      const runtime = createScreenRuntime<TestServices>(TestScreen, {
+        services: { value: "initial" },
+      })
+      await runtime.start()
+
+      const actNode = TestScreen.acts[0]!
+      await runtime.executeAct(actNode)
+
+      expect(contextLog).toHaveLength(1)
+      expect(contextLog[0]).toHaveProperty("value", "initial")
+    })
+
+    it("reload after route navigation uses the new runtime's route context, not old route context", async () => {
+      type TestServices = { route: string }
+      let contextLog: unknown[] = []
+
+      const TestScreen = screen<TestServices>("NavReloadContext", $ => {
+        const team = $.resource("team", {
+          load: async (context) => {
+            contextLog.push(context)
+            return "ok"
+          },
+        })
+
+        $.act("Refresh")
+          .when(true)
+          .does(async () => {
+            await team.reload()
+          })
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      const runtimeOld = createScreenRuntime<TestServices>(TestScreen, {
+        services: { route: "/old" },
+      })
+      await runtimeOld.start()
+      expect(contextLog).toHaveLength(1)
+      expect(contextLog[0]).toHaveProperty("route", "/old")
+      runtimeOld.dispose()
+
+      const runtimeNew = createScreenRuntime<TestServices>(TestScreen, {
+        services: { route: "/new" },
+      })
+      await runtimeNew.start()
+      expect(contextLog).toHaveLength(2)
+      expect(contextLog[1]).toHaveProperty("route", "/new")
+
+      const actNode = TestScreen.acts[0]!
+      await runtimeNew.executeAct(actNode)
+
+      expect(contextLog).toHaveLength(3)
+      expect(contextLog[2]).toHaveProperty("route", "/new")
+      runtimeNew.dispose()
+    })
+
+    it("reload preserves runtime-scoped resource isolation", async () => {
+      let loadCount = 0
+
+      const TestScreen = screen("IsolatedReload", $ => {
+        $.resource("team", {
+          load: async () => {
+            loadCount++
+            return `data${loadCount}`
+          },
+          autoLoad: false,
+        })
+      })
+
+      const runtimeA = createScreenRuntime(TestScreen)
+      await runtimeA.start()
+      await runtimeA.resources[0]!.load(runtimeA.getExecutionContext())
+      expect(runtimeA.resources[0]!.value).toBe("data1")
+
+      const runtimeB = createScreenRuntime(TestScreen)
+      await runtimeB.start()
+
+      await runtimeA.resources[0]!.reload()
+      expect(runtimeA.resources[0]!.value).toBe("data2")
+
+      expect(runtimeB.resources[0]!.status).toBe("idle")
+
+      await runtimeB.resources[0]!.load(runtimeB.getExecutionContext())
+      expect(runtimeB.resources[0]!.value).toBe("data3")
+      expect(loadCount).toBe(3)
+
+      runtimeA.dispose()
+      runtimeB.dispose()
+    })
+
+    it("no-arg resource reload still works without prior context", async () => {
+      let callCount = 0
+      const resource = createResourceNode("team", "team", async () => {
+        callCount++
+        return `data${callCount}`
+      })
+
+      await resource.reload()
+      expect(callCount).toBe(1)
+      expect(resource.value).toBe("data1")
+
+      await resource.reload()
+      expect(callCount).toBe(2)
+      expect(resource.value).toBe("data2")
+    })
+
+    it("failed reload keeps existing failure behavior", async () => {
+      const resource = createResourceNode("team", "team", async () => {
+        throw new Error("Reload failed")
+      })
+
+      await resource.load()
+      expect(resource.status).toBe("failed")
+      expect(resource.error).toBeInstanceOf(Error)
+      expect((resource.error as Error).message).toBe("Reload failed")
+
+      // Reload again - same failure
+      await resource.reload()
+      expect(resource.status).toBe("failed")
+      expect(resource.error).toBeInstanceOf(Error)
+      expect((resource.error as Error).message).toBe("Reload failed")
+    })
+
+    it("existing invalidates behavior still passes", async () => {
+      const TestScreen = screen("ExistingInvalidates", $ => {
+        const team = $.resource("team", {
+          load: async () => "data",
+          autoLoad: false,
+        })
+
+        $.act("Save")
+          .when(true)
+          .does(async () => {})
+          .invalidates(team)
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      const runtime = createScreenRuntime(TestScreen)
+      await runtime.start()
+      await runtime.resources[0]!.load(runtime.getExecutionContext())
+      expect(runtime.resources[0]!.stale.current).toBe(false)
+
+      const actNode = TestScreen.acts[0]!
+      await runtime.executeAct(actNode)
+      expect(runtime.resources[0]!.stale.current).toBe(true)
+    })
+
+    it("ResourceRef.reload() returns promise and waits for loader completion", async () => {
+      let loadCount = 0
+      let resolveLoad!: () => void
+      let loaderPromise: Promise<void> | undefined
+      let loaded = false
+
+      const TestScreen = screen("ReloadAwait", $ => {
+        const team = $.resource("team", {
+          load: async () => {
+            loadCount++
+            if (loadCount === 2) {
+              loaderPromise = new Promise<void>(resolve => { resolveLoad = resolve })
+              await loaderPromise
+              loaded = true
+            }
+            return "done"
+          },
+          autoLoad: false,
+        })
+
+        $.act("Refresh")
+          .when(true)
+          .does(async () => {
+            await team.reload()
+          })
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      const runtime = createScreenRuntime(TestScreen)
+      await runtime.start()
+      await runtime.resources[0]!.load(runtime.getExecutionContext())
+      expect(loadCount).toBe(1)
+      expect(runtime.resources[0]!.value).toBe("done")
+
+      const actNode = TestScreen.acts[0]!
+      const actPromise = runtime.executeAct(actNode)
+
+      expect(loaded).toBe(false)
+
+      resolveLoad()
+      await actPromise
+      expect(loaded).toBe(true)
+      expect(loadCount).toBe(2)
+      expect(runtime.resources[0]!.value).toBe("done")
+    })
+
+    it("ResourceRef.reload() after disconnected node returns silently", async () => {
+      const ref = new (await import("./resource.js")).ResourceRef("r_team", "team", async () => "never", false)
+      expect(ref.status).toBe("idle")
+
+      await expect(ref.reload()).resolves.toBeUndefined()
+    })
+
+    it("reload works when start() is not awaited (like renderDom)", async () => {
+      let loadCount = 0
+      type S = { route: string }
+
+      const TestScreen = screen<S>("_StartNoAwait", $ => {
+        const team = $.resource("team", {
+          load: async (ctx) => {
+            loadCount++
+            return `data${loadCount}-${(ctx as S).route}`
+          },
+        })
+
+        $.act("Refresh")
+          .when(true)
+          .does(async () => {
+            await team.reload()
+          })
+
+        $.surface("main").contains(team as unknown as never)
+      })
+
+      // Simulate renderDom: don't await start
+      const services = { route: "/team/1" } as S
+      const runtime = createScreenRuntime<S>(TestScreen, { services })
+      runtime.start()  // NOT awaited
+
+      // Wait for autoload like the DOM tests do
+      const ref = TestScreen.resourceConfigs[0]!.ref!
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(loadCount).toBe(1)
+      expect(ref.status).toBe("ready")
+      expect(ref.value).toBe("data1-/team/1")
+
+      // Now call reload via executeAct
+      const actNode = TestScreen.acts[0]!
+      await runtime.executeAct(actNode)
+
+      expect(loadCount).toBe(2)
+      expect(ref.status).toBe("ready")
+      expect(ref.value).toBe("data2-/team/1")
+    })
+  })
 })
