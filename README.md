@@ -305,6 +305,8 @@ CI runs the same validation on every PR and push to `main`.
 
 ## Examples
 
+See [Demo Guide](docs/Demo.md) for a 5-minute walkthrough.
+
 ### Team Invite Demo
 
 ```sh
