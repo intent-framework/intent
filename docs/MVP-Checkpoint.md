@@ -73,7 +73,7 @@ It now has:
 
 ## Demo state
 
-The `examples/web-basic` package contains a 201-line single-file team invite demo with four screens, router, data layer, diagnostics, and DOM rendering.
+The `examples/web-basic` package contains a small team invite demo with four screens, router, data layer, diagnostics, and DOM rendering. Source is split by responsibility across `types.ts`, `data.ts`, `screens.ts`, `router.ts`, `demo-panels.ts`, and `main.ts`.
 
 Demo demonstrates: semantic screens, independent actions, router navigation, route context, runtime-scoped resources, resource reload, ask validation, blocked reasons, feedback, keyboard default action, accessible hint, screen-name headings, and graph diagnostics.
 
