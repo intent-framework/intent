@@ -1398,5 +1398,63 @@ describe("renderRouter", () => {
       expect(ref.status).toBe("idle")
       expect(ref.value).toBeUndefined()
     })
+
+    it("renderRouter action can reload a route-aware resource via ref.reload()", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1")
+
+      let loadCount = 0
+
+      const TeamScreen = screen<AppServicesRW>("Team", $ => {
+        const team = $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name !== "team.details") throw new Error("wrong route")
+            loadCount++
+            return { id: route.params.teamId, loadCount }
+          },
+        })
+
+        const refresh = $.act("Refresh")
+          .primary()
+          .when(team.ready, "Team must load.")
+          .does(async () => {
+            await team.reload()
+          })
+
+        $.surface("main").contains(refresh)
+      })
+
+      const router = createRouter<AppServicesRW>()
+        .route("team.details", "/teams/:teamId", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win })
+
+      const ref = TeamScreen.resourceConfigs[0]!.ref!
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(loadCount).toBe(1)
+      expect(ref.status).toBe("ready")
+      expect(ref.value).toEqual({ id: "team_1", loadCount: 1 })
+
+      // Click Refresh — action should reload with route context
+      ;(root.querySelector("button") as HTMLButtonElement).click()
+      await new Promise(r => setTimeout(r, 200))
+
+      expect(loadCount).toBe(2)
+      expect(ref.status).toBe("ready")
+      expect(ref.value).toEqual({ id: "team_1", loadCount: 2 })
+
+      app.dispose()
+    })
   })
 })

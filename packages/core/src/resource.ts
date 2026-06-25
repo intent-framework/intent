@@ -59,6 +59,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
   let currentValue: TValue | undefined = undefined
   let currentError: unknown = undefined
   let currentStale = false
+  let lastContext: ResourceLoadContext<TServices> | undefined = undefined
 
   const notify = () => statusSignal.set(statusSignal.get() + 1)
   const staleNotify = () => staleSignal.set(staleSignal.get() + 1)
@@ -116,10 +117,15 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     currentError = undefined
     notify()
 
+    if (context !== undefined) {
+      lastContext = context
+    }
+    const loadContext = context ?? lastContext ?? ({} as ResourceLoadContext<TServices>)
+
     try {
       const result = await Promise.resolve(
         (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(
-          context ?? ({} as ResourceLoadContext<TServices>)
+          loadContext
         )
       )
       currentValue = result

@@ -688,6 +688,62 @@ describe("DOM renderer", () => {
     expect(loadCount).toBe(1) // invalidation marks stale, does not reload
   })
 
+  it("renderDom action can reload a resource via ref.reload()", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    let loadCount = 0
+
+    const ReloadScreen = screen("Reload", $ => {
+      const team = $.resource("team", {
+        load: async () => {
+          loadCount++
+          return { id: "team_1", loadCount }
+        },
+      })
+
+      const refresh = $.act("Refresh")
+        .primary()
+        .when(team.ready, "Team must load.")
+        .does(async () => {
+          await team.reload()
+        })
+
+      $.surface("main").contains(refresh)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(ReloadScreen, { target: root })
+
+    // Wait for autoload
+    for (const config of ReloadScreen.resourceConfigs) {
+      const r = config.ref!
+      if (r.status === "idle" || r.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = r.subscribe(() => {
+            if (r.status === "ready" || r.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+    }
+
+    expect(loadCount).toBe(1)
+
+    const buttons = root.querySelectorAll("button")
+    const ref = ReloadScreen.resourceConfigs[0]!.ref!
+
+    // Click Refresh — should reload the resource via ref.reload()
+    buttons[0]!.click()
+    await new Promise(r => setTimeout(r, 50))
+
+    // Resource should have been reloaded
+    expect(loadCount).toBe(2)
+    expect(ref.status).toBe("ready")
+    expect(ref.stale.current).toBe(false)
+  })
+
   it("ask input state is available to whichever action is clicked", async () => {
     document.body.innerHTML = '<div id="root"></div>'
 
