@@ -890,6 +890,16 @@ Also run lint if configured:
 pnpm lint
 ```
 
+### Test workflow note
+
+`pnpm test` resolves workspace packages (`@intent/core`, `@intent/router`) to their source entry points via vitest `resolve.alias` in downstream packages. It does **not** require a prior `pnpm build`. This means tests always run against current source, never stale `dist/` output, and work from a clean checkout.
+
+```sh
+rm -rf packages/*/dist examples/*/dist
+pnpm test   # works without prior build
+pnpm build  # still needed for production artifacts
+```
+
 If a command fails, either fix it or clearly document the failure.
 
 Do not say “all tests pass” unless they actually pass.
