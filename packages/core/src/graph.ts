@@ -89,6 +89,35 @@ function computeDiagnostics<TServices extends object = DefaultScreenServices>(
     }
   }
 
+  const surfacedNodeIds = new Set<string>()
+  for (const surface of screenDef.surfaces) {
+    for (const item of surface.items) {
+      surfacedNodeIds.add(item.id)
+    }
+  }
+
+  for (const ask of screenDef.asks) {
+    if (!surfacedNodeIds.has(ask.id)) {
+      diagnostics.push({
+        severity: "warning",
+        code: "ask-not-in-surface",
+        message: "Ask is defined but not included in any surface.",
+        nodeId: ask.id,
+      })
+    }
+  }
+
+  for (const act of screenDef.acts) {
+    if (!surfacedNodeIds.has(act.id)) {
+      diagnostics.push({
+        severity: "warning",
+        code: "action-not-in-surface",
+        message: "Action is defined but not included in any surface.",
+        nodeId: act.id,
+      })
+    }
+  }
+
   return diagnostics
 }
 
