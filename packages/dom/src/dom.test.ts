@@ -230,10 +230,10 @@ describe("DOM renderer", () => {
     expect(output.textContent).toBe("Logged in.")
   })
 
-  it("exposes blocked reason via title attribute on initial render", () => {
+  it("exposes blocked reason via aria-describedby on initial render", () => {
     document.body.innerHTML = '<div id="root"></div>'
 
-    const LoginScreen = screen("LoginBlockedTitle", $ => {
+    const LoginScreen = screen("LoginBlockedAria", $ => {
       const email = $.state.text("email")
       const emailAsk = $.ask("Email", email).required()
       const login = $.act("Log in")
@@ -247,13 +247,17 @@ describe("DOM renderer", () => {
 
     const button = root.querySelector("button") as HTMLButtonElement
     expect(button.disabled).toBe(true)
-    expect(button.title).toBe("Enter your email.")
+    expect(button.getAttribute("aria-describedby")).toBe("act_log_in-reason")
+
+    const reasonEl = document.getElementById("act_log_in-reason")
+    expect(reasonEl).not.toBeNull()
+    expect(reasonEl!.textContent).toBe("Enter your email.")
   })
 
-  it("updates title attribute reactively when blocked reasons change", () => {
+  it("updates aria-describedby reactively when blocked reasons change", () => {
     document.body.innerHTML = '<div id="root"></div>'
 
-    const LoginScreen = screen("LoginBlockedTitleUpdate", $ => {
+    const LoginScreen = screen("LoginBlockedAriaUpdate", $ => {
       const email = $.state.text("email")
       const emailAsk = $.ask("Email", email).required()
       const login = $.act("Log in")
@@ -266,14 +270,57 @@ describe("DOM renderer", () => {
     renderDom(LoginScreen, { target: root })
 
     const button = root.querySelector("button") as HTMLButtonElement
-    expect(button.title).toBe("Enter your email.")
+    expect(button.getAttribute("aria-describedby")).toBe("act_log_in-reason")
+    expect(document.getElementById("act_log_in-reason")?.textContent).toBe("Enter your email.")
 
-    // Fill in email — act becomes enabled, title should be removed
+    // Fill in email — act becomes enabled, aria-describedby should be removed
     const emailState = LoginScreen.asks[0]!.state as unknown as { set: (v: string) => void }
     emailState.set("test@example.com")
 
     expect(button.disabled).toBe(false)
-    expect(button.title).toBe("")
+    expect(button.hasAttribute("aria-describedby")).toBe(false)
+    expect(document.getElementById("act_log_in-reason")).toBeNull()
+  })
+
+  it("updates reason text when first blocked reason changes", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const LoginScreen = screen("LoginReasonChange", $ => {
+      const email = $.state.text("email")
+      const password = $.state.text("password")
+      const emailAsk = $.ask("Email", email).required()
+      const passwordAsk = $.ask("Password", password).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+        .when(passwordAsk.valid, "Enter your password.")
+      $.surface("main").contains(emailAsk, passwordAsk, login)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(LoginScreen, { target: root })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+
+    // Initially blocked by both — first reason is email
+    expect(button.getAttribute("aria-describedby")).toBe("act_log_in-reason")
+    expect(document.getElementById("act_log_in-reason")!.textContent).toBe("Enter your email.")
+
+    // Fill in email — now blocked only by password, reason should switch
+    const emailState = LoginScreen.asks[0]!.state as unknown as { set: (v: string) => void }
+    emailState.set("test@example.com")
+
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute("aria-describedby")).toBe("act_log_in-reason")
+    expect(document.getElementById("act_log_in-reason")!.textContent).toBe("Enter your password.")
+
+    // Fill in password — now enabled
+    const passwordState = LoginScreen.asks[1]!.state as unknown as { set: (v: string) => void }
+    passwordState.set("secret123")
+
+    expect(button.disabled).toBe(false)
+    expect(button.hasAttribute("aria-describedby")).toBe(false)
+    expect(document.getElementById("act_log_in-reason")).toBeNull()
   })
 
   it("returns a cleanup function that unsubscribes listeners", () => {
