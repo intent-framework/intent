@@ -26,6 +26,7 @@ export type ActNode = {
   status: ActStatus
   statusMessage: string | null
   enabled: Condition
+  blockedReasons: string[]
   execute: () => Promise<void>
   onStatusChange: (fn: () => void) => () => void
 }
@@ -70,6 +71,12 @@ export function createActNode(
     statusMessage: null,
     get enabled(): Condition {
       return getEnabledCondition()
+    },
+    get blockedReasons(): string[] {
+      return node.conditions
+        .filter(c => !c.check())
+        .map(c => c.message)
+        .filter((m): m is string => m !== undefined)
     },
     execute: async () => {
       await executeAct(node, notifyStatus)

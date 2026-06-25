@@ -354,6 +354,63 @@ describe("act", () => {
       expect(first).toBe(second)
     })
   })
+
+  it("exposes blocked reasons from failing conditions", () => {
+    screen("BlockedReasons", $ => {
+      const email = $.state.text("email")
+      const password = $.state.text("password")
+      const emailAsk = $.ask("Email", email).required()
+      const passwordAsk = $.ask("Password", password).required()
+
+      const login = $.act("Log in")
+        .when(emailAsk.valid, "Enter your email.")
+        .when(passwordAsk.valid, "Enter your password.")
+
+      const node = login.toNode()
+
+      // Both conditions fail
+      expect(node.blockedReasons).toEqual(["Enter your email.", "Enter your password."])
+
+      // One condition passes
+      email.set("test@example.com")
+      expect(node.blockedReasons).toEqual(["Enter your password."])
+
+      // Both conditions pass
+      password.set("secret")
+      expect(node.blockedReasons).toEqual([])
+    })
+  })
+
+  it("excludes conditions without message from blocked reasons", () => {
+    screen("BlockedReasonsNoMessage", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const login = $.act("Log in")
+        .when(emailAsk.valid)
+
+      expect(login.toNode().blockedReasons).toEqual([])
+    })
+  })
+
+  it("updates blocked reasons when conditions change", () => {
+    screen("BlockedReasonsUpdate", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const login = $.act("Log in")
+        .when(emailAsk.valid, "Enter your email.")
+
+      const node = login.toNode()
+      expect(node.blockedReasons).toEqual(["Enter your email."])
+
+      email.set("a@b.com")
+      expect(node.blockedReasons).toEqual([])
+
+      email.clear()
+      expect(node.blockedReasons).toEqual(["Enter your email."])
+    })
+  })
 })
 
 describe("flow", () => {
@@ -390,5 +447,20 @@ describe("graph inspection", () => {
     expect(inspected.acts).toHaveLength(1)
     expect(inspected.surfaces).toHaveLength(1)
     expect(inspected.surfaces[0]?.itemCount).toBe(2)
+  })
+
+  it("includes blocked reasons in inspected acts", () => {
+    const EmailScreen = screen("InspectBlocked", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(EmailScreen)
+    expect(inspected.acts[0]?.enabled).toBe(false)
+    expect(inspected.acts[0]?.blockedReasons).toEqual(["Enter your email."])
   })
 })

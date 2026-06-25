@@ -230,6 +230,52 @@ describe("DOM renderer", () => {
     expect(output.textContent).toBe("Logged in.")
   })
 
+  it("exposes blocked reason via title attribute on initial render", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const LoginScreen = screen("LoginBlockedTitle", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(LoginScreen, { target: root })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.title).toBe("Enter your email.")
+  })
+
+  it("updates title attribute reactively when blocked reasons change", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const LoginScreen = screen("LoginBlockedTitleUpdate", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(LoginScreen, { target: root })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.title).toBe("Enter your email.")
+
+    // Fill in email — act becomes enabled, title should be removed
+    const emailState = LoginScreen.asks[0]!.state as unknown as { set: (v: string) => void }
+    emailState.set("test@example.com")
+
+    expect(button.disabled).toBe(false)
+    expect(button.title).toBe("")
+  })
+
   it("returns a cleanup function that unsubscribes listeners", () => {
     document.body.innerHTML = '<div id="root"></div>'
 
