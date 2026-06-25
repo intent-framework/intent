@@ -15,12 +15,15 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
 
   const unsubscribers: Array<() => void> = []
 
-  // Subscribe to state changes — re-evaluate all action buttons
-  for (const ask of screenDef.asks) {
-    const unsub = ask.subscribe(() => {
-      updateActionButtons(screenDef, form)
-    })
-    unsubscribers.push(unsub)
+  // Subscribe directly to each act's enabled Condition
+  for (const act of screenDef.acts) {
+    const button = form.querySelector(`#${act.id}`) as HTMLButtonElement | null
+    if (button) {
+      const unsub = act.enabled.subscribe(() => {
+        button.disabled = !act.enabled.current
+      })
+      unsubscribers.push(unsub)
+    }
   }
 
   // Subscribe to act status changes — update feedback output
@@ -35,7 +38,7 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
   form.addEventListener("submit", (e: Event) => {
     e.preventDefault()
     const primaryAct = screenDef.acts.find(a => a.primary)
-    if (primaryAct?.enabled) {
+    if (primaryAct?.enabled.current) {
       primaryAct.execute()
     }
   })
@@ -110,7 +113,7 @@ function buildDom(screenDef: ScreenDefinition): HTMLElement {
       button.className = "primary"
     }
 
-    if (!act.enabled) {
+    if (!act.enabled.current) {
       button.disabled = true
     }
 
@@ -125,15 +128,6 @@ function buildDom(screenDef: ScreenDefinition): HTMLElement {
   main.appendChild(form)
 
   return main
-}
-
-function updateActionButtons(screenDef: ScreenDefinition, form: HTMLElement): void {
-  for (const act of screenDef.acts) {
-    const button = form.querySelector(`#${act.id}`) as HTMLButtonElement | null
-    if (button) {
-      button.disabled = !act.enabled
-    }
-  }
 }
 
 function updateFeedback(act: ActNode, output: Element): void {

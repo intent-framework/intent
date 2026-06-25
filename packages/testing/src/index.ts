@@ -24,7 +24,7 @@ export function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenH
 
       return {
         toBeEnabled() {
-          if (!actNode.enabled) {
+          if (!actNode.enabled.current) {
             const reasons = actNode.conditions
               .filter(c => !c.check())
               .map(c => c.message || "condition not met")
@@ -34,7 +34,7 @@ export function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenH
           }
         },
         toBeBlocked() {
-          if (actNode.enabled) {
+          if (actNode.enabled.current) {
             throw new Error(`Expected act "${label}" to be blocked but it was enabled.`)
           }
         },

@@ -1,4 +1,4 @@
-import { signal, type Signal } from "./signal.js"
+import { signal, createCondition, type Signal, isCondition, type Condition } from "./signal.js"
 import { registerActNode } from "./registry.js"
 
 export type FeedbackConfig = {
@@ -12,6 +12,8 @@ export type ActStatus = "idle" | "pending" | "success" | "failure"
 export type ActCondition = {
   check: () => boolean
   message?: string
+  /** The reactive Condition source, if the condition was created from one */
+  source?: Condition
 }
 
 export type ActNode = {
@@ -23,7 +25,7 @@ export type ActNode = {
   feedback?: FeedbackConfig
   status: ActStatus
   statusMessage: string | null
-  enabled: boolean
+  enabled: Condition
   execute: () => Promise<void>
   onStatusChange: (fn: () => void) => () => void
 }
@@ -40,6 +42,23 @@ export function createActNode(
 
   const notifyStatus = () => statusSignal.set(statusSignal.get() + 1)
 
+  let _enabledCondition: Condition | undefined
+
+  function getEnabledCondition(): Condition {
+    if (!_enabledCondition) {
+      _enabledCondition = createCondition(
+        () => computeActEnabled(node),
+        notify => {
+          const unsubs = node.conditions
+            .filter(c => c.source)
+            .map(c => c.source!.subscribe(() => notify()))
+          return () => { for (const u of unsubs) u() }
+        },
+      )
+    }
+    return _enabledCondition
+  }
+
   const node: ActNode = {
     id,
     label,
@@ -49,8 +68,8 @@ export function createActNode(
     feedback,
     status: "idle",
     statusMessage: null,
-    get enabled() {
-      return computeActEnabled(node)
+    get enabled(): Condition {
+      return getEnabledCondition()
     },
     execute: async () => {
       await executeAct(node, notifyStatus)
@@ -72,7 +91,7 @@ function computeActEnabled(node: ActNode): boolean {
 }
 
 async function executeAct(node: ActNode, notify: () => void): Promise<void> {
-  if (!node.enabled || !node.handler) {
+  if (!node.enabled.current || !node.handler) {
     return
   }
 
@@ -106,23 +125,39 @@ export class ActBuilder {
     registerActNode(this.node)
   }
 
+  get enabled(): Condition {
+    return this.node.enabled
+  }
+
   primary(): this {
     this.node.primary = true
     return this
   }
 
-  when(condition: boolean | (() => boolean) | { valid: boolean }, message?: string): this {
+  when(condition: Condition | boolean | (() => boolean) | { valid?: Condition | boolean }, message?: string): this {
     let check: () => boolean
+    let source: Condition | undefined
     if (typeof condition === "function") {
       check = condition as () => boolean
     } else if (typeof condition === "object" && condition !== null && "valid" in condition) {
-      const state = condition as { valid: boolean }
-      check = () => state.valid
+      const state = condition as { valid?: Condition | boolean }
+      if (state.valid !== undefined && isCondition(state.valid)) {
+        const cond = state.valid
+        source = cond
+        check = () => cond.current
+      } else if (state.valid !== undefined) {
+        const val = state.valid as boolean
+        check = () => val
+      } else {
+        check = () => false
+      }
+    } else if (isCondition(condition)) {
+      source = condition
+      check = () => condition.current
     } else {
-      const val = condition as boolean
-      check = () => val
+      check = () => condition as boolean
     }
-    this.node.conditions.push({ check, message })
+    this.node.conditions.push({ check, message, source })
     return this
   }
 

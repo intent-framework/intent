@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { screen, inspectScreen } from "./index.js"
+import { screen, inspectScreen, isCondition } from "./index.js"
 
 async function loginUser(_params: { email: string; password: string }) {
   await Promise.resolve()
@@ -23,8 +23,8 @@ describe("screen", () => {
 
       const login = $.act("Log in")
         .primary()
-        .when(email)
-        .when(password)
+        .when(emailAsk.valid)
+        .when(passwordAsk.valid)
         .does(async () => {
           await loginUser({ email: email.value, password: password.value })
         })
@@ -55,15 +55,15 @@ describe("screen", () => {
       const email = $.state.text("email")
 
       expect(email.value).toBe("")
-      expect(email.valid).toBe(false)
+      expect(email.valid.current).toBe(false)
 
       email.set("test@example.com")
       expect(email.value).toBe("test@example.com")
-      expect(email.valid).toBe(true)
+      expect(email.valid.current).toBe(true)
 
       email.clear()
       expect(email.value).toBe("")
-      expect(email.valid).toBe(false)
+      expect(email.valid.current).toBe(false)
     })
   })
 
@@ -72,6 +72,7 @@ describe("screen", () => {
       const accepted = $.state.boolean("accepted", { initial: false })
 
       expect(accepted.value).toBe(false)
+      expect(accepted.valid.current).toBe(true)
 
       accepted.set(true)
       expect(accepted.value).toBe(true)
@@ -90,12 +91,103 @@ describe("screen", () => {
 
       expect(role.value).toBe("viewer")
       expect(role.options).toEqual(["viewer", "editor", "admin"])
-      expect(role.valid).toBe(true)
+      expect(role.valid.current).toBe(true)
 
       role.set("editor")
       expect(role.value).toBe("editor")
 
-      expect(role.valid).toBe(true)
+      expect(role.valid.current).toBe(true)
+    })
+  })
+})
+
+describe("condition", () => {
+  it("email.valid is a reactive condition", () => {
+    screen("ConditionTest", $ => {
+      const email = $.state.text("email")
+
+      expect(isCondition(email.valid)).toBe(true)
+      expect(email.valid.current).toBe(false)
+
+      email.set("a")
+      expect(email.valid.current).toBe(true)
+
+      email.clear()
+      expect(email.valid.current).toBe(false)
+    })
+  })
+
+  it("condition.current updates after state changes", () => {
+    screen("ConditionUpdate", $ => {
+      const email = $.state.text("email")
+
+      email.set("test@example.com")
+      expect(email.valid.current).toBe(true)
+
+      email.clear()
+      expect(email.valid.current).toBe(false)
+    })
+  })
+
+  it("condition.subscribe notifies on value changes", () => {
+    screen("ConditionSubscribe", $ => {
+      const email = $.state.text("email")
+      let notified = false
+
+      const unsub = email.valid.subscribe(() => {
+        notified = true
+      })
+
+      email.set("hello")
+      expect(notified).toBe(true)
+
+      unsub()
+      notified = false
+      email.clear()
+      // after unsub, notifications stop
+      expect(notified).toBe(false)
+    })
+  })
+
+  it("boolean state has always-true condition", () => {
+    screen("BoolCondition", $ => {
+      const flag = $.state.boolean("flag", { initial: false })
+      expect(flag.valid.current).toBe(true)
+      flag.set(true)
+      expect(flag.valid.current).toBe(true)
+    })
+  })
+})
+
+describe("type safety", () => {
+  it("email.valid is a Condition object", () => {
+    screen("TypeStateCondition", $ => {
+      const email = $.state.text("email")
+      expect(isCondition(email.valid)).toBe(true)
+      // .current yields the boolean value
+      expect(typeof email.valid.current).toBe("boolean")
+    })
+  })
+
+  it("ask.valid is a Condition object", () => {
+    screen("TypeAskCondition", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      expect(isCondition(emailAsk.valid)).toBe(true)
+      expect(typeof emailAsk.valid.current).toBe("boolean")
+    })
+  })
+
+  it("choice state accepts valid options and rejects invalid options at type level", () => {
+    screen("TypeChoice", $ => {
+      const role = $.state.choice("role", {
+        initial: "viewer",
+        options: ["viewer", "editor", "admin"] as const,
+      })
+      role.set("editor")
+      expect(role.value).toBe("editor")
+      // @ts-expect-error - invalid choice assignment must fail typechecking
+      role.set("owner")
     })
   })
 })
@@ -109,11 +201,11 @@ describe("ask", () => {
         .required()
         .private()
 
-      expect(emailAsk.toNode().valid).toBe(false)
+      expect(emailAsk.toNode().valid.current).toBe(false)
       expect(emailAsk.toNode().error).toBe("This field is required.")
 
       email.set("test@example.com")
-      expect(emailAsk.toNode().valid).toBe(true)
+      expect(emailAsk.toNode().valid.current).toBe(true)
       expect(emailAsk.toNode().error).toBeNull()
     })
   })
@@ -130,11 +222,11 @@ describe("ask", () => {
         })
 
       email.set("invalid")
-      expect(emailAsk.toNode().valid).toBe(false)
+      expect(emailAsk.toNode().valid.current).toBe(false)
       expect(emailAsk.toNode().error).toBe("Email must contain @.")
 
       email.set("valid@example.com")
-      expect(emailAsk.toNode().valid).toBe(true)
+      expect(emailAsk.toNode().valid.current).toBe(true)
     })
   })
 })
@@ -143,15 +235,40 @@ describe("act", () => {
   it("is blocked when conditions are not met", () => {
     screen("ActBlocked", $ => {
       const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
 
       const login = $.act("Log in")
         .primary()
-        .when(email)
+        .when(emailAsk.valid)
 
-      expect(login.toNode().enabled).toBe(false)
+      expect(login.toNode().enabled.current).toBe(false)
 
       email.set("test@example.com")
-      expect(login.toNode().enabled).toBe(true)
+      expect(login.toNode().enabled.current).toBe(true)
+    })
+  })
+
+  it("re-evaluates when condition changes", () => {
+    screen("ActReevaluate", $ => {
+      const email = $.state.text("email")
+      const password = $.state.text("password")
+      const emailAsk = $.ask("Email", email).required()
+      const passwordAsk = $.ask("Password", password).required()
+
+      const login = $.act("Log in")
+        .when(emailAsk.valid)
+        .when(passwordAsk.valid)
+
+      expect(login.toNode().enabled.current).toBe(false)
+
+      email.set("a@b.com")
+      expect(login.toNode().enabled.current).toBe(false) // password still empty
+
+      password.set("secret")
+      expect(login.toNode().enabled.current).toBe(true)
+
+      email.clear()
+      expect(login.toNode().enabled.current).toBe(false)
     })
   })
 
@@ -178,6 +295,64 @@ describe("act", () => {
     expect(resolved).toBe(true)
     expect(actNode.status).toBe("success")
     expect(actNode.statusMessage).toBe("Done.")
+  })
+
+  it("exposes enabled via ActBuilder", () => {
+    screen("BuilderEnabled", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const login = $.act("Log in")
+        .when(emailAsk.valid)
+
+      expect(login.enabled.current).toBe(false)
+      email.set("test@example.com")
+      expect(login.enabled.current).toBe(true)
+    })
+  })
+
+  it("caches enabled Condition on ActNode", () => {
+    screen("CachedEnabled", $ => {
+      const ask = $.ask("Email", $.state.text("email")).required()
+      const login = $.act("Log in").when(ask.valid)
+
+      const node = login.toNode()
+      const first = node.enabled
+      const second = node.enabled
+      expect(first).toBe(second)
+    })
+  })
+
+  it("act.enabled.subscribe fires on state change", () => {
+    screen("EnabledSubscribe", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in").when(emailAsk.valid)
+
+      const values: boolean[] = []
+      const unsub = login.enabled.subscribe(() => {
+        values.push(login.enabled.current)
+      })
+
+      expect(values).toEqual([])
+      email.set("test@example.com")
+      expect(values).toEqual([true])
+      email.clear()
+      expect(values).toEqual([true, false])
+      unsub()
+    })
+  })
+
+  it("caches valid Condition on AskNode", () => {
+    screen("CachedValid", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const node = emailAsk.toNode()
+      const first = node.valid
+      const second = node.valid
+      expect(first).toBe(second)
+    })
   })
 })
 

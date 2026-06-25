@@ -18,3 +18,6 @@ export {
   getFlows,
   getSurfaces,
 } from "./registry.js"
+
+export type { Condition } from "./signal.js"
+export { isCondition } from "./signal.js"

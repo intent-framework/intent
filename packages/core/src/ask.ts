@@ -1,4 +1,4 @@
-import { signal, type Signal } from "./signal.js"
+import { signal, type Signal, type Condition } from "./signal.js"
 import { registerAskNode } from "./registry.js"
 
 export type AskKind = "text" | "contact" | "secret" | "choice"
@@ -14,7 +14,7 @@ export type AskNode<T> = {
   hintText?: string
   validators: Array<(value: T) => string | boolean>
   state: { value: T }
-  valid: boolean
+  valid: Condition
   error: string | null
   subscribe: (fn: () => void) => () => void
 }
@@ -32,6 +32,15 @@ export function createAskNode<T>(
     notifySignal.set(notifySignal.get() + 1)
   })
 
+  const validCondition: Condition = {
+    get current() {
+      return computeAskValidity(node)
+    },
+    subscribe(fn: () => void) {
+      return notifySignal.subscribe(() => fn())
+    },
+  }
+
   const node: AskNode<T> = {
     id,
     label,
@@ -40,8 +49,8 @@ export function createAskNode<T>(
     isPrivate: false,
     validators: [],
     state: stateRef,
-    get valid() {
-      return computeAskValidity(node)
+    get valid(): Condition {
+      return validCondition
     },
     get error() {
       return computeAskError(node)
@@ -92,6 +101,10 @@ export class AskBuilder<T> {
       : undefined
     this.node = createAskNode(id, label, stateRef, subscribeToState)
     registerAskNode(this.node as unknown as AnyAskNode)
+  }
+
+  get valid(): Condition {
+    return this.node.valid
   }
 
   asContact(kind: string): this {
