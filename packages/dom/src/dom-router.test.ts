@@ -1042,6 +1042,64 @@ describe("renderRouter", () => {
       expect(resource.status).toBe("ready")
     })
 
+    it("same screen definition with different route param re-runs resource autoload", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1/invite")
+
+      const calls: string[] = []
+
+      const TeamScreen = screen<AppServices>("TeamScreen", $ => {
+        $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name === "team.invite") {
+              calls.push(route.params.teamId)
+              return { id: route.params.teamId }
+            }
+            throw new Error("Expected team.invite")
+          },
+        })
+        $.act("View")
+          .primary()
+          .when(true)
+          .does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("team.invite", "/teams/:teamId/invite", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, {
+        target: root,
+        window: win,
+      })
+
+      // Wait for first autoload
+      const resource = TeamScreen.resources[0]!
+      if (resource.status === "idle" || resource.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = resource.subscribe(() => {
+            if (resource.status === "ready" || resource.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(calls).toEqual(["team_1"])
+      expect(resource.value).toEqual({ id: "team_1" })
+
+      // Navigate to same route with different param
+      app.navigate("team.invite", { teamId: "team_2" })
+      await new Promise(r => setTimeout(r, 50))
+
+      // After navigation, the resource should have been autoloaded again
+      // with the new route param
+      expect(calls).toEqual(["team_1", "team_2"])
+      expect(resource.value).toEqual({ id: "team_2" })
+    })
+
     it("renderRouter passes route context to resource loader via navigate", async () => {
       document.body.innerHTML = '<div id="root"></div>'
       const win = createMockWindow("/home")

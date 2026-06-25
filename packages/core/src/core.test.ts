@@ -1039,7 +1039,7 @@ describe("screen runtime", () => {
     expect(actNode.blockedReasons).toEqual([])
   })
 
-  it("start() does not duplicate load for already ready resources", async () => {
+  it("start() does not duplicate load for the same runtime instance", async () => {
     let loadCount = 0
     const TestScreen = screen("NoDuplicateLoad", $ => {
       $.resource("team", {
@@ -1050,14 +1050,12 @@ describe("screen runtime", () => {
       })
     })
 
-    const resource = TestScreen.resources[0]!
-    await resource.load()
-    expect(loadCount).toBe(1)
-
     const runtime = createScreenRuntime(TestScreen)
     await runtime.start()
+    expect(loadCount).toBe(1)
 
-    // start() should not re-load already ready resources
+    // Second start on the same runtime should not re-load
+    await runtime.start()
     expect(loadCount).toBe(1)
   })
 
@@ -1847,5 +1845,33 @@ describe("resource loader context", () => {
     await runtime.start()
     expect(received).toEqual({})
     expect(TestScreen.resources[0]!.status).toBe("ready")
+  })
+
+  it("fresh runtime autoloads resource even if previous runtime already loaded it", async () => {
+    let callCount = 0
+    const TestScreen = screen("FreshRuntimeAutoload", $ => {
+      $.resource("counter", {
+        load: async () => {
+          callCount++
+          return `data${callCount}`
+        },
+      })
+    })
+
+    // First runtime — loads the resource
+    const runtime1 = createScreenRuntime(TestScreen)
+    await runtime1.start()
+    expect(callCount).toBe(1)
+    expect(TestScreen.resources[0]!.status).toBe("ready")
+    runtime1.dispose()
+
+    // Second runtime on the same screen definition — should autoload again
+    const runtime2 = createScreenRuntime(TestScreen, { services: {} })
+    expect(TestScreen.resources[0]!.status).toBe("ready") // still ready from runtime1
+    await runtime2.start()
+    // The resource should have been loaded again despite being ready
+    expect(callCount).toBe(2)
+    expect(TestScreen.resources[0]!.value).toBe("data2")
+    runtime2.dispose()
   })
 })
