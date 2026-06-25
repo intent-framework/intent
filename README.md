@@ -2,433 +2,106 @@
 
 Intent is a semantic full-stack interaction framework for TypeScript applications.
 
-Instead of authoring component trees, markup, endpoint files, fetch calls, loading states, validation glue, and cache invalidation manually, Intent lets developers author the product interaction itself:
-
-* what the screen is for
-* what state exists
-* what the system asks from the user
-* what actions the user can perform
-* when actions are allowed
-* what feedback appears
-* what resources are loaded
-* what policies apply
-* what flows guide the interaction
-* what server operations exist
-* how the interface should materialize across targets
-
-Intent’s central idea:
-
-```txt
 Product intent is the program.
-```
 
-For the web:
+## MVP Status
 
-```txt
-The DOM is the output, not the language.
-```
+The first working proof is implemented.
 
-For backend:
+What works:
 
-```txt
-API routes are transport, not the backend model.
-```
+- `screen` - define interaction screens
+- `state.text`, `state.boolean`, `state.choice` - reactive state with getter/setter
+- `ask` - semantic questions with required validation, custom validation, privacy, input types
+- `act` - actions with reactive conditions, async handlers, feedback states
+- `flow` - interaction sequencing
+- `surface` - presentation grouping
+- `@intent/dom` - real semantic HTML renderer (form, label, input, button, output)
+- `@intent/testing` - semantic test harness (answer asks, assert act state)
+- `@intent/server` - typed action/resource/policy skeleton
+- `examples/web-basic` - Login screen without JSX or manual DOM
 
-For native:
-
-```txt
-Native components are output, not the source of truth.
-```
-
-## Why Intent Exists
-
-React made HTML reactive.
-
-Intent makes product behavior executable.
-
-Most frontend frameworks still ask developers to write UI as a visual tree:
-
-```tsx
-<form>
-  <input />
-  <button>Save</button>
-</form>
-```
-
-Intent starts from semantic interaction:
+## Quick Example
 
 ```ts
-screen("Settings", $ => {
-  const email = $.state.text("email")
+import { screen } from "@intent/core"
+import { renderDom } from "@intent/dom"
 
-  const emailAsk = $.ask("Email address", email)
-    .asContact("email")
-    .required()
-    .private()
-
-  const save = $.act("Save changes")
-    .primary()
-    .when(email.valid)
-    .does(saveProfile)
-    .feedback({
-      pending: "Saving...",
-      success: "Settings saved.",
-      failure: "Could not save settings."
-    })
-
-  $.flow("settings")
-    .startsWith(emailAsk)
-    .then(save)
-
-  $.surface("main")
-    .purpose("manage-account-settings")
-    .contains(emailAsk, save)
-})
-```
-
-Intent does not ask the developer to write the DOM tree.
-
-The framework materializes the semantic graph into real target output.
-
-## Core Philosophy
-
-Intent is built around these principles:
-
-1. Core concepts are semantic, not visual.
-2. Renderers materialize intent into target-specific UI.
-3. The web renderer must output real semantic HTML.
-4. React Native should be a first-class renderer target.
-5. Server resources and actions should replace internal API route glue.
-6. Type safety must be first-class from routes to actions to resources to tests.
-7. The framework should generate and inspect behavior, not hide it.
-8. Escape hatches must exist, but should not become the main authoring model.
-
-## Core Primitives
-
-Intent core should stay platformless.
-
-Core primitives:
-
-```txt
-screen
-state
-ask
-act
-flow
-surface
-resource
-policy
-operation
-event
-job
-subscription
-```
-
-Renderer-level concepts:
-
-```txt
-div
-button
-input
-form
-card
-row
-column
-view
-text
-pressable
-CSS
-DOM
-native components
-HTTP routes
-```
-
-The core must not collapse into a prettier component library.
-
-## Architecture
-
-```txt
-Developer code
-  screen("Invite member", $ => {
-    state
-    ask
-    act
-    flow
-    surface
-    resource
-    policy
-  })
-
-        ↓
-
-Semantic application graph
-  nodes
-  dependencies
-  rules
-  metadata
-  policies
-  runtime contracts
-
-        ↓
-
-Reactive runtime
-  fine-grained state
-  derived semantic nodes
-  resources
-  action lifecycle
-  validation
-  feedback
-
-        ↓
-
-Materialization planner
-  chooses target-specific patterns
-  maps semantic nodes to output primitives
-
-        ↓
-
-Renderers and adapters
-  DOM
-  React Native
-  SSR
-  server
-  OpenAPI
-  SSE
-  WebSocket
-  tests
-  docs
-  command palette
-
-        ↓
-
-Real output
-  semantic HTML
-  native UI
-  HTTP endpoints
-  generated clients
-  streams
-  jobs
-  tests
-  documentation
-```
-
-## Planned Packages
-
-```txt
-packages/
-  core/
-  dom/
-  server/
-  router/
-  testing/
-  devtools/
-  openapi/
-  realtime/
-  react-native/
-  compiler/
-```
-
-Initial MVP packages:
-
-```txt
-packages/core
-packages/dom
-packages/testing
-packages/server
-```
-
-## MVP Goal
-
-The MVP must prove this:
-
-```txt
-A developer can build real web interactions without authoring DOM, JSX, or component trees, while still getting real semantic HTML, validation, feedback, routing, server actions, and tests.
-```
-
-## MVP Scope
-
-Must include:
-
-```txt
-screen
-state.text
-state.choice
-state.boolean
-ask
-act
-flow
-surface
-resource
-basic policy
-DOM renderer
-basic server actions
-basic validation
-basic feedback
-semantic graph inspector
-semantic tests
-```
-
-Do not build initially:
-
-```txt
-full design system
-full React Native renderer
-full OpenAPI suite
-full realtime suite
-visual editor
-AI assistant
-complex compiler
-massive component library
-full database abstraction
-```
-
-## First Demo
-
-The first demo should be a login screen:
-
-```ts
 const LoginScreen = screen("Login", $ => {
   const email = $.state.text("email")
   const password = $.state.text("password")
 
-  const emailAsk = $.ask("Email", email)
-    .asContact("email")
-    .required()
-    .private()
+  $.ask("Email", email).asContact("email").required().private()
+  $.ask("Password", password).asSecret().required().private()
 
-  const passwordAsk = $.ask("Password", password)
-    .asSecret()
-    .required()
-    .private()
-
-  const login = $.act("Log in")
+  $.act("Log in")
     .primary()
-    .when(email.valid)
-    .when(password.valid)
-    .does(async () => {
-      await loginUser({
-        email: email.value,
-        password: password.value
-      })
-    })
-    .feedback({
-      pending: "Logging in...",
-      success: "Logged in.",
-      failure: "Could not log in."
-    })
+    .when(email)
+    .when(password)
+    .does(async () => { await loginUser({ email: email.value, password: password.value }) })
+    .feedback({ pending: "Logging in...", success: "Logged in.", failure: "Could not log in." })
 
-  $.flow("login")
-    .startsWith(emailAsk)
-    .then(passwordAsk)
-    .then(login)
-
-  $.surface("main")
-    .contains(emailAsk, passwordAsk, login)
+  $.surface("main").contains(emailAsk, passwordAsk, login)
 })
+
+renderDom(LoginScreen, { target: document.getElementById("root")! })
 ```
 
-Expected DOM renderer output shape:
+Outputs real semantic HTML:
 
 ```html
 <main>
   <form>
-    <label>Email</label>
-    <input type="email" autocomplete="email" required />
-
-    <label>Password</label>
-    <input type="password" required />
-
+    <label>Email</label><input type="email" autocomplete="email" required />
+    <label>Password</label><input type="password" required />
     <button type="submit" disabled>Log in</button>
-
     <output aria-live="polite"></output>
   </form>
 </main>
 ```
 
-Expected semantic test:
+## Semantic Tests
 
 ```ts
-testScreen(LoginScreen, async screen => {
-  expect(screen.act("Log in")).toBeBlocked()
+import { testScreen } from "@intent/testing"
 
+await testScreen(LoginScreen, async screen => {
+  expect(screen.act("Log in")).toBeBlocked()
   await screen.answer("Email", "mahyar@example.com")
   await screen.answer("Password", "secret")
-
   expect(screen.act("Log in")).toBeEnabled()
 })
 ```
 
-## Type Safety
+## Packages
 
-Type safety is a foundational requirement.
-
-Intent should type:
-
-```txt
-state values
-ask bindings
-action inputs
-action outputs
-resource keys
-resource values
-route params
-search params
-policies
-events
-jobs
-subscriptions
-tests
-renderer nodes
-```
-
-React types props.
-
-Intent should type product behavior.
-
-## Documentation
-
-Detailed design documents live in `docs/`.
-
-Recommended docs:
-
-```txt
-docs/01-vision.md
-docs/02-architecture-addendum.md
-docs/03-framework-specification.md
-docs/04-building-the-framework.md
-```
+| Package | Description |
+|---------|-------------|
+| `@intent/core` | Semantic graph builder. Zero DOM/React/Node dependencies. |
+| `@intent/dom` | DOM renderer. Real semantic HTML. No JSX, no React. |
+| `@intent/testing` | Semantic test harness. Test intent, not DOM. |
+| `@intent/server` | Typed server actions, resources, policies. |
 
 ## Development
-
-This repository is expected to use:
-
-```txt
-pnpm
-TypeScript
-tsdown
-Vitest
-Changesets
-Biome or ESLint/Prettier
-```
-
-Exact commands should be added once the repo is scaffolded.
-
-Expected commands:
 
 ```sh
 pnpm install
 pnpm build
 pnpm test
 pnpm typecheck
-pnpm lint
 ```
 
-## Status
+## Examples
 
-Intent is currently a concept-stage framework.
+```sh
+cd examples/web-basic
+pnpm dev
+```
 
-The first implementation goal is not breadth.
+## Architecture
 
-The first implementation goal is to prove the authoring model.
+Intent starts from the semantic graph, not the component tree.
 
-Build the dagger before the cathedral.
+```
+Developer authors intent → Semantic graph → DOM/resource/test materialization
+```
