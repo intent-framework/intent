@@ -1,7 +1,6 @@
 import { screen } from "@intent/core"
 import type { AppServices } from "./types.js"
 import { loadTeam, inviteMember } from "./data.js"
-import { updateTeamInfo } from "./demo-panels.js"
 
 export const HomeScreen = screen<AppServices>("Home", $ => {
   const openAlpha = $.act("Open Alpha — team_1")
@@ -34,11 +33,8 @@ export const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
   })
 
   const refresh = $.act("Refresh team")
-    .does(async ({ route }) => {
+    .does(async () => {
       await team.reload()
-      if (route.name === "team.details") {
-        updateTeamInfo(route.params.teamId)
-      }
     })
     .feedback({
       pending: "Refreshing...",
@@ -76,7 +72,6 @@ export const InviteScreen = screen<AppServices>("Invite", $ => {
     .does(async ({ navigate, route }) => {
       if (route.name === "team.invite") {
         await inviteMember(route.params.teamId, emailText.value)
-        updateTeamInfo(route.params.teamId)
         navigate("team.details", { teamId: route.params.teamId })
       }
     })
