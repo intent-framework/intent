@@ -1,4 +1,4 @@
-import type { ScreenDefinition, ActNode } from "@intent/core"
+import type { ScreenDefinition, ActNode, ScreenRuntimeServices } from "@intent/core"
 import { createScreenRuntime } from "@intent/core"
 
 function getReasonId(actId: string): string {
@@ -7,18 +7,19 @@ function getReasonId(actId: string): string {
 
 export type DomRendererOptions = {
   target: HTMLElement
+  services?: ScreenRuntimeServices
 }
 
 export { renderRouter } from "./dom-router.js"
 export type { RouterDomHandle, RenderRouterOptions } from "./dom-router.js"
 
 export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptions): () => void {
-  const { target } = options
+  const { target, services } = options
   target.innerHTML = ""
   const root = buildDom(screenDef)
   target.appendChild(root)
 
-  const runtime = createScreenRuntime(screenDef)
+  const runtime = createScreenRuntime(screenDef, { services })
   runtime.start()
 
   const form = target.querySelector("form")!
@@ -66,7 +67,7 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
     e.preventDefault()
     const primaryAct = screenDef.acts.find(a => a.primary)
     if (primaryAct?.enabled.current) {
-      primaryAct.execute()
+      primaryAct.execute(runtime.getExecutionContext())
     }
   })
 

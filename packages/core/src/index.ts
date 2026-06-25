@@ -4,12 +4,12 @@ export { inspectScreen } from "./graph.js"
 export type { InspectedScreen } from "./graph.js"
 export type { TextState, BooleanState, ChoiceState } from "./state.js"
 export type { AskNode, AnyAskNode, AskKind, AskBuilder } from "./ask.js"
-export type { ActNode, ActCondition, ActStatus, FeedbackConfig, ActBuilder } from "./act.js"
+export type { ActNode, ActCondition, ActStatus, FeedbackConfig, ActBuilder, NavigationService, ActionExecutionContext } from "./act.js"
 export type { FlowNode, FlowStep, FlowBuilder } from "./flow.js"
 export type { SurfaceNode, SurfaceBuilder } from "./surface.js"
 export type { ResourceNode, ResourceStatus, AnyResourceNode } from "./resource.js"
 export { createScreenRuntime } from "./runtime.js"
-export type { ScreenRuntime } from "./runtime.js"
+export type { ScreenRuntime, ScreenRuntimeServices } from "./runtime.js"
 
 export {
   resetAskRegistry,
