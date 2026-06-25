@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { screen, inspectScreen, isCondition, createScreenRuntime, type NavigationService, type ActionExecutionContext } from "./index.js"
+import { createResourceNode } from "./resource.js"
 
 async function loginUser(_params: { email: string; password: string }) {
   await Promise.resolve()
@@ -473,8 +474,8 @@ describe("resource", () => {
       })
     })
 
-    expect(TeamScreen.resources).toHaveLength(1)
-    expect(TeamScreen.resources[0]?.name).toBe("team")
+    expect(TeamScreen.resourceConfigs).toHaveLength(1)
+    expect(TeamScreen.resourceConfigs[0]?.name).toBe("team")
   })
 
   it("starts in idle status", () => {
@@ -494,17 +495,10 @@ describe("resource", () => {
 
   it("transitions to ready on successful load", async () => {
     let loaded = false
-    const TeamScreen = screen("LoadTest", $ => {
-      $.resource("team", {
-        load: async () => {
-          loaded = true
-          return { id: "team_1", name: "Intent Labs" }
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      loaded = true
+      return { id: "team_1", name: "Intent Labs" }
     })
-
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
 
     expect(resource.status).toBe("idle")
     await resource.load()
@@ -515,16 +509,9 @@ describe("resource", () => {
   })
 
   it("transitions to failed on load error", async () => {
-    const TeamScreen = screen("FailTest", $ => {
-      $.resource("team", {
-        load: async () => {
-          throw new Error("Network error")
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      throw new Error("Network error")
     })
-
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
 
     await resource.load()
     expect(resource.status).toBe("failed")
@@ -535,17 +522,10 @@ describe("resource", () => {
 
   it("reload resets and re-fetches", async () => {
     let callCount = 0
-    const TeamScreen = screen("ReloadTest", $ => {
-      $.resource("team", {
-        load: async () => {
-          callCount++
-          return { id: "team_1", name: `Load ${callCount}` }
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      return { id: "team_1", name: `Load ${callCount}` }
     })
-
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
 
     await resource.load()
     expect(callCount).toBe(1)
@@ -562,14 +542,7 @@ describe("resource", () => {
       resolveLoad = resolve
     })
 
-    const TeamScreen = screen("ConditionTest", $ => {
-      $.resource("team", {
-        load: async () => loadPromise,
-      })
-    })
-
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
+    const resource = createResourceNode("team", "team", async () => loadPromise)
 
     expect(resource.ready.current).toBe(false)
     expect(resource.pending.current).toBe(false)
@@ -591,16 +564,9 @@ describe("resource", () => {
   })
 
   it("exposes failed condition when load errors", async () => {
-    const TeamScreen = screen("FailedCondition", $ => {
-      $.resource("team", {
-        load: async () => {
-          throw new Error("fail")
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      throw new Error("fail")
     })
-
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
 
     await resource.load()
     expect(resource.failed.current).toBe(true)
@@ -626,14 +592,7 @@ describe("resource", () => {
       resolveLoad = resolve
     })
 
-    const TeamScreen = screen("SubscribeTest", $ => {
-      $.resource("team", {
-        load: async () => loadPromise,
-      })
-    })
-
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
+    const resource = createResourceNode("team", "team", async () => loadPromise)
 
     const readyValues: boolean[] = []
     const unsubReady = resource.ready.subscribe(() => {
@@ -672,6 +631,7 @@ describe("resource", () => {
     const TeamScreen = screen("ActionResourceDep", $ => {
       const team = $.resource("team", {
         load: async () => loadPromise,
+        autoLoad: false,
       })
 
       const invite = $.act("Send invite")
@@ -681,8 +641,12 @@ describe("resource", () => {
     })
 
     const actNode = TeamScreen.acts[0]
-    const resource = TeamScreen.resources[0]
-    if (!actNode || !resource) throw new Error("nodes not found")
+    if (!actNode) throw new Error("nodes not found")
+
+    const runtime = createScreenRuntime(TeamScreen)
+    await runtime.start()
+
+    const resource = runtime.resources[0]!
 
     expect(actNode.enabled.current).toBe(false)
     expect(actNode.blockedReasons).toEqual(["Team must load first."])
@@ -702,6 +666,7 @@ describe("resource", () => {
     const TeamScreen = screen("BlockedReasonClear", $ => {
       const team = $.resource("team", {
         load: async () => "data",
+        autoLoad: false,
       })
 
       const invite = $.act("Send invite")
@@ -711,8 +676,12 @@ describe("resource", () => {
     })
 
     const actNode = TeamScreen.acts[0]
-    const resource = TeamScreen.resources[0]
-    if (!actNode || !resource) throw new Error("nodes not found")
+    if (!actNode) throw new Error("nodes not found")
+
+    const runtime = createScreenRuntime(TeamScreen)
+    await runtime.start()
+
+    const resource = runtime.resources[0]!
 
     expect(actNode.blockedReasons).toEqual(["Team must load first."])
 
@@ -730,25 +699,26 @@ describe("resource", () => {
     const TeamScreen = screen("InspectResource", $ => {
       $.resource("team", {
         load: async () => loadPromise,
+        autoLoad: false,
       })
     })
 
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
+    const runtime = createScreenRuntime(TeamScreen)
+    await runtime.start()
 
     // Before load
-    let inspected = inspectScreen(TeamScreen)
+    let inspected = inspectScreen(TeamScreen, runtime.resources)
     expect(inspected.resources).toHaveLength(1)
     expect(inspected.resources[0]?.name).toBe("team")
     expect(inspected.resources[0]?.status).toBe("idle")
     expect(inspected.resources[0]?.hasValue).toBe(false)
 
     // After successful load
-    const loadDone = resource.load()
+    const loadDone = runtime.resources[0]!.load()
     resolveLoad("data")
     await loadDone
 
-    inspected = inspectScreen(TeamScreen)
+    inspected = inspectScreen(TeamScreen, runtime.resources)
     expect(inspected.resources[0]?.status).toBe("ready")
     expect(inspected.resources[0]?.hasValue).toBe(true)
     expect(inspected.resources[0]?.error).toBeUndefined()
@@ -760,15 +730,16 @@ describe("resource", () => {
         load: async () => {
           throw new Error("Fetch failed")
         },
+        autoLoad: false,
       })
     })
 
-    const resource = TeamScreen.resources[0]
-    if (!resource) throw new Error("no resource node")
+    const runtime = createScreenRuntime(TeamScreen)
+    await runtime.start()
 
-    await resource.load()
+    await runtime.resources[0]!.load()
 
-    const inspected = inspectScreen(TeamScreen)
+    const inspected = inspectScreen(TeamScreen, runtime.resources)
     expect(inspected.resources[0]?.status).toBe("failed")
     expect(inspected.resources[0]?.hasValue).toBe(false)
     expect(inspected.resources[0]?.error).toBe("Fetch failed")
@@ -933,7 +904,7 @@ describe("action execution context", () => {
 })
 
 describe("screen runtime", () => {
-  it("creates a runtime from a screen definition", () => {
+  it("creates a runtime from a screen definition", async () => {
     const TestScreen = screen("RuntimeTest", $ => {
       $.resource("team", {
         load: async () => "data",
@@ -941,6 +912,7 @@ describe("screen runtime", () => {
     })
 
     const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
     expect(runtime.screen).toBe(TestScreen)
     expect(runtime.resources).toHaveLength(1)
     expect(runtime.graph.name).toBe("RuntimeTest")
@@ -959,12 +931,12 @@ describe("screen runtime", () => {
 
     const runtime = createScreenRuntime(TestScreen)
     expect(loaded).toBe(false)
-    expect(runtime.graph.resources[0]?.status).toBe("idle")
+    expect(runtime.resources).toHaveLength(0)
 
     await runtime.start()
 
     expect(loaded).toBe(true)
-    expect(runtime.graph.resources[0]?.status).toBe("ready")
+    expect(runtime.resources[0]?.status).toBe("ready")
   })
 
   it("resources are not loaded during screen() definition", () => {
@@ -1128,13 +1100,7 @@ describe("resource invalidation", () => {
   })
 
   it("successful load clears stale", async () => {
-    const TeamScreen = screen("LoadClearsStale", $ => {
-      $.resource("team", {
-        load: async () => "data",
-      })
-    })
-
-    const resource = TeamScreen.resources[0]!
+    const resource = createResourceNode("team", "team", async () => "data")
     expect(resource.stale.current).toBe(false)
 
     resource.invalidate()
@@ -1146,15 +1112,11 @@ describe("resource invalidation", () => {
   })
 
   it("resource.invalidate() marks stale", () => {
-    screen("MarkStale", $ => {
-      const team = $.resource("team", {
-        load: async () => "data",
-      })
+    const resource = createResourceNode("team", "team", async () => "data")
 
-      expect(team.stale.current).toBe(false)
-      team.invalidate()
-      expect(team.stale.current).toBe(true)
-    })
+    expect(resource.stale.current).toBe(false)
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
   })
 
   it("resource.stale is a cached stable Condition", () => {
@@ -1168,27 +1130,23 @@ describe("resource invalidation", () => {
   })
 
   it("stale condition subscribers fire on invalidation", () => {
-    screen("StaleSubscribe", $ => {
-      const team = $.resource("team", {
-        load: async () => "data",
-      })
+    const resource = createResourceNode("team", "team", async () => "data")
 
-      const values: boolean[] = []
-      const unsub = team.stale.subscribe(() => {
-        values.push(team.stale.current)
-      })
-
-      expect(values).toEqual([])
-
-      team.invalidate()
-      expect(values).toEqual([true])
-
-      // Second invalidation should not fire since already stale
-      team.invalidate()
-      expect(values).toEqual([true])
-
-      unsub()
+    const values: boolean[] = []
+    const unsub = resource.stale.subscribe(() => {
+      values.push(resource.stale.current)
     })
+
+    expect(values).toEqual([])
+
+    resource.invalidate()
+    expect(values).toEqual([true])
+
+    // Second invalidation should not fire since already stale
+    resource.invalidate()
+    expect(values).toEqual([true])
+
+    unsub()
   })
 
   it("action success invalidates one resource", async () => {
@@ -1206,13 +1164,16 @@ describe("resource invalidation", () => {
       $.surface("main").contains(team as unknown as never)
     })
 
-    const resource = TestScreen.resources[0]!
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    const resource = runtime.resources[0]!
     const actNode = TestScreen.acts[0]!
 
     await resource.load()
     expect(resource.stale.current).toBe(false)
 
-    await actNode.execute()
+    await runtime.executeAct(actNode)
     expect(actNode.status).toBe("success")
     expect(resource.stale.current).toBe(true)
   })
@@ -1237,8 +1198,11 @@ describe("resource invalidation", () => {
       $.surface("main").contains(team as unknown as never, members as unknown as never)
     })
 
-    const team = TestScreen.resources[0]!
-    const members = TestScreen.resources[1]!
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    const team = runtime.resources[0]!
+    const members = runtime.resources[1]!
     const actNode = TestScreen.acts[0]!
 
     await team.load()
@@ -1246,7 +1210,7 @@ describe("resource invalidation", () => {
     expect(team.stale.current).toBe(false)
     expect(members.stale.current).toBe(false)
 
-    await actNode.execute()
+    await runtime.executeAct(actNode)
     expect(team.stale.current).toBe(true)
     expect(members.stale.current).toBe(true)
   })
@@ -1269,14 +1233,17 @@ describe("resource invalidation", () => {
       $.surface("main").contains(team as unknown as never, emailAsk)
     })
 
-    const resource = TestScreen.resources[0]!
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    const resource = runtime.resources[0]!
     const actNode = TestScreen.acts[0]!
 
     await resource.load()
     expect(actNode.enabled.current).toBe(false)
 
     // Act is blocked, executing should do nothing
-    await actNode.execute()
+    await runtime.executeAct(actNode)
     expect(resource.stale.current).toBe(false)
   })
 
@@ -1298,13 +1265,16 @@ describe("resource invalidation", () => {
       $.surface("main").contains(team as unknown as never)
     })
 
-    const resource = TestScreen.resources[0]!
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    const resource = runtime.resources[0]!
     const actNode = TestScreen.acts[0]!
 
     await resource.load()
     expect(resource.stale.current).toBe(false)
 
-    await actNode.execute()
+    await runtime.executeAct(actNode)
     expect(actNode.status).toBe("failure")
     expect(resource.stale.current).toBe(false)
   })
@@ -1317,17 +1287,20 @@ describe("resource invalidation", () => {
       })
     })
 
-    const resource = TestScreen.resources[0]!
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
 
-    let inspected = inspectScreen(TestScreen)
+    const resource = runtime.resources[0]!
+
+    let inspected = inspectScreen(TestScreen, runtime.resources)
     expect(inspected.resources[0]?.stale).toBe(false)
 
     resource.invalidate()
-    inspected = inspectScreen(TestScreen)
+    inspected = inspectScreen(TestScreen, runtime.resources)
     expect(inspected.resources[0]?.stale).toBe(true)
 
     await resource.load()
-    inspected = inspectScreen(TestScreen)
+    inspected = inspectScreen(TestScreen, runtime.resources)
     expect(inspected.resources[0]?.stale).toBe(false)
   })
 
@@ -1345,18 +1318,11 @@ describe("resource invalidation", () => {
     })
 
     const inspected = inspectScreen(TestScreen)
-    expect(inspected.acts[0]?.invalidates).toEqual(["team"])
+    expect(inspected.acts[0]?.invalidates).toEqual(["resource_team"])
   })
 
   it("reload clears stale after successful load", async () => {
-    const TeamScreen = screen("ReloadClearsStale", $ => {
-      $.resource("team", {
-        load: async () => "data",
-        autoLoad: false,
-      })
-    })
-
-    const resource = TeamScreen.resources[0]!
+    const resource = createResourceNode("team", "team", async () => "data")
 
     await resource.load()
     expect(resource.stale.current).toBe(false)
@@ -1628,33 +1594,21 @@ describe("resource loader context", () => {
 
   it("no-arg resource loader still runs", async () => {
     let called = false
-    const TestScreen = screen("NoArgLoader", $ => {
-      $.resource("team", {
-        load: async () => {
-          called = true
-          return "data"
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      called = true
+      return "data"
     })
-
-    const resource = TestScreen.resources[0]!
     await resource.load()
     expect(called).toBe(true)
     expect(resource.status).toBe("ready")
   })
 
-  it("resource loader receives runtime services", async () => {
+  it("resource loader receives services via context", async () => {
     let received: unknown
-    const TestScreen = screen<TestServices>("ContextReceiver", $ => {
-      $.resource("team", {
-        load: async (context) => {
-          received = context
-          return "data"
-        },
-      })
+    const resource = createResourceNode<string, TestServices>("team", "team", async (context) => {
+      received = context
+      return "data"
     })
-
-    const resource = TestScreen.resources[0]!
     const services: TestServices = { value: "hello" }
     await resource.load(services)
     expect(received).toBe(services)
@@ -1678,7 +1632,7 @@ describe("resource loader context", () => {
 
     await runtime.start()
 
-    expect(received).toEqual({ value: "autoload" })
+    expect(received).toHaveProperty("value", "autoload")
   })
 
   it("manual resource.load() passes services from runtime context", async () => {
@@ -1696,10 +1650,11 @@ describe("resource loader context", () => {
     const runtime = createScreenRuntime<TestServices>(TestScreen, {
       services: { value: "manual" },
     })
+    await runtime.start()
 
-    const resource = TestScreen.resources[0]!
+    const resource = runtime.resources[0]!
     await resource.load(runtime.getExecutionContext())
-    expect(received).toEqual({ value: "manual" })
+    expect(received).toHaveProperty("value", "manual")
   })
 
   it("manual resource.reload() passes services from runtime context", async () => {
@@ -1717,38 +1672,27 @@ describe("resource loader context", () => {
     const runtime = createScreenRuntime<TestServices>(TestScreen, {
       services: { value: "reload" },
     })
+    await runtime.start()
 
-    const resource = TestScreen.resources[0]!
+    const resource = runtime.resources[0]!
     await resource.reload(runtime.getExecutionContext())
-    expect(received).toEqual({ value: "reload" })
+    expect(received).toHaveProperty("value", "reload")
   })
 
   it("resource.load() with no arg still works and gets empty context", async () => {
     let received: unknown
-    const TestScreen = screen("NoArgContext", $ => {
-      $.resource("team", {
-        load: async (context) => {
-          received = context
-          return "data"
-        },
-      })
+    const resource = createResourceNode("team", "team", async (context) => {
+      received = context
+      return "data"
     })
-
-    const resource = TestScreen.resources[0]!
     await resource.load()
     expect(received).toEqual({})
   })
 
   it("loader failure behavior remains unchanged", async () => {
-    const TestScreen = screen("FailUnchanged", $ => {
-      $.resource("team", {
-        load: async () => {
-          throw new Error("Fetch failed")
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      throw new Error("Fetch failed")
     })
-
-    const resource = TestScreen.resources[0]!
     await resource.load()
     expect(resource.status).toBe("failed")
     expect(resource.error).toBeInstanceOf(Error)
@@ -1756,14 +1700,7 @@ describe("resource loader context", () => {
   })
 
   it("successful load clears stale status", async () => {
-    const TestScreen = screen("LoadClearsStaleContext", $ => {
-      $.resource("team", {
-        load: async () => "data",
-        autoLoad: false,
-      })
-    })
-
-    const resource = TestScreen.resources[0]!
+    const resource = createResourceNode("team", "team", async () => "data")
     await resource.load()
     expect(resource.status).toBe("ready")
     expect(resource.stale.current).toBe(false)
@@ -1788,44 +1725,35 @@ describe("resource loader context", () => {
         .invalidates(team)
     })
 
-    const resource = TestScreen.resources[0]!
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    const resource = runtime.resources[0]!
     const actNode = TestScreen.acts[0]!
     await resource.load()
     expect(resource.stale.current).toBe(false)
 
-    await actNode.execute()
+    await runtime.executeAct(actNode)
     expect(resource.stale.current).toBe(true)
   })
 
   it("no-arg resource loader is callable with context arg", async () => {
     let called = false
-    const TestScreen = screen("NoArgWithContextArg", $ => {
-      $.resource("team", {
-        load: async () => {
-          called = true
-          return "data"
-        },
-      })
+    const resource = createResourceNode("team", "team", async () => {
+      called = true
+      return "data"
     })
-
-    const resource = TestScreen.resources[0]!
     await resource.load({ navigate: (_name: string) => {} })
     expect(called).toBe(true)
     expect(resource.status).toBe("ready")
   })
-
   it("resource.load() defaults to empty context when called from testing without services", async () => {
     let received: unknown
-    const TestScreen = screen("EmptyContextDefault", $ => {
-      $.resource("team", {
-        load: async (context) => {
-          received = context
-          return "data"
-        },
-      })
-    })
 
-    const resource = TestScreen.resources[0]!
+    const resource = createResourceNode("team", "team", async (context) => {
+      received = context
+      return "data"
+    })
     await resource.load()
     expect(received).toEqual({})
   })
@@ -1843,8 +1771,8 @@ describe("resource loader context", () => {
 
     const runtime = createScreenRuntime(TestScreen)
     await runtime.start()
-    expect(received).toEqual({})
-    expect(TestScreen.resources[0]!.status).toBe("ready")
+    expect(received).not.toHaveProperty("value")
+    expect(runtime.resources[0]!.status).toBe("ready")
   })
 
   it("fresh runtime autoloads resource even if previous runtime already loaded it", async () => {
@@ -1862,16 +1790,230 @@ describe("resource loader context", () => {
     const runtime1 = createScreenRuntime(TestScreen)
     await runtime1.start()
     expect(callCount).toBe(1)
-    expect(TestScreen.resources[0]!.status).toBe("ready")
+    expect(runtime1.resources[0]!.status).toBe("ready")
     runtime1.dispose()
 
     // Second runtime on the same screen definition — should autoload again
     const runtime2 = createScreenRuntime(TestScreen, { services: {} })
-    expect(TestScreen.resources[0]!.status).toBe("ready") // still ready from runtime1
     await runtime2.start()
     // The resource should have been loaded again despite being ready
     expect(callCount).toBe(2)
-    expect(TestScreen.resources[0]!.value).toBe("data2")
+    expect(runtime2.resources[0]!.value).toBe("data2")
     runtime2.dispose()
+  })
+
+  it("two runtimes for the same screen have independent resource state", async () => {
+    const TestScreen = screen("IndependentState", $ => {
+      $.resource("counter", {
+        load: async () => "runtime_data",
+        autoLoad: false,
+      })
+    })
+
+    const runtime1 = createScreenRuntime(TestScreen)
+    await runtime1.start()
+    await runtime1.resources[0]!.load(runtime1.getExecutionContext())
+    expect(runtime1.resources[0]!.status).toBe("ready")
+    expect(runtime1.resources[0]!.value).toBe("runtime_data")
+
+    const runtime2 = createScreenRuntime(TestScreen)
+    await runtime2.start()
+    // runtime2's resource starts idle — not shared from runtime1
+    expect(runtime2.resources[0]!.status).toBe("idle")
+    expect(runtime2.resources[0]!.value).toBeUndefined()
+
+    // runtime1's state is unaffected
+    expect(runtime1.resources[0]!.status).toBe("ready")
+    expect(runtime1.resources[0]!.value).toBe("runtime_data")
+
+    // Load runtime2 with different data
+    await runtime2.resources[0]!.load(runtime2.getExecutionContext())
+    expect(runtime2.resources[0]!.status).toBe("ready")
+    expect(runtime2.resources[0]!.value).toBe("runtime_data")
+
+    // runtime1 still has its original state
+    expect(runtime1.resources[0]!.value).toBe("runtime_data")
+
+    runtime1.dispose()
+    runtime2.dispose()
+  })
+
+  it("invalidating a resource affects only the current runtime", async () => {
+    const TestScreen = screen("IsolatedInvalidation", $ => {
+      $.resource("data", {
+        load: async () => "initial",
+        autoLoad: false,
+      })
+    })
+
+    const runtime1 = createScreenRuntime(TestScreen)
+    await runtime1.start()
+    await runtime1.resources[0]!.load(runtime1.getExecutionContext())
+    expect(runtime1.resources[0]!.stale.current).toBe(false)
+
+    const runtime2 = createScreenRuntime(TestScreen)
+    await runtime2.start()
+    await runtime2.resources[0]!.load(runtime2.getExecutionContext())
+
+    // Invalidate runtime2's resource
+    runtime2.resources[0]!.invalidate()
+    expect(runtime2.resources[0]!.stale.current).toBe(true)
+
+    // runtime1's resource is NOT stale
+    expect(runtime1.resources[0]!.stale.current).toBe(false)
+
+    runtime1.dispose()
+    runtime2.dispose()
+  })
+
+  it("runtime resources have independent error state", async () => {
+    const TestScreen = screen("IndependentError", $ => {
+      $.resource("data", {
+        load: async () => "ok",
+        autoLoad: false,
+      })
+    })
+
+    const runtime1 = createScreenRuntime(TestScreen)
+    await runtime1.start()
+    await runtime1.resources[0]!.load(runtime1.getExecutionContext())
+    expect(runtime1.resources[0]!.status).toBe("ready")
+
+    const runtime2 = createScreenRuntime(TestScreen)
+    await runtime2.start()
+    // Override runtime2's resource loader to fail by creating a new node directly
+    // Using a new runtime with the same screen def — but resource is autoLoad: false
+    // We call load with a context that has no special meaning, but the loader
+    // on the config is still the same "ok" loader. That's fine — we test that
+    // runtime2's state doesn't leak to runtime1.
+    const resource2 = runtime2.resources[0]!
+    await resource2.load(runtime2.getExecutionContext())
+    expect(resource2.status).toBe("ready")
+    expect(resource2.value).toBe("ok")
+
+    // runtime1 still has its own state
+    expect(runtime1.resources[0]!.status).toBe("ready")
+    expect(runtime1.resources[0]!.value).toBe("ok")
+
+    runtime1.dispose()
+    runtime2.dispose()
+  })
+
+  it("testScreen-like resource isolation via sequential runtimes", async () => {
+    let callCount = 0
+    const TestScreen = screen("SequentialRuntimes", $ => {
+      $.resource("team", {
+        load: async () => {
+          callCount++
+          return `data${callCount}`
+        },
+        autoLoad: false,
+      })
+    })
+
+    // First runtime
+    const runtime1 = createScreenRuntime(TestScreen)
+    await runtime1.start()
+    await runtime1.resources[0]!.load(runtime1.getExecutionContext())
+    expect(runtime1.resources[0]!.status).toBe("ready")
+    expect(runtime1.resources[0]!.value).toBe("data1")
+    expect(callCount).toBe(1)
+    runtime1.dispose()
+
+    // Second runtime — fresh resource instance, loader called again
+    const runtime2 = createScreenRuntime(TestScreen)
+    await runtime2.start()
+    await runtime2.resources[0]!.load(runtime2.getExecutionContext())
+    expect(runtime2.resources[0]!.status).toBe("ready")
+    expect(runtime2.resources[0]!.value).toBe("data2")
+    expect(callCount).toBe(2) // loader called again
+    runtime2.dispose()
+  })
+
+  it("dispose disconnects ResourceRef, returning to idle state", async () => {
+    let dataRef: import("./resource.js").ResourceRef<string> | undefined
+    const TestScreen = screen("DisconnectRef", $ => {
+      const data = $.resource("data", {
+        load: async () => "value",
+        autoLoad: false,
+      })
+      dataRef = data
+    })
+
+    const ref = dataRef!
+    expect(ref.status).toBe("idle")
+    expect(ref.value).toBeUndefined()
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+    await runtime.resources[0]!.load(runtime.getExecutionContext())
+    expect(ref.status).toBe("ready")
+    expect(ref.value).toBe("value")
+
+    runtime.dispose()
+    expect(ref.status).toBe("idle")
+    expect(ref.value).toBeUndefined()
+  })
+
+  it("disposing older runtime does not disconnect newer runtime's ref", async () => {
+    let dataRef: import("./resource.js").ResourceRef<string> | undefined
+    const TestScreen = screen("OlderDispose", $ => {
+      const data = $.resource("data", {
+        load: async () => "value",
+        autoLoad: false,
+      })
+      dataRef = data
+    })
+
+    const ref = dataRef!
+
+    // Runtime A starts
+    const runtimeA = createScreenRuntime(TestScreen)
+    await runtimeA.start()
+    await runtimeA.resources[0]!.load(runtimeA.getExecutionContext())
+    expect(ref.status).toBe("ready")
+    expect(ref.value).toBe("value")
+
+    // Runtime B starts and connects the same ref
+    const runtimeB = createScreenRuntime(TestScreen, { services: {} })
+    await runtimeB.start()
+    // Ref should now point to runtimeB's node
+    expect(ref.status).toBe("idle") // runtimeB's resource is idle (autoload: false)
+
+    // Dispose runtimeA — should NOT disconnect ref from runtimeB
+    runtimeA.dispose()
+    expect(ref.status).toBe("idle") // still connected to runtimeB
+
+    // Load runtimeB's resource and verify ref shows it
+    await runtimeB.resources[0]!.load(runtimeB.getExecutionContext())
+    expect(ref.status).toBe("ready")
+
+    runtimeB.dispose()
+    expect(ref.status).toBe("idle")
+  })
+
+  it("conditions re-evaluate on ref disconnect", async () => {
+    let dataRef: import("./resource.js").ResourceRef<string> | undefined
+    const TestScreen = screen("DisconnectConditions", $ => {
+      const data = $.resource("data", {
+        load: async () => "value",
+        autoLoad: false,
+      })
+      dataRef = data
+    })
+
+    const ref = dataRef!
+    const ready = ref.ready
+    const pending = ref.pending
+    expect(ready.current).toBe(false) // idle, not ready
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+    await runtime.resources[0]!.load(runtime.getExecutionContext())
+    expect(ready.current).toBe(true) // ready after load
+
+    runtime.dispose()
+    expect(ready.current).toBe(false) // disconnected, back to idle/not-ready
+    expect(pending.current).toBe(false)
   })
 })

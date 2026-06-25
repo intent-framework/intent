@@ -377,8 +377,8 @@ describe("DOM renderer", () => {
     expect(button.disabled).toBe(true)
 
     // Resources load in background — wait for them
-    for (const r of ResourceTest.resources) {
-      // The resource is auto-loaded by the runtime, so we just wait for it
+    for (const config of ResourceTest.resourceConfigs) {
+      const r = config.ref!
       if (r.status === "idle" || r.status === "pending") {
         await new Promise<void>(resolve => {
           const unsub = r.subscribe(() => {
@@ -431,7 +431,7 @@ describe("DOM renderer", () => {
     const cleanup = renderDom<TestServices>(TestScreen, { target: root, services: { value: "from-dom" } })
 
     // Wait for autoload
-    const resource = TestScreen.resources[0]!
+    const resource = TestScreen.resourceConfigs[0]!.ref!
     if (resource.status === "idle" || resource.status === "pending") {
       await new Promise<void>(resolve => {
         const unsub = resource.subscribe(() => {

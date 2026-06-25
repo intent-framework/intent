@@ -1023,7 +1023,7 @@ describe("renderRouter", () => {
       })
 
       // Wait for autoload
-      const resource = TeamResourceScreen.resources[0]!
+      const resource = TeamResourceScreen.resourceConfigs[0]!.ref!
       if (resource.status === "idle" || resource.status === "pending") {
         await new Promise<void>(resolve => {
           const unsub = resource.subscribe(() => {
@@ -1075,7 +1075,7 @@ describe("renderRouter", () => {
       })
 
       // Wait for first autoload
-      const resource = TeamScreen.resources[0]!
+      const resource = TeamScreen.resourceConfigs[0]!.ref!
       if (resource.status === "idle" || resource.status === "pending") {
         await new Promise<void>(resolve => {
           const unsub = resource.subscribe(() => {
@@ -1146,7 +1146,7 @@ describe("renderRouter", () => {
       await new Promise(r => setTimeout(r, 50))
 
       // Wait for resource autoload on the new screen
-      const resource = TeamResourceScreen.resources[0]!
+      const resource = TeamResourceScreen.resourceConfigs[0]!.ref!
       if (resource.status === "idle" || resource.status === "pending") {
         await new Promise<void>(resolve => {
           const unsub = resource.subscribe(() => {

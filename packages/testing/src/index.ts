@@ -77,7 +77,7 @@ export async function testScreen<TServices extends object = DefaultScreenService
           }
         },
         async run() {
-          await actNode.execute(runtime.getExecutionContext())
+          await runtime.executeAct(actNode)
         },
       }
     },
@@ -99,12 +99,12 @@ export async function testScreen<TServices extends object = DefaultScreenService
     },
 
     resource(name: string) {
-      const resourceNode = screenDef.resources.find(
+      const resourceNode = runtime.resources.find(
         r => r.name.toLowerCase() === name.toLowerCase()
       )
       if (!resourceNode) {
         throw new Error(
-          `Resource "${name}" not found. Available resources: ${screenDef.resources.map(r => r.name).join(", ")}`
+          `Resource "${name}" not found. Available resources: ${runtime.resources.map(r => r.name).join(", ")}`
         )
       }
 

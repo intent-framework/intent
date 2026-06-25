@@ -1,6 +1,5 @@
 import { signal, createCondition, type Signal, isCondition, type Condition } from "./signal.js"
 import { registerActNode } from "./registry.js"
-import type { AnyResourceNode } from "./resource.js"
 
 export type NavigationService = (name: string, params?: Record<string, string>) => void
 
@@ -23,9 +22,10 @@ export type ActStatus = "idle" | "pending" | "success" | "failure"
 export type ActCondition = {
   check: () => boolean
   message?: string
-  /** The reactive Condition source, if the condition was created from one */
   source?: Condition
 }
+
+export const kResourceMap: unique symbol = Symbol("resourceMap")
 
 export type ActNode<TServices extends object = DefaultScreenServices> = {
   id: string
@@ -34,7 +34,7 @@ export type ActNode<TServices extends object = DefaultScreenServices> = {
   conditions: ActCondition[]
   handler: ((context: ActionExecutionContext<TServices>) => Promise<void> | void) | null
   feedback?: FeedbackConfig
-  invalidates: AnyResourceNode[]
+  invalidatedResourceIds: string[]
   status: ActStatus
   statusMessage: string | null
   enabled: Condition
@@ -50,7 +50,7 @@ export function createActNode<TServices extends object = DefaultScreenServices>(
   handler: ((context: ActionExecutionContext<TServices>) => Promise<void> | void) | null,
   feedback: FeedbackConfig | undefined,
   primary: boolean,
-  invalidates: AnyResourceNode[] = [],
+  invalidatedResourceIds: string[] = [],
 ): ActNode<TServices> {
   const statusSignal: Signal<number> = signal(0)
 
@@ -80,7 +80,7 @@ export function createActNode<TServices extends object = DefaultScreenServices>(
     conditions,
     handler,
     feedback,
-    invalidates,
+    invalidatedResourceIds,
     status: "idle",
     statusMessage: null,
     get enabled(): Condition {
@@ -111,6 +111,8 @@ function computeActEnabled<TServices extends object = DefaultScreenServices>(nod
   return true
 }
 
+type InvalidationTarget = { id: string; invalidate: () => void }
+
 async function executeAct<TServices extends object = DefaultScreenServices>(
   node: ActNode<TServices>,
   context: ActionExecutionContext<TServices> | undefined,
@@ -129,8 +131,12 @@ async function executeAct<TServices extends object = DefaultScreenServices>(
     node.status = "success"
     node.statusMessage = node.feedback?.success ?? null
     notify()
-    for (const resource of node.invalidates) {
-      resource.invalidate()
+    const resourceMap: Map<string, InvalidationTarget> | undefined =
+      context ? (context as Record<symbol, unknown>)[kResourceMap] as Map<string, InvalidationTarget> : undefined
+    if (resourceMap) {
+      for (const id of node.invalidatedResourceIds) {
+        resourceMap.get(id)?.invalidate()
+      }
     }
   } catch (error: unknown) {
     node.status = "failure"
@@ -194,8 +200,8 @@ export class ActBuilder<TServices extends object = DefaultScreenServices> {
     return this
   }
 
-  invalidates(...resources: AnyResourceNode[]): this {
-    this.node.invalidates = resources
+  invalidates(...resources: { id: string }[]): this {
+    this.node.invalidatedResourceIds = resources.map(r => r.id)
     return this
   }
 
