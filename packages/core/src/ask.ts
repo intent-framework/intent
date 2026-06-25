@@ -32,6 +32,15 @@ export function createAskNode<T>(
     notifySignal.set(notifySignal.get() + 1)
   })
 
+  const validCondition: Condition = {
+    get current() {
+      return computeAskValidity(node)
+    },
+    subscribe(fn: () => void) {
+      return notifySignal.subscribe(() => fn())
+    },
+  }
+
   const node: AskNode<T> = {
     id,
     label,
@@ -41,14 +50,7 @@ export function createAskNode<T>(
     validators: [],
     state: stateRef,
     get valid(): Condition {
-      return {
-        get current() {
-          return computeAskValidity(node)
-        },
-        subscribe(fn: () => void) {
-          return notifySignal.subscribe(() => fn())
-        },
-      }
+      return validCondition
     },
     get error() {
       return computeAskError(node)

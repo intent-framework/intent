@@ -47,7 +47,7 @@ export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
       id: a.id,
       label: a.label,
       primary: a.primary,
-      enabled: a.enabled,
+      enabled: a.enabled.current,
       status: a.status,
       statusMessage: a.statusMessage,
     })),

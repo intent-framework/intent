@@ -241,10 +241,10 @@ describe("act", () => {
         .primary()
         .when(emailAsk.valid)
 
-      expect(login.toNode().enabled).toBe(false)
+      expect(login.toNode().enabled.current).toBe(false)
 
       email.set("test@example.com")
-      expect(login.toNode().enabled).toBe(true)
+      expect(login.toNode().enabled.current).toBe(true)
     })
   })
 
@@ -259,16 +259,16 @@ describe("act", () => {
         .when(emailAsk.valid)
         .when(passwordAsk.valid)
 
-      expect(login.toNode().enabled).toBe(false)
+      expect(login.toNode().enabled.current).toBe(false)
 
       email.set("a@b.com")
-      expect(login.toNode().enabled).toBe(false) // password still empty
+      expect(login.toNode().enabled.current).toBe(false) // password still empty
 
       password.set("secret")
-      expect(login.toNode().enabled).toBe(true)
+      expect(login.toNode().enabled.current).toBe(true)
 
       email.clear()
-      expect(login.toNode().enabled).toBe(false)
+      expect(login.toNode().enabled.current).toBe(false)
     })
   })
 
@@ -295,6 +295,64 @@ describe("act", () => {
     expect(resolved).toBe(true)
     expect(actNode.status).toBe("success")
     expect(actNode.statusMessage).toBe("Done.")
+  })
+
+  it("exposes enabled via ActBuilder", () => {
+    screen("BuilderEnabled", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const login = $.act("Log in")
+        .when(emailAsk.valid)
+
+      expect(login.enabled.current).toBe(false)
+      email.set("test@example.com")
+      expect(login.enabled.current).toBe(true)
+    })
+  })
+
+  it("caches enabled Condition on ActNode", () => {
+    screen("CachedEnabled", $ => {
+      const ask = $.ask("Email", $.state.text("email")).required()
+      const login = $.act("Log in").when(ask.valid)
+
+      const node = login.toNode()
+      const first = node.enabled
+      const second = node.enabled
+      expect(first).toBe(second)
+    })
+  })
+
+  it("act.enabled.subscribe fires on state change", () => {
+    screen("EnabledSubscribe", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in").when(emailAsk.valid)
+
+      const values: boolean[] = []
+      const unsub = login.enabled.subscribe(() => {
+        values.push(login.enabled.current)
+      })
+
+      expect(values).toEqual([])
+      email.set("test@example.com")
+      expect(values).toEqual([true])
+      email.clear()
+      expect(values).toEqual([true, false])
+      unsub()
+    })
+  })
+
+  it("caches valid Condition on AskNode", () => {
+    screen("CachedValid", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const node = emailAsk.toNode()
+      const first = node.valid
+      const second = node.valid
+      expect(first).toBe(second)
+    })
   })
 })
 
