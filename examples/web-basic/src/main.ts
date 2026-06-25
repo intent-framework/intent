@@ -50,7 +50,7 @@ const HomeScreen = screen<AppServices>("Home", $ => {
 })
 
 const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
-  $.resource("team", {
+  const team = $.resource("team", {
     load: async ({ route }) => {
       if (route.name === "team.details") {
         return loadTeam(route.params.teamId)
@@ -59,16 +59,27 @@ const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
     },
   })
 
+  const refresh = $.act("Refresh team")
+    .when(team.ready, "Team must load first.")
+    .invalidates(team)
+    .does(async () => {})
+
   const invite = $.act("Invite member")
     .primary()
-    .when(true)
+    .when(team.ready, "Team must load first.")
     .does(({ navigate, route }) => {
       if (route.name === "team.details") {
         navigate("team.invite", { teamId: route.params.teamId })
       }
     })
 
-  $.surface("main").contains(invite)
+  const back = $.act("Back home")
+    .when(true)
+    .does(({ navigate }) => {
+      navigate("home")
+    })
+
+  $.surface("main").contains(refresh, invite, back)
 })
 
 const InviteScreen = screen<AppServices>("Invite", $ => {

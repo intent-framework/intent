@@ -308,17 +308,16 @@ describe("renderRouter", () => {
     const root = document.getElementById("root")!
     renderRouter(router, { target: root, window: win })
 
-    expect(root.querySelector("button")?.textContent).toBe("Go to login")
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.textContent).toBe("Go to login")
 
-    // Submit the form to trigger the act's navigate
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    // Click the button to trigger the act's navigate
+    button.click()
     // Wait for async execution
     await new Promise(r => setTimeout(r, 10))
 
     // Should have navigated to login
-    const button = root.querySelector("button")
-    expect(button?.textContent).toBe("Login action")
+    expect(root.querySelector("button")?.textContent).toBe("Login action")
     expect(win._getPathname()).toBe("/login")
   })
 
@@ -333,14 +332,13 @@ describe("renderRouter", () => {
     const root = document.getElementById("root")!
     renderRouter(router, { target: root, window: win })
 
-    expect(root.querySelector("button")?.textContent).toBe("Open team invite")
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.textContent).toBe("Open team invite")
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
-    const button = root.querySelector("button")
-    expect(button?.textContent).toBe("Team detail action")
+    expect(root.querySelector("button")?.textContent).toBe("Team detail action")
     expect(win._getPathname()).toBe("/teams/team_1")
   })
 
@@ -355,11 +353,11 @@ describe("renderRouter", () => {
     const root = document.getElementById("root")!
     renderRouter(router, { target: root, window: win })
 
-    expect(root.querySelector("button")?.textContent).toBe("Go to login")
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.textContent).toBe("Go to login")
 
-    // Submit form to trigger navigation
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    // Click the button to trigger navigation
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     // Only one button should exist (login), no stale elements from home screen
@@ -382,8 +380,7 @@ describe("renderRouter", () => {
     const button = root.querySelector("button") as HTMLButtonElement
     expect(button.disabled).toBe(true)
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     // Should still be on the same screen (action was blocked)
@@ -402,8 +399,8 @@ describe("renderRouter", () => {
       services: { navigate },
     })
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    const button = root.querySelector("button") as HTMLButtonElement
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     expect(navigate).toHaveBeenCalledWith("login")
@@ -440,8 +437,8 @@ describe("renderRouter", () => {
       services: { analytics: { track }, navigate },
     })
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    const button = root.querySelector("button") as HTMLButtonElement
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     expect(track).toHaveBeenCalledWith("submitted")
@@ -481,8 +478,8 @@ describe("renderRouter", () => {
       services: { analytics: { track } },
     })
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    const button = root.querySelector("button") as HTMLButtonElement
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     expect(track).toHaveBeenCalledWith("routed_action")
@@ -520,8 +517,8 @@ describe("renderRouter", () => {
       services: { analytics: { track } },
     })
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    const button = root.querySelector("button") as HTMLButtonElement
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     expect(track).toHaveBeenCalledWith("not_found")
@@ -563,8 +560,8 @@ describe("renderRouter", () => {
       services: { analytics: { track } },
     })
 
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    const button = root.querySelector("button") as HTMLButtonElement
+    button.click()
     await new Promise(r => setTimeout(r, 10))
 
     expect(track).toHaveBeenCalledWith("navigated")
@@ -614,8 +611,8 @@ describe("renderRouter", () => {
         services: { analytics: { track } },
       })
 
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
       expect(track).toHaveBeenCalledWith("clicked")
@@ -655,8 +652,8 @@ describe("renderRouter", () => {
         services: { analytics: { track } },
       })
 
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
       expect(track).toHaveBeenCalledWith("invite_opened")
@@ -689,8 +686,8 @@ describe("renderRouter", () => {
         services: { analytics: { track } },
       })
 
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
       expect(track).toHaveBeenCalledWith("custom_event")
@@ -786,8 +783,8 @@ describe("renderRouter", () => {
         window: win,
       })
 
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
       const rt = capturedRoute as { name: string; path: string; params: Record<string, string> }
@@ -823,8 +820,8 @@ describe("renderRouter", () => {
         window: win,
       })
 
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
       expect(capturedTeamId).toBe("t-01")
@@ -866,14 +863,14 @@ describe("renderRouter", () => {
         window: win,
       })
 
-      // Trigger navigation
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      // Click button to trigger navigation
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
-      // Now on team screen, submit to capture route
-      const form2 = root.querySelector("form")!
-      form2.dispatchEvent(new Event("submit", { bubbles: true }))
+      // Now on team screen, click button to capture route
+      const button2 = root.querySelector("button") as HTMLButtonElement
+      button2.click()
       await new Promise(r => setTimeout(r, 10))
 
       const rt = capturedRouteAtTeam as { name: string; params: Record<string, string> }
@@ -984,8 +981,8 @@ describe("renderRouter", () => {
         services: { analytics: { track } } as any,
       })
 
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 10))
 
       expect(track).toHaveBeenCalledWith("clicked")
@@ -1141,8 +1138,8 @@ describe("renderRouter", () => {
       })
 
       // Navigate to team screen
-      const form = root.querySelector("form")!
-      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
       await new Promise(r => setTimeout(r, 50))
 
       // Wait for resource autoload on the new screen

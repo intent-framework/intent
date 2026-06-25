@@ -65,14 +65,17 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
     unsubscribers.push(unsub)
   }
 
-  // Handle form submission
-  form.addEventListener("submit", (e: Event) => {
-    e.preventDefault()
-    const primaryAct = screenDef.acts.find(a => a.primary)
-    if (primaryAct?.enabled.current) {
-      runtime.executeAct(primaryAct)
+  // Each button click executes its own action through the runtime
+  for (const act of screenDef.acts) {
+    const button = form.querySelector(`#${act.id}`) as HTMLButtonElement | null
+    if (button) {
+      button.addEventListener("click", () => {
+        if (act.enabled.current) {
+          runtime.executeAct(act)
+        }
+      })
     }
-  })
+  }
 
   // Return cleanup function
   return () => {
@@ -138,7 +141,7 @@ function buildDom<TServices extends object = DefaultScreenServices>(screenDef: S
   for (const act of screenDef.acts) {
     const button = document.createElement("button")
     button.id = act.id
-    button.type = "submit"
+    button.type = "button"
     button.textContent = act.label
 
     if (act.primary) {
