@@ -73,6 +73,7 @@ describe("DOM renderer", () => {
     const button = root.querySelector("button")
     expect(button).not.toBeNull()
     expect(button?.textContent).toBe("Log in")
+    expect(button?.getAttribute("type")).toBe("button")
     expect(button?.disabled).toBe(true)
 
     const output = root.querySelector("output")
@@ -219,9 +220,9 @@ describe("DOM renderer", () => {
     emailState2.set("a@b.com")
     passwordState2.set("pwd")
 
-    // Submit the form
-    const form = root.querySelector("form")!
-    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    // Click the button to execute the action
+    const button = root.querySelector("button") as HTMLButtonElement
+    button.click()
 
     // Wait for the async handler
     await new Promise(r => setTimeout(r, 50))
@@ -446,5 +447,292 @@ describe("DOM renderer", () => {
     expect(received).toEqual({ value: "from-dom" })
     expect(resource.status).toBe("ready")
     cleanup()
+  })
+
+  it("renders multiple buttons for multiple actions", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const MultiActionScreen = screen("MultiAction", $ => {
+      const refresh = $.act("Refresh").does(async () => {})
+      const invite = $.act("Invite member").does(async () => {})
+      const back = $.act("Back").does(async () => {})
+      $.surface("main").contains(refresh, invite, back)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(MultiActionScreen, { target: root })
+
+    const buttons = root.querySelectorAll("button")
+    expect(buttons).toHaveLength(3)
+    expect(buttons[0]?.textContent).toBe("Refresh")
+    expect(buttons[1]?.textContent).toBe("Invite member")
+    expect(buttons[2]?.textContent).toBe("Back")
+  })
+
+  it("clicking each button executes only that action", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    let refreshed = false
+    let invited = false
+
+    const MultiActionScreen = screen("MultiActionExec", $ => {
+      const refresh = $.act("Refresh")
+        .primary()
+        .when(true)
+        .does(async () => {
+          refreshed = true
+        })
+
+      const invite = $.act("Invite member")
+        .when(true)
+        .does(async () => {
+          invited = true
+        })
+
+      $.surface("main").contains(refresh, invite)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(MultiActionScreen, { target: root })
+
+    const buttons = root.querySelectorAll("button")
+
+    // Click invite first — only invite should execute
+    ;(buttons[1] as HTMLButtonElement).click()
+    await new Promise(r => setTimeout(r, 10))
+    expect(refreshed).toBe(false)
+    expect(invited).toBe(true)
+
+    // Reset and click refresh
+    invited = false
+    ;(buttons[0] as HTMLButtonElement).click()
+    await new Promise(r => setTimeout(r, 10))
+    expect(refreshed).toBe(true)
+    expect(invited).toBe(false)
+  })
+
+  it("disabled/blocked state is per action", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const MultiActionBlocked = screen("MultiActionBlocked", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const actionA = $.act("Action A")
+        .primary()
+        .when(emailAsk.valid, "Need email for A.")
+
+      const actionB = $.act("Action B")
+        .when(true)
+
+      $.surface("main").contains(emailAsk, actionA, actionB)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(MultiActionBlocked, { target: root })
+
+    const buttons = root.querySelectorAll("button")
+    const buttonA = buttons[0] as HTMLButtonElement
+    const buttonB = buttons[1] as HTMLButtonElement
+
+    // Action A should be disabled (no email), Action B should be enabled
+    expect(buttonA.disabled).toBe(true)
+    expect(buttonB.disabled).toBe(false)
+
+    // Fill in email — Action A becomes enabled
+    const emailState = MultiActionBlocked.asks[0]!.state as unknown as { set: (v: string) => void }
+    emailState.set("test@example.com")
+
+    expect(buttonA.disabled).toBe(false)
+    expect(buttonB.disabled).toBe(false)
+  })
+
+  it("blocked reason text is per action", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const MultiActionReasons = screen("MultiActionReasons", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      const actionA = $.act("Action A")
+        .primary()
+        .when(emailAsk.valid, "Email required for A.")
+
+      const actionB = $.act("Action B")
+        .when(emailAsk.valid, "Email required for B.")
+
+      $.surface("main").contains(emailAsk, actionA, actionB)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(MultiActionReasons, { target: root })
+
+    const buttons = root.querySelectorAll("button")
+    const buttonA = buttons[0] as HTMLButtonElement
+    const buttonB = buttons[1] as HTMLButtonElement
+
+    // Both should be disabled and each should have its own reason
+    expect(buttonA.disabled).toBe(true)
+    expect(buttonA.getAttribute("aria-describedby")).toBe("act_action_a-reason")
+    const reasonA = document.getElementById("act_action_a-reason")
+    expect(reasonA).not.toBeNull()
+    expect(reasonA!.textContent).toBe("Email required for A.")
+
+    expect(buttonB.disabled).toBe(true)
+    expect(buttonB.getAttribute("aria-describedby")).toBe("act_action_b-reason")
+    const reasonB = document.getElementById("act_action_b-reason")
+    expect(reasonB).not.toBeNull()
+    expect(reasonB!.textContent).toBe("Email required for B.")
+  })
+
+  it("feedback is shown for the clicked action", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const MultiActionFeedback = screen("MultiActionFeedback", $ => {
+      const actionA = $.act("Action A")
+        .primary()
+        .when(true)
+        .does(async () => {
+          await Promise.resolve()
+        })
+        .feedback({
+          pending: "Doing A...",
+          success: "A done.",
+        })
+
+      const actionB = $.act("Action B")
+        .when(true)
+        .does(async () => {
+          await Promise.resolve()
+        })
+        .feedback({
+          pending: "Doing B...",
+          success: "B done.",
+        })
+
+      $.surface("main").contains(actionA, actionB)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(MultiActionFeedback, { target: root })
+
+    const buttons = root.querySelectorAll("button")
+    const output = root.querySelector("output")!
+    expect(output.textContent).toBe("")
+
+    // Click Action B
+    ;(buttons[1] as HTMLButtonElement).click()
+    await new Promise(r => setTimeout(r, 10))
+    expect(output.textContent).toBe("B done.")
+  })
+
+  it("runtime-scoped invalidation works when clicking an action that invalidates a resource", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    let loadCount = 0
+
+    const InvalidationScreen = screen("Invalidation", $ => {
+      const team = $.resource("team", {
+        load: async () => {
+          loadCount++
+          return { id: "team_1", loadCount }
+        },
+      })
+
+      const refresh = $.act("Refresh")
+        .primary()
+        .when(team.ready, "Team must load.")
+        .invalidates(team)
+        .does(async () => {})
+
+      const view = $.act("View")
+        .when(team.ready, "Team must load.")
+        .does(async () => {})
+
+      $.surface("main").contains(refresh, view)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(InvalidationScreen, { target: root })
+
+    // Wait for resource to load
+    for (const config of InvalidationScreen.resourceConfigs) {
+      const r = config.ref!
+      if (r.status === "idle" || r.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = r.subscribe(() => {
+            if (r.status === "ready" || r.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+    }
+
+    expect(loadCount).toBe(1)
+
+    const buttons = root.querySelectorAll("button")
+    const refreshButton = buttons[0] as HTMLButtonElement
+    const ref = InvalidationScreen.resourceConfigs[0]!.ref!
+
+    // Resource should not be stale yet
+    expect(ref.stale.current).toBe(false)
+
+    // Click Refresh — should invalidate the resource (mark as stale)
+    refreshButton.click()
+    await new Promise(r => setTimeout(r, 50))
+
+    // Resource should be marked stale
+    expect(ref.stale.current).toBe(true)
+    expect(loadCount).toBe(1) // invalidation marks stale, does not reload
+  })
+
+  it("ask input state is available to whichever action is clicked", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    let capturedA: string | undefined
+    let capturedB: string | undefined
+
+    const AskStateScreen = screen("AskState", $ => {
+      const text = $.state.text("message")
+      const textAsk = $.ask("Message", text).required()
+
+      const actionA = $.act("Action A")
+        .primary()
+        .when(textAsk.valid)
+        .does(async () => {
+          capturedA = text.value
+        })
+
+      const actionB = $.act("Action B")
+        .when(textAsk.valid)
+        .does(async () => {
+          capturedB = text.value
+        })
+
+      $.surface("main").contains(textAsk, actionA, actionB)
+    })
+
+    const root = document.getElementById("root")!
+    renderDom(AskStateScreen, { target: root })
+
+    // Fill in the ask
+    const input = root.querySelector("input")!
+    input.value = "hello world"
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+
+    const buttons = root.querySelectorAll("button")
+
+    // Click Action B
+    ;(buttons[1] as HTMLButtonElement).click()
+    await new Promise(r => setTimeout(r, 10))
+    expect(capturedB).toBe("hello world")
+    expect(capturedA).toBeUndefined()
+
+    // Click Action A
+    ;(buttons[0] as HTMLButtonElement).click()
+    await new Promise(r => setTimeout(r, 10))
+    expect(capturedA).toBe("hello world")
   })
 })

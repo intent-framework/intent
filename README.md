@@ -18,10 +18,10 @@ What works:
 - `createScreenRuntime` - runtime lifecycle (start auto-loads resources, dispose cleans up)
 - `flow` - interaction sequencing
 - `surface` - presentation grouping
-- `@intent/dom` - real semantic HTML renderer (form, label, input, button, output)
+- `@intent/dom` - real semantic HTML renderer (form, label, input, button, output); each action renders as an independently executable button
 - `@intent/testing` - semantic test harness (answer asks, assert act state, load resources)
 - `@intent/server` - typed action/resource/policy skeleton
-- `examples/web-basic` - Login screen + route-driven team invite app demonstrating typed navigation, route context, runtime-scoped resources, action blocked reasons, and semantic asks/acts/surfaces
+- `examples/web-basic` - Login screen + route-driven team invite app demonstrating typed navigation, route context, runtime-scoped resources, action blocked reasons, semantic asks/acts/surfaces, and multiple independent actions per screen
 
 ## Quick Example
 
@@ -33,10 +33,10 @@ const LoginScreen = screen("Login", $ => {
   const email = $.state.text("email")
   const password = $.state.text("password")
 
-  $.ask("Email", email).asContact("email").required().private()
-  $.ask("Password", password).asSecret().required().private()
+  const emailAsk = $.ask("Email", email).asContact("email").required().private()
+  const passwordAsk = $.ask("Password", password).asSecret().required().private()
 
-  $.act("Log in")
+  const login = $.act("Log in")
     .primary()
     .when(emailAsk.valid)
     .when(passwordAsk.valid)
@@ -56,7 +56,7 @@ Outputs real semantic HTML:
   <form>
     <label>Email</label><input type="email" autocomplete="email" required />
     <label>Password</label><input type="password" required />
-    <button type="submit" disabled>Log in</button>
+    <button type="button" disabled>Log in</button>
     <output aria-live="polite"></output>
   </form>
 </main>
