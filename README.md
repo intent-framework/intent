@@ -83,6 +83,30 @@ team.value              // T | undefined
 team.ready.current      // boolean
 ```
 
+### Invalidation
+
+Actions can declare which resources become stale after success:
+
+```ts
+const team = $.resource("team", {
+  load: async () => getTeam()
+})
+
+const save = $.act("Save")
+  .does(saveTeam)
+  .invalidates(team)
+// or multiple:
+// .invalidates(team, members)
+```
+
+Semantics:
+
+- `resource.invalidate()` marks the resource stale without clearing the value.
+- `resource.stale.current` is a reactive Condition.
+- `resource.ready.current` remains `true` even when stale — readiness and staleness are independent.
+- Successful load clears stale; failed load also clears stale (the refresh was attempted).
+- Invalidation fires stale condition subscribers.
+
 Resources support an auto-load policy (default `true`):
 
 ```ts

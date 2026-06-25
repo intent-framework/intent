@@ -239,4 +239,20 @@ describe("testScreen", () => {
       expect(() => screen.act("Save").toBeEnabled()).not.toThrow()
     })
   })
+
+  it("testing harness can observe stale state", async () => {
+    const TeamScreen = screen("HarnessStale", $ => {
+      $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      expect(screen.resource("team").stale()).toBe(false)
+
+      screen.resource("team").invalidate()
+      expect(screen.resource("team").stale()).toBe(true)
+    })
+  })
 })

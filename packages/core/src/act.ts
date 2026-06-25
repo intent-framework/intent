@@ -1,5 +1,6 @@
 import { signal, createCondition, type Signal, isCondition, type Condition } from "./signal.js"
 import { registerActNode } from "./registry.js"
+import type { AnyResourceNode } from "./resource.js"
 
 export type FeedbackConfig = {
   pending?: string
@@ -23,6 +24,7 @@ export type ActNode = {
   conditions: ActCondition[]
   handler: (() => Promise<void> | void) | null
   feedback?: FeedbackConfig
+  invalidates: AnyResourceNode[]
   status: ActStatus
   statusMessage: string | null
   enabled: Condition
@@ -38,6 +40,7 @@ export function createActNode(
   handler: (() => Promise<void> | void) | null,
   feedback: FeedbackConfig | undefined,
   primary: boolean,
+  invalidates: AnyResourceNode[] = [],
 ): ActNode {
   const statusSignal: Signal<number> = signal(0)
 
@@ -67,6 +70,7 @@ export function createActNode(
     conditions,
     handler,
     feedback,
+    invalidates,
     status: "idle",
     statusMessage: null,
     get enabled(): Condition {
@@ -111,6 +115,9 @@ async function executeAct(node: ActNode, notify: () => void): Promise<void> {
     node.status = "success"
     node.statusMessage = node.feedback?.success ?? null
     notify()
+    for (const resource of node.invalidates) {
+      resource.invalidate()
+    }
   } catch (error: unknown) {
     node.status = "failure"
     const fb = node.feedback?.failure
@@ -170,6 +177,11 @@ export class ActBuilder {
 
   does(fn: () => Promise<void> | void): this {
     this.node.handler = fn
+    return this
+  }
+
+  invalidates(...resources: AnyResourceNode[]): this {
+    this.node.invalidates = resources
     return this
   }
 

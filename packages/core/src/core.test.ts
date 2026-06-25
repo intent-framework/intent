@@ -977,3 +977,257 @@ describe("screen runtime", () => {
     expect(() => runtime.dispose()).not.toThrow()
   })
 })
+
+describe("resource invalidation", () => {
+  it("resource starts not stale", () => {
+    screen("StaleInit", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      expect(team.status).toBe("idle")
+      expect(team.stale.current).toBe(false)
+    })
+  })
+
+  it("successful load clears stale", async () => {
+    const TeamScreen = screen("LoadClearsStale", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    const resource = TeamScreen.resources[0]!
+    expect(resource.stale.current).toBe(false)
+
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    await resource.load()
+    expect(resource.status).toBe("ready")
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("resource.invalidate() marks stale", () => {
+    screen("MarkStale", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      expect(team.stale.current).toBe(false)
+      team.invalidate()
+      expect(team.stale.current).toBe(true)
+    })
+  })
+
+  it("resource.stale is a cached stable Condition", () => {
+    screen("CachedStale", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      expect(team.stale).toBe(team.stale)
+    })
+  })
+
+  it("stale condition subscribers fire on invalidation", () => {
+    screen("StaleSubscribe", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      const values: boolean[] = []
+      const unsub = team.stale.subscribe(() => {
+        values.push(team.stale.current)
+      })
+
+      expect(values).toEqual([])
+
+      team.invalidate()
+      expect(values).toEqual([true])
+
+      // Second invalidation should not fire since already stale
+      team.invalidate()
+      expect(values).toEqual([true])
+
+      unsub()
+    })
+  })
+
+  it("action success invalidates one resource", async () => {
+    const TestScreen = screen("InvalidatesOne", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+
+      $.act("Save")
+        .when(true)
+        .does(async () => {})
+        .invalidates(team)
+
+      $.surface("main").contains(team as unknown as never)
+    })
+
+    const resource = TestScreen.resources[0]!
+    const actNode = TestScreen.acts[0]!
+
+    await resource.load()
+    expect(resource.stale.current).toBe(false)
+
+    await actNode.execute()
+    expect(actNode.status).toBe("success")
+    expect(resource.stale.current).toBe(true)
+  })
+
+  it("action success invalidates multiple resources", async () => {
+    const TestScreen = screen("InvalidatesMultiple", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+
+      const members = $.resource("members", {
+        load: async () => ["a", "b"],
+        autoLoad: false,
+      })
+
+      $.act("Save")
+        .when(true)
+        .does(async () => {})
+        .invalidates(team, members)
+
+      $.surface("main").contains(team as unknown as never, members as unknown as never)
+    })
+
+    const team = TestScreen.resources[0]!
+    const members = TestScreen.resources[1]!
+    const actNode = TestScreen.acts[0]!
+
+    await team.load()
+    await members.load()
+    expect(team.stale.current).toBe(false)
+    expect(members.stale.current).toBe(false)
+
+    await actNode.execute()
+    expect(team.stale.current).toBe(true)
+    expect(members.stale.current).toBe(true)
+  })
+
+  it("blocked action does not invalidate resources", async () => {
+    const TestScreen = screen("BlockedNoInvalidate", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+
+      $.act("Save")
+        .when(emailAsk.valid)
+        .does(async () => {})
+        .invalidates(team)
+
+      $.surface("main").contains(team as unknown as never, emailAsk)
+    })
+
+    const resource = TestScreen.resources[0]!
+    const actNode = TestScreen.acts[0]!
+
+    await resource.load()
+    expect(actNode.enabled.current).toBe(false)
+
+    // Act is blocked, executing should do nothing
+    await actNode.execute()
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("failed action does not invalidate resources", async () => {
+    const TestScreen = screen("FailNoInvalidate", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+
+      $.act("Save")
+        .when(true)
+        .does(async () => {
+          throw new Error("Save failed")
+        })
+        .invalidates(team)
+        .feedback({ failure: "Save failed." })
+
+      $.surface("main").contains(team as unknown as never)
+    })
+
+    const resource = TestScreen.resources[0]!
+    const actNode = TestScreen.acts[0]!
+
+    await resource.load()
+    expect(resource.stale.current).toBe(false)
+
+    await actNode.execute()
+    expect(actNode.status).toBe("failure")
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("graph inspection includes resource stale state", async () => {
+    const TestScreen = screen("InspectStale", $ => {
+      $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+
+    let inspected = inspectScreen(TestScreen)
+    expect(inspected.resources[0]?.stale).toBe(false)
+
+    resource.invalidate()
+    inspected = inspectScreen(TestScreen)
+    expect(inspected.resources[0]?.stale).toBe(true)
+
+    await resource.load()
+    inspected = inspectScreen(TestScreen)
+    expect(inspected.resources[0]?.stale).toBe(false)
+  })
+
+  it("graph inspection includes action invalidates", () => {
+    const TestScreen = screen("InspectInvalidates", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      $.act("Save")
+        .when(true)
+        .invalidates(team)
+
+      $.surface("main").contains(team as unknown as never)
+    })
+
+    const inspected = inspectScreen(TestScreen)
+    expect(inspected.acts[0]?.invalidates).toEqual(["team"])
+  })
+
+  it("reload clears stale after successful load", async () => {
+    const TeamScreen = screen("ReloadClearsStale", $ => {
+      $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+    })
+
+    const resource = TeamScreen.resources[0]!
+
+    await resource.load()
+    expect(resource.stale.current).toBe(false)
+
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    await resource.reload()
+    expect(resource.stale.current).toBe(false)
+  })
+})
