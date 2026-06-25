@@ -294,11 +294,14 @@ await testScreen(LoginScreen, async screen => {
 
 ```sh
 pnpm install
-pnpm typecheck
+rm -rf packages/*/dist examples/*/dist
 pnpm test
+pnpm typecheck
 pnpm build
 pnpm lint
 ```
+
+CI runs the same validation on every PR and push to `main`.
 
 ## Examples
 
