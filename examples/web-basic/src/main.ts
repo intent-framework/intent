@@ -18,6 +18,8 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+let teamLoadVersion = 0
+
 const teams: Record<string, { id: string; name: string; members: string[] }> = {
   team_1: { id: "team_1", name: "Alpha", members: [] },
   team_2: { id: "team_2", name: "Beta", members: [] },
@@ -28,7 +30,7 @@ async function loadTeam(teamId: string) {
   await delay(80)
   const team = teams[teamId]
   if (!team) throw new Error(`Team "${teamId}" not found`)
-  return team
+  return { ...team, version: ++teamLoadVersion }
 }
 
 async function inviteMember(teamId: string, email: string) {
@@ -60,9 +62,9 @@ const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
   })
 
   const refresh = $.act("Refresh team")
-    .when(team.ready, "Team must load first.")
-    .invalidates(team)
-    .does(async () => {})
+    .does(async () => {
+      await team.reload()
+    })
 
   const invite = $.act("Invite member")
     .primary()

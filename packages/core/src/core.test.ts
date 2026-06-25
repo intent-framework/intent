@@ -994,10 +994,10 @@ describe("screen runtime", () => {
         load: async () => "data",
       })
 
-      $.act("Save")
+      const save = $.act("Save")
         .when(team.ready, "Team must load first.")
 
-      $.surface("main").contains(team as unknown as never)
+      $.surface("main").contains(save)
     })
 
     const actNode = TestScreen.acts[0]!
@@ -1156,12 +1156,12 @@ describe("resource invalidation", () => {
         autoLoad: false,
       })
 
-      $.act("Save")
+      const save = $.act("Save")
         .when(true)
         .does(async () => {})
         .invalidates(team)
 
-      $.surface("main").contains(team as unknown as never)
+      $.surface("main").contains(save)
     })
 
     const runtime = createScreenRuntime(TestScreen)
@@ -1190,12 +1190,12 @@ describe("resource invalidation", () => {
         autoLoad: false,
       })
 
-      $.act("Save")
+      const save = $.act("Save")
         .when(true)
         .does(async () => {})
         .invalidates(team, members)
 
-      $.surface("main").contains(team as unknown as never, members as unknown as never)
+      $.surface("main").contains(save)
     })
 
     const runtime = createScreenRuntime(TestScreen)
@@ -1225,12 +1225,12 @@ describe("resource invalidation", () => {
       const email = $.state.text("email")
       const emailAsk = $.ask("Email", email).required()
 
-      $.act("Save")
+      const save = $.act("Save")
         .when(emailAsk.valid)
         .does(async () => {})
         .invalidates(team)
 
-      $.surface("main").contains(team as unknown as never, emailAsk)
+      $.surface("main").contains(save, emailAsk)
     })
 
     const runtime = createScreenRuntime(TestScreen)
@@ -1254,7 +1254,7 @@ describe("resource invalidation", () => {
         autoLoad: false,
       })
 
-      $.act("Save")
+      const save = $.act("Save")
         .when(true)
         .does(async () => {
           throw new Error("Save failed")
@@ -1262,7 +1262,7 @@ describe("resource invalidation", () => {
         .invalidates(team)
         .feedback({ failure: "Save failed." })
 
-      $.surface("main").contains(team as unknown as never)
+      $.surface("main").contains(save)
     })
 
     const runtime = createScreenRuntime(TestScreen)
@@ -1310,11 +1310,11 @@ describe("resource invalidation", () => {
         load: async () => "data",
       })
 
-      $.act("Save")
+      const save = $.act("Save")
         .when(true)
         .invalidates(team)
 
-      $.surface("main").contains(team as unknown as never)
+      $.surface("main").contains(save)
     })
 
     const inspected = inspectScreen(TestScreen)
@@ -2029,13 +2029,13 @@ describe("resource loader context", () => {
           autoLoad: false,
         })
 
-        $.act("Refresh")
+        const refresh = $.act("Refresh")
           .when(true)
           .does(async () => {
             await team.reload()
           })
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(refresh)
       })
 
       const runtime = createScreenRuntime(TestScreen)
@@ -2065,13 +2065,13 @@ describe("resource loader context", () => {
           },
         })
 
-        $.act("Refresh")
+        const refresh = $.act("Refresh")
           .when(true)
           .does(async () => {
             await team.reload()
           })
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(refresh)
       })
 
       const runtime = createScreenRuntime<TestServices>(TestScreen, {
@@ -2102,13 +2102,13 @@ describe("resource loader context", () => {
           autoLoad: false,
         })
 
-        $.act("Refresh")
+        const refresh = $.act("Refresh")
           .when(true)
           .does(async (ctx) => {
             await team.reload(ctx)
           })
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(refresh)
       })
 
       const runtime = createScreenRuntime<TestServices>(TestScreen, {
@@ -2135,13 +2135,13 @@ describe("resource loader context", () => {
           },
         })
 
-        $.act("Refresh")
+        const refresh = $.act("Refresh")
           .when(true)
           .does(async () => {
             await team.reload()
           })
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(refresh)
       })
 
       const runtimeOld = createScreenRuntime<TestServices>(TestScreen, {
@@ -2241,12 +2241,12 @@ describe("resource loader context", () => {
           autoLoad: false,
         })
 
-        $.act("Save")
+        const save = $.act("Save")
           .when(true)
           .does(async () => {})
           .invalidates(team)
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(save)
       })
 
       const runtime = createScreenRuntime(TestScreen)
@@ -2279,13 +2279,13 @@ describe("resource loader context", () => {
           autoLoad: false,
         })
 
-        $.act("Refresh")
+        const refresh = $.act("Refresh")
           .when(true)
           .does(async () => {
             await team.reload()
           })
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(refresh)
       })
 
       const runtime = createScreenRuntime(TestScreen)
@@ -2325,13 +2325,13 @@ describe("resource loader context", () => {
           },
         })
 
-        $.act("Refresh")
+        const refresh = $.act("Refresh")
           .when(true)
           .does(async () => {
             await team.reload()
           })
 
-        $.surface("main").contains(team as unknown as never)
+        $.surface("main").contains(refresh)
       })
 
       // Simulate renderDom: don't await start
