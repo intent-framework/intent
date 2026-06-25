@@ -9,10 +9,15 @@ export type ScreenHandle = {
   answer(label: string, value: string): Promise<void>
   feedback(): string | null
   state(): ScreenDefinition
+  resource(name: string): {
+    status(): string
+    load(): Promise<void>
+    reload(): Promise<void>
+  }
 }
 
 export function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenHandle) => Promise<void>): Promise<void> {
-  const screenDef = typeof name === "string" ? { name, asks: [], acts: [], flows: [], surfaces: [] } : name
+  const screenDef = typeof name === "string" ? { name, asks: [], acts: [], flows: [], surfaces: [], resources: [] } : name
 
   const handle: ScreenHandle = {
     act(label: string) {
@@ -70,6 +75,23 @@ export function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenH
       const stateObj = askNode.state as { value: string; set: (v: string) => void }
       if (typeof stateObj.set === "function") {
         stateObj.set(value)
+      }
+    },
+
+    resource(name: string) {
+      const resourceNode = screenDef.resources.find(
+        r => r.name.toLowerCase() === name.toLowerCase()
+      )
+      if (!resourceNode) {
+        throw new Error(
+          `Resource "${name}" not found. Available resources: ${screenDef.resources.map(r => r.name).join(", ")}`
+        )
+      }
+
+      return {
+        status: () => resourceNode.status,
+        load: () => resourceNode.load(),
+        reload: () => resourceNode.reload(),
       }
     },
 

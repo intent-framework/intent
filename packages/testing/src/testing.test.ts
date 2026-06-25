@@ -100,4 +100,61 @@ describe("testScreen", () => {
       expect(() => screen.act("Log in").toBeBlockedBy("Enter your email.")).toThrow()
     })
   })
+
+  it("checks resource status via screen handle", async () => {
+    let resolveLoad!: (value: string) => void
+    const loadPromise = new Promise<string>(resolve => { resolveLoad = resolve })
+
+    const TeamScreen = screen("ResourceTest", $ => {
+      $.resource("team", {
+        load: async () => loadPromise,
+      })
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      expect(screen.resource("team").status()).toBe("idle")
+
+      const loadDone = screen.resource("team").load()
+      expect(screen.resource("team").status()).toBe("pending")
+
+      resolveLoad("team_data")
+      await loadDone
+      expect(screen.resource("team").status()).toBe("ready")
+    })
+  })
+
+  it("throws when resource not found", async () => {
+    const TeamScreen = screen("NotFound", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      expect(() => screen.resource("nonexistent")).toThrow('Resource "nonexistent" not found.')
+    })
+  })
+
+  it("supports resource.reload via screen handle", async () => {
+    let callCount = 0
+    const TeamScreen = screen("ReloadTest", $ => {
+      $.resource("team", {
+        load: async () => {
+          callCount++
+          return `data${callCount}`
+        },
+      })
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      await screen.resource("team").load()
+      expect(screen.resource("team").status()).toBe("ready")
+
+      await screen.resource("team").reload()
+      expect(screen.resource("team").status()).toBe("ready")
+
+      // reload called the loader again
+      expect(callCount).toBe(2)
+    })
+  })
 })
