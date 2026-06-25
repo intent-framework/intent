@@ -145,6 +145,27 @@ runtime.dispose()         // cleanup
 renderDom(MyScreen, { target: document.getElementById("root")! })
 ```
 
+## Router
+
+```ts
+import { createRouter } from "@intent/router"
+
+const router = createRouter()
+  .route("home", "/", HomeScreen)
+  .route("login", "/login", LoginScreen)
+  .route("team.invite", "/teams/:teamId/invite", InviteMemberScreen)
+
+const match = router.match("/teams/team_1/invite")
+
+if (match.found) {
+  match.name       // "team.invite"
+  match.params     // { teamId: "team_1" }
+  match.screen     // InviteMemberScreen
+}
+
+router.path("team.invite", { teamId: "team_1" }) // "/teams/team_1/invite"
+```
+
 ## Semantic Tests
 
 ```ts
@@ -164,6 +185,7 @@ await testScreen(LoginScreen, async screen => {
 |---------|-------------|
 | `@intent/core` | Semantic graph builder. Zero DOM/React/Node dependencies. |
 | `@intent/dom` | DOM renderer. Real semantic HTML. No JSX, no React. |
+| `@intent/router` | Typed router. Map URL paths to semantic screens. |
 | `@intent/testing` | Semantic test harness. Test intent, not DOM. |
 | `@intent/server` | Typed server actions, resources, policies. |
 

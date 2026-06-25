@@ -7,6 +7,7 @@
     "paths": {
       "@intent/core": ["packages/core/src/index.ts"],
       "@intent/dom": ["packages/dom/src/index.ts"],
+      "@intent/router": ["packages/router/src/index.ts"],
       "@intent/testing": ["packages/testing/src/index.ts"],
       "@intent/server": ["packages/server/src/index.ts"]
     }
