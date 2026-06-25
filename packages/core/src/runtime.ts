@@ -1,25 +1,21 @@
 import type { ScreenDefinition } from "./screen.js"
 import { inspectScreen, type InspectedScreen } from "./graph.js"
 import type { AnyResourceNode } from "./resource.js"
-import type { ActionExecutionContext, NavigationService } from "./act.js"
+import type { ActionExecutionContext, DefaultScreenServices } from "./act.js"
 
-export type ScreenRuntimeServices = {
-  navigate?: NavigationService
-}
-
-export class ScreenRuntime {
-  private _screen: ScreenDefinition
+export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
+  private _screen: ScreenDefinition<TServices>
   private _started = false
   private _disposed = false
   private _unsubscribers: Array<() => void> = []
-  private _services: ScreenRuntimeServices
+  private _services: TServices
 
-  constructor(screen: ScreenDefinition, services: ScreenRuntimeServices = {}) {
+  constructor(screen: ScreenDefinition<TServices>, services: TServices = {} as TServices) {
     this._screen = screen
     this._services = services
   }
 
-  get screen(): ScreenDefinition {
+  get screen(): ScreenDefinition<TServices> {
     return this._screen
   }
 
@@ -31,14 +27,12 @@ export class ScreenRuntime {
     return [...this._screen.resources]
   }
 
-  get services(): ScreenRuntimeServices {
+  get services(): TServices {
     return this._services
   }
 
-  getExecutionContext(): ActionExecutionContext {
-    return {
-      navigate: this._services.navigate,
-    }
+  getExecutionContext(): ActionExecutionContext<TServices> {
+    return this._services as ActionExecutionContext<TServices>
   }
 
   async start(): Promise<void> {
@@ -68,9 +62,9 @@ export class ScreenRuntime {
   }
 }
 
-export function createScreenRuntime(
-  screen: ScreenDefinition,
-  options?: { services?: ScreenRuntimeServices },
-): ScreenRuntime {
-  return new ScreenRuntime(screen, options?.services)
+export function createScreenRuntime<TServices extends object = DefaultScreenServices>(
+  screen: ScreenDefinition<TServices>,
+  options?: { services?: TServices },
+): ScreenRuntime<TServices> {
+  return new ScreenRuntime<TServices>(screen, options?.services)
 }

@@ -1,11 +1,11 @@
 import type { AnyAskNode } from "./ask.js"
-import type { ActNode } from "./act.js"
+import type { ActNode, DefaultScreenServices } from "./act.js"
 import type { FlowNode } from "./flow.js"
 import type { SurfaceNode } from "./surface.js"
 import type { AnyResourceNode } from "./resource.js"
 
 const askMap = new Map<string, AnyAskNode>()
-const actMap = new Map<string, ActNode>()
+const actMap = new Map<string, ActNode<any>>()
 const flowMap = new Map<string, FlowNode>()
 const surfaceMap = new Map<string, SurfaceNode>()
 const resourceMap = new Map<string, AnyResourceNode>()
@@ -18,7 +18,7 @@ export function unregisterAskNode(id: string): void {
   askMap.delete(id)
 }
 
-export function registerActNode(node: ActNode): void {
+export function registerActNode<TServices extends object = DefaultScreenServices>(node: ActNode<TServices>): void {
   actMap.set(node.id, node)
 }
 
@@ -74,7 +74,7 @@ export function getAsks(): Map<string, AnyAskNode> {
   return askMap
 }
 
-export function getActs(): Map<string, ActNode> {
+export function getActs(): Map<string, ActNode<any>> {
   return actMap
 }
 

@@ -1,5 +1,5 @@
 import type { AnyAskNode } from "./ask.js"
-import type { ActNode } from "./act.js"
+import type { ActNode, DefaultScreenServices } from "./act.js"
 import type { FlowNode } from "./flow.js"
 import type { SurfaceNode } from "./surface.js"
 import type { ResourceNode, AnyResourceNode } from "./resource.js"
@@ -11,43 +11,46 @@ import { SurfaceBuilder } from "./surface.js"
 import { createResourceNode } from "./resource.js"
 import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, resetResourceRegistry, getAsks, getActs, getFlows, getSurfaces, getResources, registerResourceNode } from "./registry.js"
 
-export type ScreenBuilder = {
+export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
   state: {
     text: (name: string, opts?: { initial?: string }) => TextState
     boolean: (name: string, opts?: { initial?: boolean }) => BooleanState
     choice: <T extends string>(name: string, opts: { initial: T; options: readonly T[] }) => ChoiceState<T>
   }
   ask: <T>(label: string, state: { value: T }) => AskBuilder<T>
-  act: (label: string) => ActBuilder
+  act: (label: string) => ActBuilder<TServices>
   flow: (name: string) => FlowBuilder
   surface: (name: string) => SurfaceBuilder
   resource: <T>(name: string, config: { load: () => Promise<T>; autoLoad?: boolean }) => ResourceNode<T>
 }
 
-export type ScreenDefinition = {
+export type ScreenDefinition<TServices extends object = DefaultScreenServices> = {
   name: string
   asks: AnyAskNode[]
-  acts: ActNode[]
+  acts: ActNode<TServices>[]
   flows: FlowNode[]
   surfaces: SurfaceNode[]
   resources: AnyResourceNode[]
 }
 
-export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefinition {
+export function screen<TServices extends object = DefaultScreenServices>(
+  name: string,
+  fn: ($: ScreenBuilder<TServices>) => void
+): ScreenDefinition<TServices> {
   resetAskRegistry()
   resetActRegistry()
   resetFlowRegistry()
   resetSurfaceRegistry()
   resetResourceRegistry()
 
-  const builder: ScreenBuilder = {
+  const builder: ScreenBuilder<TServices> = {
     state: {
       text: (n, opts) => createTextState(n, opts?.initial),
       boolean: (n, opts) => createBooleanState(n, opts?.initial),
       choice: (n, opts) => createChoiceState(n, opts),
     },
     ask: (label, state) => new AskBuilder(label, state),
-    act: (label) => new ActBuilder(label),
+    act: (label) => new ActBuilder<TServices>(label),
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
     resource: <T>(n: string, config: { load: () => Promise<T>; autoLoad?: boolean }) => {
@@ -69,7 +72,7 @@ export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefi
   return {
     name,
     asks: Array.from(asks.values()),
-    acts: Array.from(acts.values()),
+    acts: Array.from(acts.values()) as ActNode<TServices>[],
     flows: Array.from(flows.values()),
     surfaces: Array.from(surfaces.values()),
     resources: Array.from(resources.values()),

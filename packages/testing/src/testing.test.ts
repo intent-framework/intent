@@ -345,4 +345,34 @@ describe("testScreen", () => {
       expect(navigate).toHaveBeenCalledWith("somewhere")
     }, { services: { navigate } })
   })
+
+  it("testScreen passes custom typed services to action", async () => {
+    type AppAnalytics = {
+      track(event: string): void
+    }
+
+    type AppServices = {
+      analytics: AppAnalytics
+      navigate: (name: string) => void
+    }
+
+    const analytics: AppAnalytics = { track: vi.fn() }
+    const navigate: (name: string) => void = vi.fn()
+
+    const TestScreen = screen<AppServices>("CustomServices", $ => {
+      $.act("Track and go")
+        .when(true)
+        .does(({ analytics: a, navigate: n }) => {
+          a.track("click")
+          n?.("home")
+        })
+      $.surface("main").contains()
+    })
+
+    await testScreen<AppServices>(TestScreen, async screen => {
+      await screen.act("Track and go").run()
+      expect(analytics.track).toHaveBeenCalledWith("click")
+      expect(navigate).toHaveBeenCalledWith("home")
+    }, { services: { analytics, navigate } })
+  })
 })

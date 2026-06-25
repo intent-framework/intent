@@ -1,25 +1,28 @@
-import type { ScreenDefinition, ActNode, ScreenRuntimeServices } from "@intent/core"
+import type { ScreenDefinition, ActNode, DefaultScreenServices } from "@intent/core"
 import { createScreenRuntime } from "@intent/core"
 
 function getReasonId(actId: string): string {
   return `${actId}-reason`
 }
 
-export type DomRendererOptions = {
+export type DomRendererOptions<TServices extends object = DefaultScreenServices> = {
   target: HTMLElement
-  services?: ScreenRuntimeServices
+  services?: TServices
 }
 
 export { renderRouter } from "./dom-router.js"
 export type { RouterDomHandle, RenderRouterOptions } from "./dom-router.js"
 
-export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptions): () => void {
+export function renderDom<TServices extends object = DefaultScreenServices>(
+  screenDef: ScreenDefinition<TServices>,
+  options: DomRendererOptions<TServices>
+): () => void {
   const { target, services } = options
   target.innerHTML = ""
   const root = buildDom(screenDef)
   target.appendChild(root)
 
-  const runtime = createScreenRuntime(screenDef, { services })
+  const runtime = createScreenRuntime<TServices>(screenDef, { services })
   runtime.start()
 
   const form = target.querySelector("form")!
@@ -80,7 +83,7 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
   }
 }
 
-function buildDom(screenDef: ScreenDefinition): HTMLElement {
+function buildDom<TServices extends object = DefaultScreenServices>(screenDef: ScreenDefinition<TServices>): HTMLElement {
   const surface = screenDef.surfaces[0]
   const main = document.createElement("main")
 
@@ -167,7 +170,7 @@ function buildDom(screenDef: ScreenDefinition): HTMLElement {
   return main
 }
 
-function updateFeedback(act: ActNode, output: Element): void {
+function updateFeedback<TServices extends object = DefaultScreenServices>(act: ActNode<TServices>, output: Element): void {
   const msg = act.feedback && act.statusMessage ? act.statusMessage : ""
   if (msg) {
     output.textContent = msg

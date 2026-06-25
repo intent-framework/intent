@@ -1370,3 +1370,138 @@ describe("resource invalidation", () => {
     expect(resource.stale.current).toBe(false)
   })
 })
+
+// Type-only test helpers — these are verified during pnpm typecheck
+type _TypeTestAppServices = {
+  analytics: { track(event: "login_clicked"): void }
+  navigate: (name: "home" | "login") => void
+}
+
+screen<_TypeTestAppServices>("TypeTestScreen", $ => {
+  $.act("Track")
+    .when(true)
+    .does(({ analytics }) => {
+      analytics.track("login_clicked")
+      // @ts-expect-error wrong event name
+      analytics.track("wrong_event")
+    })
+})
+
+{
+  screen<_TypeTestAppServices>("UnknownAccess", $ => {
+    $.act("Bad")
+      .does((ctx) => {
+        // @ts-expect-error unknown property
+        ctx.unknownService
+      })
+  })
+}
+
+describe("generic runtime services", () => {
+  type AppAnalytics = {
+    track(event: string): void
+  }
+
+  type AppServices = {
+    analytics: AppAnalytics
+    navigate: (name: "home" | "login") => void
+  }
+
+  it("no-arg does() still compiles and runs", async () => {
+    let called = false
+    const TestScreen = screen("NoArgGeneric", $ => {
+      $.act("Test")
+        .when(true)
+        .does(() => {
+          called = true
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    await actNode.execute()
+    expect(called).toBe(true)
+  })
+
+  it("does((context) => {...}) receives default services", async () => {
+    let received: unknown
+    const TestScreen = screen("DefaultContext", $ => {
+      $.act("Test")
+        .when(true)
+        .does((context) => {
+          received = context
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    const ctx = { navigate: (_name: string) => {} }
+    await actNode.execute(ctx)
+    expect(received).toBe(ctx)
+  })
+
+  it("custom screen services are visible in action context", async () => {
+    let receivedAnalytics: unknown
+    const TestScreen = screen<AppServices>("CustomServices", $ => {
+      $.act("Track")
+        .when(true)
+        .does(({ analytics }) => {
+          receivedAnalytics = analytics
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    const analytics: AppAnalytics = { track: vi.fn() }
+    await actNode.execute({ analytics, navigate: (_name: "home" | "login") => {} })
+    expect(receivedAnalytics).toBe(analytics)
+  })
+
+  it("custom service method types are enforced", async () => {
+    const TestScreen = screen<AppServices>("EnforcedTypes", $ => {
+      $.act("Track")
+        .when(true)
+        .does(({ analytics }) => {
+          analytics.track("test_event")
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    const analytics: AppAnalytics = { track: vi.fn() }
+    await actNode.execute({ analytics, navigate: (_name: "home" | "login") => {} })
+    expect(analytics.track).toHaveBeenCalledWith("test_event")
+  })
+
+  it("runtime passes custom service to action", async () => {
+    const analytics: AppAnalytics = { track: vi.fn() }
+    const TestScreen = screen<AppServices>("RuntimeCustom", $ => {
+      $.act("Track")
+        .when(true)
+        .does(({ analytics: a }) => {
+          a.track("event")
+        })
+    })
+
+    const runtime = createScreenRuntime<AppServices>(TestScreen, {
+      services: { analytics, navigate: (_name: "home" | "login") => {} },
+    })
+
+    const ctx = runtime.getExecutionContext()
+    const actNode = TestScreen.acts[0]!
+    await actNode.execute(ctx)
+    expect(analytics.track).toHaveBeenCalledWith("event")
+  })
+
+  it("runtime.getExecutionContext() returns typed services", () => {
+    const analytics: AppAnalytics = { track: vi.fn() }
+    const navigate: (name: "home" | "login") => void = vi.fn()
+    const TestScreen = screen<AppServices>("TypedRuntimeContext", $ => {
+      $.act("Test").when(true)
+    })
+
+    const runtime = createScreenRuntime<AppServices>(TestScreen, {
+      services: { analytics, navigate },
+    })
+
+    const ctx = runtime.getExecutionContext()
+    expect(ctx.analytics).toBe(analytics)
+    expect(ctx.navigate).toBe(navigate)
+  })
+})

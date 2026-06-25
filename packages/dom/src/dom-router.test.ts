@@ -409,4 +409,43 @@ describe("renderRouter", () => {
 
     cleanup()
   })
+
+  it("renderDom passes custom typed services to action on form submit", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    type AppServices = {
+      analytics: { track(event: string): void }
+      navigate: (name: string) => void
+    }
+
+    const track = vi.fn()
+    const navigate: (name: string) => void = vi.fn()
+
+    const CustomScreen = screen<AppServices>("CustomScreen", $ => {
+      $.act("Do it")
+        .primary()
+        .when(true)
+        .does(({ analytics, navigate }) => {
+          analytics.track("submitted")
+          navigate?.("done")
+        })
+      $.surface("main").contains()
+    })
+
+    const root = document.getElementById("root")!
+
+    const cleanup = renderDom<AppServices>(CustomScreen, {
+      target: root,
+      services: { analytics: { track }, navigate },
+    })
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(track).toHaveBeenCalledWith("submitted")
+    expect(navigate).toHaveBeenCalledWith("done")
+
+    cleanup()
+  })
 })

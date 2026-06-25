@@ -1,4 +1,4 @@
-import type { ScreenDefinition, NavigationService } from "@intent/core"
+import type { ScreenDefinition, NavigationService, DefaultScreenServices } from "@intent/core"
 import type { Router, RoutePathArgs } from "@intent/router"
 import { renderDom } from "./index.js"
 
@@ -41,7 +41,7 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
     const navigateService: NavigationService = internalNavigate
 
     if (match.found) {
-      currentCleanup = renderDom(match.screen, {
+      currentCleanup = renderDom<DefaultScreenServices>(match.screen as ScreenDefinition<DefaultScreenServices>, {
         target: options.target,
         services: { navigate: navigateService },
       })
@@ -52,7 +52,7 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
       const screen = typeof options.notFound === "function"
         ? options.notFound(pathname)
         : options.notFound
-      currentCleanup = renderDom(screen, {
+      currentCleanup = renderDom<DefaultScreenServices>(screen as ScreenDefinition<DefaultScreenServices>, {
         target: options.target,
         services: { navigate: navigateService },
       })

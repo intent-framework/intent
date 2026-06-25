@@ -1,4 +1,5 @@
 import type { ScreenDefinition } from "./screen.js"
+import type { DefaultScreenServices } from "./act.js"
 
 export type InspectedScreen = {
   name: string
@@ -41,7 +42,7 @@ export type InspectedScreen = {
   }>
 }
 
-export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
+export function inspectScreen<TServices extends object = DefaultScreenServices>(screenDef: ScreenDefinition<TServices>): InspectedScreen {
   return {
     name: screenDef.name,
     asks: screenDef.asks.map(a => ({

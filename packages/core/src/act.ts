@@ -4,9 +4,13 @@ import type { AnyResourceNode } from "./resource.js"
 
 export type NavigationService = (name: string, params?: Record<string, string>) => void
 
-export type ActionExecutionContext = {
+export type DefaultScreenServices = {
   navigate?: NavigationService
 }
+
+export type ActionExecutionContext<
+  TServices extends object = DefaultScreenServices
+> = Readonly<TServices>
 
 export type FeedbackConfig = {
   pending?: string
@@ -23,31 +27,31 @@ export type ActCondition = {
   source?: Condition
 }
 
-export type ActNode = {
+export type ActNode<TServices extends object = DefaultScreenServices> = {
   id: string
   label: string
   primary: boolean
   conditions: ActCondition[]
-  handler: ((context: ActionExecutionContext) => Promise<void> | void) | null
+  handler: ((context: ActionExecutionContext<TServices>) => Promise<void> | void) | null
   feedback?: FeedbackConfig
   invalidates: AnyResourceNode[]
   status: ActStatus
   statusMessage: string | null
   enabled: Condition
   blockedReasons: string[]
-  execute: (context?: ActionExecutionContext) => Promise<void>
+  execute: (context?: ActionExecutionContext<TServices>) => Promise<void>
   onStatusChange: (fn: () => void) => () => void
 }
 
-export function createActNode(
+export function createActNode<TServices extends object = DefaultScreenServices>(
   id: string,
   label: string,
   conditions: ActCondition[],
-  handler: ((context: ActionExecutionContext) => Promise<void> | void) | null,
+  handler: ((context: ActionExecutionContext<TServices>) => Promise<void> | void) | null,
   feedback: FeedbackConfig | undefined,
   primary: boolean,
   invalidates: AnyResourceNode[] = [],
-): ActNode {
+): ActNode<TServices> {
   const statusSignal: Signal<number> = signal(0)
 
   const notifyStatus = () => statusSignal.set(statusSignal.get() + 1)
@@ -69,7 +73,7 @@ export function createActNode(
     return _enabledCondition
   }
 
-  const node: ActNode = {
+  const node: ActNode<TServices> = {
     id,
     label,
     primary,
@@ -88,7 +92,7 @@ export function createActNode(
         .map(c => c.message)
         .filter((m): m is string => m !== undefined)
     },
-    execute: async (context?: ActionExecutionContext) => {
+    execute: async (context?: ActionExecutionContext<TServices>) => {
       await executeAct(node, context, notifyStatus)
     },
     onStatusChange(fn: () => void) {
@@ -98,7 +102,7 @@ export function createActNode(
   return node
 }
 
-function computeActEnabled(node: ActNode): boolean {
+function computeActEnabled<TServices extends object = DefaultScreenServices>(node: ActNode<TServices>): boolean {
   for (const cond of node.conditions) {
     if (!cond.check()) {
       return false
@@ -107,7 +111,11 @@ function computeActEnabled(node: ActNode): boolean {
   return true
 }
 
-async function executeAct(node: ActNode, context: ActionExecutionContext | undefined, notify: () => void): Promise<void> {
+async function executeAct<TServices extends object = DefaultScreenServices>(
+  node: ActNode<TServices>,
+  context: ActionExecutionContext<TServices> | undefined,
+  notify: () => void
+): Promise<void> {
   if (!node.enabled.current || !node.handler) {
     return
   }
@@ -117,7 +125,7 @@ async function executeAct(node: ActNode, context: ActionExecutionContext | undef
   notify()
 
   try {
-    await node.handler(context ?? {})
+    await node.handler(context ?? ({} as ActionExecutionContext<TServices>))
     node.status = "success"
     node.statusMessage = node.feedback?.success ?? null
     notify()
@@ -136,12 +144,12 @@ async function executeAct(node: ActNode, context: ActionExecutionContext | undef
   }
 }
 
-export class ActBuilder {
-  private node: ActNode
+export class ActBuilder<TServices extends object = DefaultScreenServices> {
+  private node: ActNode<TServices>
 
   constructor(label: string) {
     const id = `act_${label.toLowerCase().replace(/\s+/g, "_")}`
-    this.node = createActNode(id, label, [], null, undefined, false)
+    this.node = createActNode<TServices>(id, label, [], null, undefined, false)
     registerActNode(this.node)
   }
 
@@ -181,7 +189,7 @@ export class ActBuilder {
     return this
   }
 
-  does(fn: (context: ActionExecutionContext) => Promise<void> | void): this {
+  does(fn: (context: ActionExecutionContext<TServices>) => Promise<void> | void): this {
     this.node.handler = fn
     return this
   }
@@ -196,7 +204,7 @@ export class ActBuilder {
     return this
   }
 
-  toNode(): ActNode {
+  toNode(): ActNode<TServices> {
     return this.node
   }
 }

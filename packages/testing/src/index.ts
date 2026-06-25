@@ -1,7 +1,7 @@
-import type { ScreenDefinition, ScreenRuntimeServices } from "@intent/core"
+import type { ScreenDefinition, DefaultScreenServices } from "@intent/core"
 import { createScreenRuntime } from "@intent/core"
 
-export type ScreenHandle = {
+export type ScreenHandle<TServices extends object = DefaultScreenServices> = {
   act(label: string): {
     toBeEnabled(): void
     toBeBlocked(): void
@@ -10,7 +10,7 @@ export type ScreenHandle = {
   }
   answer(label: string, value: string): Promise<void>
   feedback(): string | null
-  state(): ScreenDefinition
+  state(): ScreenDefinition<TServices>
   resource(name: string): {
     status(): string
     load(): Promise<void>
@@ -21,20 +21,22 @@ export type ScreenHandle = {
   start(): Promise<void>
 }
 
-export type TestScreenOptions = {
-  services?: ScreenRuntimeServices
+export type TestScreenOptions<TServices extends object = DefaultScreenServices> = {
+  services?: TServices
 }
 
-export async function testScreen(
-  name: string | ScreenDefinition,
-  fn: (screen: ScreenHandle) => Promise<void>,
-  options?: TestScreenOptions,
+export async function testScreen<TServices extends object = DefaultScreenServices>(
+  name: string | ScreenDefinition<TServices>,
+  fn: (screen: ScreenHandle<TServices>) => Promise<void>,
+  options?: TestScreenOptions<TServices>,
 ): Promise<void> {
-  const screenDef = typeof name === "string" ? { name, asks: [], acts: [], flows: [], surfaces: [], resources: [] } : name
+  const screenDef = typeof name === "string"
+    ? { name, asks: [], acts: [], flows: [], surfaces: [], resources: [] } as unknown as ScreenDefinition<TServices>
+    : name
 
-  const runtime = createScreenRuntime(screenDef, { services: options?.services })
+  const runtime = createScreenRuntime<TServices>(screenDef, { services: options?.services })
 
-  const handle: ScreenHandle = {
+  const handle: ScreenHandle<TServices> = {
     act(label: string) {
       const actNode = screenDef.acts.find(
         a => a.label.toLowerCase() === label.toLowerCase()
@@ -122,7 +124,7 @@ export async function testScreen(
       return actWithFeedback?.statusMessage ?? null
     },
 
-    state() {
+    state(): ScreenDefinition<TServices> {
       return screenDef
     },
 
