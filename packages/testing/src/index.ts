@@ -14,6 +14,8 @@ export type ScreenHandle = {
     status(): string
     load(): Promise<void>
     reload(): Promise<void>
+    invalidate(): void
+    stale(): boolean
   }
   start(): Promise<void>
 }
@@ -96,6 +98,8 @@ export async function testScreen(name: string | ScreenDefinition, fn: (screen: S
         status: () => resourceNode.status,
         load: () => resourceNode.load(),
         reload: () => resourceNode.reload(),
+        invalidate: () => resourceNode.invalidate(),
+        stale: () => resourceNode.stale.current,
       }
     },
 

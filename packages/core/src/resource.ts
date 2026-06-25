@@ -12,8 +12,10 @@ export type ResourceNode<T> = {
   ready: Condition
   pending: Condition
   failed: Condition
+  stale: Condition
   load: () => Promise<void>
   reload: () => Promise<void>
+  invalidate: () => void
   subscribe: (fn: () => void) => () => void
 }
 
@@ -26,16 +28,20 @@ export function createResourceNode<T>(
   autoLoad = true,
 ): ResourceNode<T> {
   const statusSignal: Signal<number> = signal(0)
+  const staleSignal: Signal<number> = signal(0)
 
   let currentStatus: ResourceStatus = "idle"
   let currentValue: T | undefined = undefined
   let currentError: unknown = undefined
+  let currentStale = false
 
   const notify = () => statusSignal.set(statusSignal.get() + 1)
+  const staleNotify = () => staleSignal.set(staleSignal.get() + 1)
 
   let _ready: Condition | undefined
   let _pending: Condition | undefined
   let _failed: Condition | undefined
+  let _stale: Condition | undefined
 
   function getReady(): Condition {
     if (!_ready) {
@@ -67,7 +73,19 @@ export function createResourceNode<T>(
     return _failed
   }
 
+  function getStale(): Condition {
+    if (!_stale) {
+      _stale = createCondition(
+        () => currentStale,
+        notify => staleSignal.subscribe(() => notify()),
+      )
+    }
+    return _stale
+  }
+
   async function executeLoad(): Promise<void> {
+    currentStale = false
+    staleNotify()
     currentStatus = "pending"
     currentValue = undefined
     currentError = undefined
@@ -77,11 +95,22 @@ export function createResourceNode<T>(
       const result = await loader()
       currentValue = result
       currentStatus = "ready"
+      currentStale = false
       notify()
+      staleNotify()
     } catch (e: unknown) {
       currentError = e
       currentStatus = "failed"
+      currentStale = false
       notify()
+      staleNotify()
+    }
+  }
+
+  function invalidate(): void {
+    if (!currentStale) {
+      currentStale = true
+      staleNotify()
     }
   }
 
@@ -107,8 +136,12 @@ export function createResourceNode<T>(
     get failed() {
       return getFailed()
     },
+    get stale() {
+      return getStale()
+    },
     load: executeLoad,
     reload: executeLoad,
+    invalidate,
     subscribe(fn: () => void) {
       return statusSignal.subscribe(fn)
     },

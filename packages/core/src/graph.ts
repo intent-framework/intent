@@ -19,6 +19,7 @@ export type InspectedScreen = {
     blockedReasons: string[]
     status: string
     statusMessage: string | null
+    invalidates: string[]
   }>
   flows: Array<{
     id: string
@@ -35,6 +36,7 @@ export type InspectedScreen = {
     name: string
     status: string
     hasValue: boolean
+    stale: boolean
     error: string | undefined
   }>
 }
@@ -59,6 +61,7 @@ export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
       blockedReasons: a.blockedReasons,
       status: a.status,
       statusMessage: a.statusMessage,
+      invalidates: a.invalidates.map(r => r.name),
     })),
     flows: screenDef.flows.map(f => ({
       id: f.id,
@@ -75,6 +78,7 @@ export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
       name: r.name,
       status: r.status,
       hasValue: r.value !== undefined,
+      stale: r.stale.current,
       error: r.status === "failed"
         ? (r.error instanceof Error ? r.error.message : String(r.error))
         : undefined,
