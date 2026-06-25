@@ -387,6 +387,8 @@ If validation fails:
 
 Do not hide failed commands.
 
+CI runs the same clean-dist validation expected locally.
+
 ---
 
 ## Testing Rules
