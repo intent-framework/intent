@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@intent/core": "workspace:*",
-    "@intent/dom": "workspace:*"
+    "@intent/dom": "workspace:*",
+    "@intent/router": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

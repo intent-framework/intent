@@ -21,7 +21,7 @@ What works:
 - `@intent/dom` - real semantic HTML renderer (form, label, input, button, output)
 - `@intent/testing` - semantic test harness (answer asks, assert act state, load resources)
 - `@intent/server` - typed action/resource/policy skeleton
-- `examples/web-basic` - Login screen without JSX or manual DOM
+- `examples/web-basic` - Login screen + route-driven team invite app demonstrating typed navigation, route context, runtime-scoped resources, action blocked reasons, and semantic asks/acts/surfaces
 
 ## Quick Example
 
@@ -301,10 +301,24 @@ pnpm lint
 
 ## Examples
 
+### Login Screen
+
 ```sh
 cd examples/web-basic
 pnpm dev
 ```
+
+Open `http://localhost:5173/` or `http://localhost:5173/login` to see typed navigation.
+
+The example demonstrates:
+- `createRouter` and `renderRouter` with three routes: home, team details (`/teams/:teamId`), and team invite (`/teams/:teamId/invite`)
+- Typed navigation with route params in action handlers
+- Route context injection into action handlers and resource loaders
+- Runtime-scoped resource loading (`$.resource` with route-param-driven load)
+- Action blocked reasons (ask validation blocks an action until the email is valid)
+- Action feedback (pending/success/failure states)
+- `$.flow` for interaction sequencing
+- Semantic asks with contact type, required, and private metadata
 
 ## Architecture
 
