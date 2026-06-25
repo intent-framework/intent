@@ -21,7 +21,7 @@ What works:
 - `@intent/dom` - real semantic HTML renderer (form, label, input, button, output); each action renders as an independently executable button
 - `@intent/testing` - semantic test harness (answer asks, assert act state, load resources)
 - `@intent/server` - typed action/resource/policy skeleton
-- `examples/web-basic` - Login screen + route-driven team invite app demonstrating typed navigation, route context, runtime-scoped resources, action blocked reasons, semantic asks/acts/surfaces, and multiple independent actions per screen
+- `examples/web-basic` - Team invite demo demonstrating semantic screens, typed router navigation, route context, runtime-scoped resources, resource reload, independent actions, keyboard default action, accessible Enter hint, and graph diagnostics
 - `inspectScreen()` includes semantic diagnostics for common graph footguns, including ambiguous primary actions and unsurfaced asks/actions.
 
 ## Quick Example
@@ -302,24 +302,35 @@ pnpm lint
 
 ## Examples
 
-### Login Screen
+### Team Invite Demo
 
 ```sh
 cd examples/web-basic
 pnpm dev
 ```
 
-Open `http://localhost:5173/` or `http://localhost:5173/login` to see typed navigation.
+Open `http://localhost:5173/` to explore the demo.
 
-The example demonstrates:
-- `createRouter` and `renderRouter` with three routes: home, team details (`/teams/:teamId`), and team invite (`/teams/:teamId/invite`)
-- Typed navigation with route params in action handlers
+**What to click:**
+
+1. **Home** — Shows three teams (Alpha, Beta, Gamma) as independent actions. Click one to navigate.
+2. **Team Details** — Resource auto-loads team data. Click "Refresh team" to reload and see the version increment. Click "Invite member" to navigate to the invite form.
+3. **Invite** — Type an email address. The "Send invite" button is blocked until the email is valid. Press **Enter** to submit (the accessible hint appears automatically). After sending, the demo navigates back to team details with the member count updated.
+4. **Diagnostics panel** — Below each screen, `inspectScreen()` shows any graph diagnostics. Clean screens show "✓ No diagnostics."
+
+**Features demonstrated:**
+- Semantic screens (Home, Team Details, Invite, Not Found)
+- Typed router navigation with route params
 - Route context injection into action handlers and resource loaders
 - Runtime-scoped resource loading (`$.resource` with route-param-driven load)
-- Action blocked reasons (ask validation blocks an action until the email is valid)
+- Manual resource reload with visible version increment
+- Multiple independent actions per surface
+- Action blocked reasons (email validation blocks Send invite)
 - Action feedback (pending/success/failure states)
 - `$.flow` for interaction sequencing
 - Semantic asks with contact type, required, and private metadata
+- Keyboard Enter key default action with accessible hint
+- Graph diagnostics via `inspectScreen()`
 
 ## Architecture
 

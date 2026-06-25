@@ -1,4 +1,4 @@
-import { screen } from "@intent/core"
+import { screen, inspectScreen, type ScreenDefinition } from "@intent/core"
 import { createRouter } from "@intent/router"
 import { renderRouter } from "@intent/dom"
 import type { RouterServices, RoutesFromPaths, RouteContext } from "@intent/router"
@@ -19,6 +19,7 @@ function delay(ms: number) {
 }
 
 let teamLoadVersion = 0
+const teamVersions: Record<string, number> = {}
 
 const teams: Record<string, { id: string; name: string; members: string[] }> = {
   team_1: { id: "team_1", name: "Alpha", members: [] },
@@ -30,7 +31,9 @@ async function loadTeam(teamId: string) {
   await delay(80)
   const team = teams[teamId]
   if (!team) throw new Error(`Team "${teamId}" not found`)
-  return { ...team, version: ++teamLoadVersion }
+  const version = ++teamLoadVersion
+  teamVersions[teamId] = version
+  return { ...team, version }
 }
 
 async function inviteMember(teamId: string, email: string) {
@@ -40,15 +43,52 @@ async function inviteMember(teamId: string, email: string) {
   team.members.push(email)
 }
 
+function updateTeamInfo(teamId: string | undefined) {
+  const el = document.getElementById("team-info")
+  if (!el) return
+  if (!teamId) {
+    el.textContent = ""
+    return
+  }
+  const team = teams[teamId]
+  const version = teamVersions[teamId]
+  if (team) {
+    const versionStr = version ? `(v${version}) ` : ""
+    el.textContent = `${versionStr}${team.name} — ${team.members.length} member${team.members.length === 1 ? "" : "s"}`
+  }
+}
+
+function updateDiagnostics(screenDef: ScreenDefinition<any>) {
+  const el = document.getElementById("diagnostics")
+  if (!el) return
+  const inspected = inspectScreen(screenDef)
+  if (inspected.diagnostics.length === 0) {
+    el.textContent = "✓ No diagnostics."
+  } else {
+    el.textContent = inspected.diagnostics.map(d =>
+      `[${d.severity}] ${d.code}${d.nodeId ? ` (${d.nodeId})` : ""}: ${d.message}`
+    ).join("\n")
+  }
+}
+
 const HomeScreen = screen<AppServices>("Home", $ => {
-  const openTeam = $.act("Open team")
+  const openAlpha = $.act("Open Alpha — team_1")
     .primary()
-    .when(true)
     .does(({ navigate }) => {
       navigate("team.details", { teamId: "team_1" })
     })
 
-  $.surface("main").contains(openTeam)
+  const openBeta = $.act("Open Beta — team_2")
+    .does(({ navigate }) => {
+      navigate("team.details", { teamId: "team_2" })
+    })
+
+  const openGamma = $.act("Open Gamma — team_3")
+    .does(({ navigate }) => {
+      navigate("team.details", { teamId: "team_3" })
+    })
+
+  $.surface("main").contains(openAlpha, openBeta, openGamma)
 })
 
 const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
@@ -62,8 +102,16 @@ const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
   })
 
   const refresh = $.act("Refresh team")
-    .does(async () => {
+    .does(async ({ route }) => {
       await team.reload()
+      if (route.name === "team.details") {
+        updateTeamInfo(route.params.teamId)
+      }
+    })
+    .feedback({
+      pending: "Refreshing...",
+      success: "Team refreshed.",
+      failure: "Could not refresh.",
     })
 
   const invite = $.act("Invite member")
@@ -76,7 +124,6 @@ const TeamDetailScreen = screen<AppServices>("Team Details", $ => {
     })
 
   const back = $.act("Back home")
-    .when(true)
     .does(({ navigate }) => {
       navigate("home")
     })
@@ -97,6 +144,7 @@ const InviteScreen = screen<AppServices>("Invite", $ => {
     .does(async ({ navigate, route }) => {
       if (route.name === "team.invite") {
         await inviteMember(route.params.teamId, emailText.value)
+        updateTeamInfo(route.params.teamId)
         navigate("team.details", { teamId: route.params.teamId })
       }
     })
@@ -122,10 +170,31 @@ const router = createRouter<AppServices>()
   .route("team.details", appPaths["team.details"], TeamDetailScreen)
   .route("team.invite", appPaths["team.invite"], InviteScreen)
 
-const root = document.getElementById("root")
-if (root) {
-  renderRouter(router, {
-    target: root,
-    notFound: NotFoundScreen,
-  })
+const root = document.getElementById("root")!
+renderRouter(router, {
+  target: root,
+  notFound: NotFoundScreen,
+})
+
+function onRouteChanged() {
+  const match = router.match(location.pathname)
+  if (match.found) {
+    updateDiagnostics(match.screen)
+    if (match.name === "team.details") {
+      updateTeamInfo(match.params.teamId)
+    } else {
+      updateTeamInfo(undefined)
+    }
+  }
 }
+
+let framePending: number | undefined
+new MutationObserver(() => {
+  if (framePending) cancelAnimationFrame(framePending)
+  framePending = requestAnimationFrame(() => {
+    framePending = undefined
+    onRouteChanged()
+  })
+}).observe(root, { childList: true })
+
+onRouteChanged()
