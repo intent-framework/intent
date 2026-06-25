@@ -21,7 +21,7 @@ export type ScreenBuilder = {
   act: (label: string) => ActBuilder
   flow: (name: string) => FlowBuilder
   surface: (name: string) => SurfaceBuilder
-  resource: <T>(name: string, config: { load: () => Promise<T> }) => ResourceNode<T>
+  resource: <T>(name: string, config: { load: () => Promise<T>; autoLoad?: boolean }) => ResourceNode<T>
 }
 
 export type ScreenDefinition = {
@@ -50,9 +50,9 @@ export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefi
     act: (label) => new ActBuilder(label),
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
-    resource: <T>(n: string, config: { load: () => Promise<T> }) => {
+    resource: <T>(n: string, config: { load: () => Promise<T>; autoLoad?: boolean }) => {
       const id = `resource_${n}`
-      const node = createResourceNode<T>(id, n, config.load)
+      const node = createResourceNode<T>(id, n, config.load, config.autoLoad)
       registerResourceNode(node as AnyResourceNode)
       return node
     },

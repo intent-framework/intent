@@ -5,6 +5,7 @@ export type ResourceStatus = "idle" | "pending" | "ready" | "failed"
 export type ResourceNode<T> = {
   id: string
   name: string
+  autoLoad: boolean
   status: ResourceStatus
   value: T | undefined
   error: unknown | undefined
@@ -22,6 +23,7 @@ export function createResourceNode<T>(
   id: string,
   name: string,
   loader: () => Promise<T>,
+  autoLoad = true,
 ): ResourceNode<T> {
   const statusSignal: Signal<number> = signal(0)
 
@@ -86,6 +88,7 @@ export function createResourceNode<T>(
   const node: ResourceNode<T> = {
     id,
     name,
+    autoLoad,
     get status() {
       return currentStatus
     },

@@ -1,4 +1,5 @@
 import type { ScreenDefinition } from "@intent/core"
+import { createScreenRuntime } from "@intent/core"
 
 export type ScreenHandle = {
   act(label: string): {
@@ -14,10 +15,13 @@ export type ScreenHandle = {
     load(): Promise<void>
     reload(): Promise<void>
   }
+  start(): Promise<void>
 }
 
-export function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenHandle) => Promise<void>): Promise<void> {
+export async function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenHandle) => Promise<void>): Promise<void> {
   const screenDef = typeof name === "string" ? { name, asks: [], acts: [], flows: [], surfaces: [], resources: [] } : name
+
+  const runtime = createScreenRuntime(screenDef)
 
   const handle: ScreenHandle = {
     act(label: string) {
@@ -105,7 +109,17 @@ export function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenH
     state() {
       return screenDef
     },
+
+    start() {
+      return runtime.start()
+    },
   }
 
-  return fn(handle)
+  await runtime.start()
+
+  try {
+    await fn(handle)
+  } finally {
+    runtime.dispose()
+  }
 }

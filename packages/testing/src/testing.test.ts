@@ -108,6 +108,7 @@ describe("testScreen", () => {
     const TeamScreen = screen("ResourceTest", $ => {
       $.resource("team", {
         load: async () => loadPromise,
+        autoLoad: false,
       })
     })
 
@@ -143,6 +144,7 @@ describe("testScreen", () => {
           callCount++
           return `data${callCount}`
         },
+        autoLoad: false,
       })
     })
 
@@ -155,6 +157,86 @@ describe("testScreen", () => {
 
       // reload called the loader again
       expect(callCount).toBe(2)
+    })
+  })
+
+  it("auto-loads resources on testScreen start", async () => {
+    let loaded = false
+    const TeamScreen = screen("AutoLoad", $ => {
+      $.resource("team", {
+        load: async () => {
+          loaded = true
+          return "team_data"
+        },
+      })
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      expect(loaded).toBe(true)
+      expect(screen.resource("team").status()).toBe("ready")
+    })
+  })
+
+  it("autoLoad: false resources stay idle after auto-start", async () => {
+    let loaded = false
+    const TeamScreen = screen("ManualLoad", $ => {
+      $.resource("searchResults", {
+        load: async () => {
+          loaded = true
+          return "results"
+        },
+        autoLoad: false,
+      })
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      expect(loaded).toBe(false)
+      expect(screen.resource("searchResults").status()).toBe("idle")
+    })
+  })
+
+  it("exposes start() for manual runtime control", async () => {
+    let loaded = false
+    const TeamScreen = screen("ManualStart", $ => {
+      $.resource("team", {
+        load: async () => {
+          loaded = true
+          return "data"
+        },
+        autoLoad: false,
+      })
+    })
+
+    // autoLoad: false means testScreen won't load it on auto-start
+    await testScreen(TeamScreen, async screen => {
+      expect(loaded).toBe(false)
+
+      // Manually start the runtime (already started, but start guards against double)
+      await screen.start()
+      expect(loaded).toBe(false) // still false because autoLoad: false
+
+      // Manually load
+      await screen.resource("team").load()
+      expect(loaded).toBe(true)
+      expect(screen.resource("team").status()).toBe("ready")
+    })
+  })
+
+  it("resource conditions update act state after auto-load in testScreen", async () => {
+    const TeamScreen = screen("TestResourceUpdatesAct", $ => {
+      const team = $.resource("team", {
+        load: async () => ({ id: "team_1" }),
+      })
+
+      $.act("Save")
+        .when(team.ready, "Team must load first.")
+
+      $.surface("main").contains(team as unknown as never)
+    })
+
+    await testScreen(TeamScreen, async screen => {
+      // After auto-load, resource is ready and act should be enabled
+      expect(() => screen.act("Save").toBeEnabled()).not.toThrow()
     })
   })
 })
