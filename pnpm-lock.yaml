@@ -45,6 +45,9 @@ importers:
       '@intent/core':
         specifier: workspace:*
         version: link:../core
+      '@intent/router':
+        specifier: workspace:*
+        version: link:../router
     devDependencies:
       jsdom:
         specifier: ^29.1.1

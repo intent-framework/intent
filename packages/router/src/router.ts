@@ -20,7 +20,7 @@ export type RouteParams<Path extends string> =
     ? {}
     : { [Key in RouteParamNames<Path>]: string }
 
-type RoutePathArgs<Path extends string> =
+export type RoutePathArgs<Path extends string> =
   [RouteParamNames<Path>] extends [never]
     ? []
     : [params: RouteParams<Path>]

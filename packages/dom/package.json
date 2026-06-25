@@ -22,7 +22,8 @@
     "lint": "tsc -b"
   },
   "dependencies": {
-    "@intent/core": "workspace:*"
+    "@intent/core": "workspace:*",
+    "@intent/router": "workspace:*"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

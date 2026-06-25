@@ -9,6 +9,9 @@ export type DomRendererOptions = {
   target: HTMLElement
 }
 
+export { renderRouter } from "./dom-router.js"
+export type { RouterDomHandle, RenderRouterOptions } from "./dom-router.js"
+
 export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptions): () => void {
   const { target } = options
   target.innerHTML = ""
