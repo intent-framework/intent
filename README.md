@@ -1,299 +1,258 @@
 # Intent
 
-Intent is a semantic full-stack interaction framework for TypeScript applications.
+**Product intent is the program.**
 
-Product intent is the program.
+Intent is an experimental TypeScript framework for describing applications as a semantic graph of screens, state, asks, actions, resources, routes, and surfaces.
 
-## MVP Status
+It is not trying to make JSX nicer. It is not trying to wrap React. It is not a UI kit.
 
-The first working proof is implemented.
+Intent asks a different question:
 
-What works:
+> What if the source of truth for an app was not components, DOM nodes, routes, or handlers, but the product intent itself?
 
-- `screen` - define interaction screens
-- `state.text`, `state.boolean`, `state.choice` - reactive state with getter/setter
-- `ask` - semantic questions with required validation, custom validation, privacy, input types
-- `act` - actions with reactive conditions, async handlers, feedback states
-- `resource` - async resources with load/reload lifecycle, auto-load policy, and reactive conditions
-- `createScreenRuntime` - runtime lifecycle (start auto-loads resources, dispose cleans up)
-- `flow` - interaction sequencing
-- `surface` - presentation grouping
-- `@intent/dom` - real semantic HTML renderer (form, label, input, button, output); each action renders as an independently executable button
-- `@intent/testing` - semantic test harness (answer asks, assert act state, load resources)
-- `@intent/server` - typed action/resource/policy skeleton
-- `examples/web-basic` - Team invite demo demonstrating semantic screens, typed router navigation, route context, runtime-scoped resources, resource reload, independent actions, keyboard default action, accessible Enter hint, and graph diagnostics
-- `inspectScreen()` includes semantic diagnostics for common graph footguns, including ambiguous primary actions and unsurfaced asks/actions.
+The DOM is one possible output. A server route is one possible transport. A test harness is one possible observer. The product model lives above them.
 
-## Quick Example
+## Status
+
+Intent is early and experimental.
+
+The current repository proves the core shape:
+
+- Platformless semantic core
+- DOM renderer
+- Typed router
+- Runtime-scoped resources
+- Resource reload and invalidation
+- Independent executable actions
+- Keyboard Enter default action
+- Accessible Enter hints
+- Screen-name headings
+- Graph diagnostics via `inspectScreen()`
+- Semantic test harness
+- A runnable web demo
+- CI clean-dist validation
+
+It is not production-ready yet. The goal right now is to keep the foundation small, inspectable, and hard to fake.
+
+## Why Intent exists
+
+Modern app code often scatters product meaning across UI components, route files, data hooks, form handlers, test selectors, and backend endpoints.
+
+Intent tries to keep the meaning in one graph.
+
+Instead of starting with:
+
+```txt
+Which component renders this?
+Which route owns this?
+Which handler mutates this?
+Which selector does the test click?
+```
+
+Intent starts with:
+
+```txt
+What is the screen?
+What does the user need to provide?
+What actions are possible?
+When is an action blocked?
+What resource does this screen depend on?
+What should tests be able to assert semantically?
+```
+
+The renderer then materializes that graph.
+
+## Tiny example
 
 ```ts
-import { screen } from "@intent/core"
-import { renderDom } from "@intent/dom"
+import { screen, state } from "@intent/core"
 
-const LoginScreen = screen("Login", $ => {
+export const InviteScreen = screen("Invite", $ => {
   const email = $.state.text("email")
-  const password = $.state.text("password")
 
-  const emailAsk = $.ask("Email", email).asContact("email").required().private()
-  const passwordAsk = $.ask("Password", password).asSecret().required().private()
+  const emailAsk = $.ask("Email", email)
+    .asContact("email")
+    .required()
 
-  const login = $.act("Log in")
+  const sendInvite = $.act("Send invite")
     .primary()
-    .when(emailAsk.valid)
-    .when(passwordAsk.valid)
-    .does(async () => { await loginUser({ email: email.value, password: password.value }) })
-    .feedback({ pending: "Logging in...", success: "Logged in.", failure: "Could not log in." })
-
-  $.surface("main").contains(emailAsk, passwordAsk, login)
-})
-
-renderDom(LoginScreen, { target: document.getElementById("root")! })
-```
-
-Outputs real semantic HTML:
-
-```html
-<main>
-  <form>
-    <label>Email</label><input type="email" autocomplete="email" required />
-    <label>Password</label><input type="password" required />
-    <button type="button" disabled>Log in</button>
-    <output aria-live="polite"></output>
-  </form>
-</main>
-```
-
-## Resources
-
-Resources let screens declare async data dependencies semantically:
-
-```ts
-const team = $.resource("team", {
-  load: async () => getTeam(teamId.value)
-})
-
-// Reactive conditions
-const invite = $.act("Send invite")
-  .when(team.ready, "Team must load first.")
-
-// Lifecycle
-await team.load()       // idle → pending → ready/failed
-await team.reload()     // re-fetch
-team.status             // "idle" | "pending" | "ready" | "failed"
-team.value              // T | undefined
-team.ready.current      // boolean
-```
-
-### Invalidation
-
-Actions can declare which resources become stale after success:
-
-```ts
-const team = $.resource("team", {
-  load: async () => getTeam()
-})
-
-const save = $.act("Save")
-  .does(saveTeam)
-  .invalidates(team)
-// or multiple:
-// .invalidates(team, members)
-```
-
-Semantics:
-
-- `resource.invalidate()` marks the resource stale without clearing the value.
-- `resource.stale.current` is a reactive Condition.
-- `resource.ready.current` remains `true` even when stale — readiness and staleness are independent.
-- Successful load clears stale; failed load also clears stale (the refresh was attempted).
-- Invalidation fires stale condition subscribers.
-
-Resources support an auto-load policy (default `true`):
-
-```ts
-// Auto-loads when the screen starts
-const team = $.resource("team", {
-  load: async () => getTeam()
-})
-
-// Manual/lazy — load only when explicitly triggered
-const searchResults = $.resource("searchResults", {
-  load: async () => search(query.value),
-  autoLoad: false
-})
-```
-
-## Screen Runtime
-
-A runtime starts a screen instance and triggers lifecycle behavior such as resource auto-loading:
-
-```ts
-import { createScreenRuntime } from "@intent/core"
-import { screen } from "@intent/core"
-import { renderDom } from "@intent/dom"
-
-const MyScreen = screen("MyScreen", $ => { /* ... */ })
-
-// Manual runtime
-const runtime = createScreenRuntime(MyScreen)
-await runtime.start()     // auto-loads resources
-runtime.screen            // ScreenDefinition
-runtime.graph             // snapshot via inspectScreen
-runtime.resources         // resource nodes
-runtime.dispose()         // cleanup
-
-// DOM renderer creates and starts a runtime automatically
-renderDom(MyScreen, { target: document.getElementById("root")! })
-```
-
-## Router
-
-```ts
-import { createRouter } from "@intent/router"
-import { renderRouter } from "@intent/dom"
-
-const router = createRouter()
-  .route("home", "/", HomeScreen)
-  .route("login", "/login", LoginScreen)
-  .route("team.invite", "/teams/:teamId/invite", InviteMemberScreen)
-
-// Type-safe path building
-router.path("home")                                 // "/"
-router.path("team.invite", { teamId: "team_1" })    // "/teams/team_1/invite"
-// router.path("team.invite")                       // type error: missing params
-// router.path("team.invite", { wrong: "x" })       // type error: wrong param
-
-// Typed match results
-const match = router.match("/teams/team_1/invite")
-
-if (match.found) {
-  match.name       // "home" | "login" | "team.invite"
-  match.params     // { teamId: "team_1" }
-  match.screen     // InviteMemberScreen
-}
-
-// Browser router shell — renders matched screens to the DOM
-const app = renderRouter(router, {
-  target: document.getElementById("root")!,
-})
-
-// Typed imperative navigation
-app.navigate("login")
-app.navigate("team.invite", { teamId: "team_1" })
-
-app.dispose()
-```
-
-## Action Navigation
-
-Actions can navigate using a runtime-provided service. When rendered through `renderRouter()`, the router provides navigation to actions:
-
-```ts
-import { screen } from "@intent/core"
-import { renderRouter } from "@intent/dom"
-
-const LoginScreen = screen("Login", $ => {
-  $.act("Go to home")
-    .primary()
-    .does(({ navigate }) => {
-      navigate?.("home")
+    .when(emailAsk.valid, "Enter a valid email.")
+    .does(async ({ navigate }) => {
+      // product behavior goes here
+      navigate?.("team")
     })
-  $.surface("main").contains()
+
+  $.surface("main").contains(emailAsk, sendInvite)
 })
 ```
 
-The `navigate` function is available in the action execution context. The service is provided by the runtime — core only knows the abstract interface:
+This defines more than UI.
 
-```ts
-navigate?.("login")                              // static route
-navigate?.("team.details", { teamId: "team_1" }) // dynamic route
+It defines:
+
+* A screen named `Invite`
+* A semantic email ask
+* A required validation condition
+* A primary action
+* A blocked reason
+* A surface containing product-relevant nodes
+* Something renderers, tests, and diagnostics can inspect
+
+## What Intent is
+
+Intent is a semantic application graph.
+
+It gives names and behavior to product-level concepts:
+
+* `screen`
+* `state`
+* `ask`
+* `act`
+* `condition`
+* `resource`
+* `surface`
+* `flow`
+* `route`
+
+Renderers and adapters then materialize that graph into specific environments.
+
+Today, the repository includes a DOM renderer, a router, a server package, and a testing package. More targets can exist later without making the core depend on them.
+
+## What Intent is not
+
+Intent is not:
+
+* A React clone
+* A JSX replacement
+* A component library
+* A UI kit
+* A CSS framework
+* An API route framework
+* A backend framework
+* A compiler yet
+* A native renderer yet
+* A DevTools package yet
+
+Those may become outputs, adapters, or tools around the graph. They are not the center.
+
+## Core idea
+
+Intent separates product meaning from output mechanics.
+
+```txt
+Product graph     → screen, ask, action, resource, route, surface
+Runtime           → state, conditions, blocked reasons, feedback, resource lifecycle
+Materializers     → DOM, tests, server adapters, future native/devtools/compiler
 ```
 
-Direct calls to `screen.act(...).execute()` without context still work.
+The DOM is an output, not the language.
 
-### Typed Navigation
+Routes are navigation, not the product model.
 
-Route-map-derived types give typed navigation inside action context:
+API routes are transport, not the backend model.
 
-```ts
-import { screen } from "@intent/core"
-import { type RouterServices, type RoutesFromPaths } from "@intent/router"
-
-const appPaths = { home: "/", login: "/login" } as const
-type AppRoutes = RoutesFromPaths<typeof appPaths>
-type AppServices = RouterServices<AppRoutes>
-
-const Home = screen<AppServices>("Home", $ => {
-  const goLogin = $.act("Go login").does(({ navigate }) => {
-    navigate("login")
-    // navigate("login", {})  // type error: static route rejects params
-  })
-
-  $.surface("main").contains(goLogin)
-})
-```
-
-Extra services can be added alongside typed navigate:
-
-```ts
-type AppServices = RouterServices<AppRoutes, {
-  analytics: { track(event: string): void }
-}>
-```
-
-### Route Context
-
-Routed screens can access matched route params inside action handlers:
-
-```ts
-import { type RouteContext, type RouterServices, type RoutesFromPaths } from "@intent/router"
-
-const appPaths = { home: "/", "team.invite": "/teams/:teamId/invite" } as const
-type AppRoutes = RoutesFromPaths<typeof appPaths>
-type AppServices = RouterServices<AppRoutes, {
-  route: RouteContext<AppRoutes>
-}>
-
-const Team = screen<AppServices>("Team", $ => {
-  $.act("Accept invite")
-    .does(({ route }) => {
-      if (route.name === "team.invite") {
-        console.log(route.params.teamId)
-      }
-    })
-  $.surface("main").contains()
-})
-```
-
-`renderRouter()` injects the route context automatically. For not-found screens, route is absent.
-
-## Semantic Tests
-
-```ts
-import { testScreen } from "@intent/testing"
-
-await testScreen(LoginScreen, async screen => {
-  expect(screen.act("Log in")).toBeBlocked()
-  await screen.answer("Email", "mahyar@example.com")
-  await screen.answer("Password", "secret")
-  expect(screen.act("Log in")).toBeEnabled()
-})
-```
+Tests should assert product semantics, not DOM trivia.
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `@intent/core` | Semantic graph builder. Zero DOM/React/Node dependencies. |
-| `@intent/dom` | DOM renderer. Real semantic HTML. No JSX, no React. |
-| `@intent/router` | Typed router. Map URL paths to semantic screens. |
-| `@intent/testing` | Semantic test harness. Test intent, not DOM. |
-| `@intent/server` | Typed server actions, resources, policies. |
+This repository currently contains:
 
-## Development
+| Package           | Purpose                                 |
+| ----------------- | --------------------------------------- |
+| `@intent/core`    | Platformless semantic graph and runtime |
+| `@intent/dom`     | DOM materializer for screens and router |
+| `@intent/router`  | Typed route definitions and navigation  |
+| `@intent/testing` | Semantic test harness                   |
+| `@intent/server`  | Early server-side package               |
+
+The core package must remain platformless. It should not import DOM, React, router internals, server framework code, or native APIs.
+
+## Run the demo
+
+Install dependencies:
 
 ```sh
 pnpm install
+```
+
+Run the web demo:
+
+```sh
+pnpm dev:web-basic
+```
+
+Open the local URL printed by Vite.
+
+The demo shows a small team invite flow:
+
+1. Pick a team.
+2. View team details.
+3. Refresh the team resource.
+4. Open the invite screen.
+5. Try to send with an empty or invalid email.
+6. Type a valid email.
+7. Press Enter or click Send invite.
+8. Return to team details and see the member count update.
+9. Inspect the diagnostics panel.
+
+For a guided walkthrough, see [Demo Guide](docs/Demo.md).
+
+## What the demo demonstrates
+
+The demo is intentionally small. It is a dagger, not a cathedral.
+
+It demonstrates:
+
+* Semantic screens
+* Independent actions rendered as buttons
+* Typed router navigation
+* Route context passed into actions and resources
+* Runtime-scoped resources
+* Resource reload
+* Ask validation
+* Blocked action reasons
+* Feedback output
+* Keyboard Enter default action
+* Accessible Enter hint
+* Opt-in screen-name headings
+* Graph diagnostics via `inspectScreen()`
+* Clean-dist CI validation
+
+## Testing philosophy
+
+Intent tests should speak product language.
+
+Instead of testing only DOM selectors, tests can ask questions like:
+
+```txt
+Is this action enabled?
+Why is this action blocked?
+What happens when this ask is answered?
+What resources does this screen expose?
+What diagnostics does this graph produce?
+```
+
+The testing package exists so product behavior can be checked without pretending the DOM is the source of truth.
+
+## Diagnostics
+
+Intent can inspect a screen graph through `inspectScreen()`.
+
+Diagnostics currently catch graph-level issues such as:
+
+* Multiple primary actions
+* Secret asks that are not private
+* Primary actions blocked without a human-readable reason
+* Asks not included in a surface
+* Actions not included in a surface
+
+Diagnostics are not lint rules for HTML. They are semantic graph feedback.
+
+## Development
+
+Run clean validation locally:
+
+```sh
 rm -rf packages/*/dist examples/*/dist
 pnpm test
 pnpm typecheck
@@ -301,45 +260,75 @@ pnpm build
 pnpm lint
 ```
 
-CI runs the same validation on every PR and push to `main`.
+CI runs the same clean-dist validation on every pull request and every push to `main`.
 
-## Examples
+The clean-dist step matters. It prevents tests from accidentally passing because of stale package output.
 
-### Team Invite Demo
+## Current limitations
 
-```sh
-cd examples/web-basic
-pnpm dev
-```
+Intent is still missing many things on purpose.
 
-Open `http://localhost:5173/` to explore the demo.
+Current limitations include:
 
-**What to click:**
+* No compiler yet
+* No native renderer yet
+* No SSR story yet
+* No backend persistence yet
+* No real resource cache policy yet
+* No DevTools package yet
+* No package publishing flow yet
+* Demo side panels use manual DOM
+* Demo diagnostics panel uses `MutationObserver`
+* Demo data is in memory only
 
-1. **Home** — Shows three teams (Alpha, Beta, Gamma) as independent actions. Click one to navigate.
-2. **Team Details** — Resource auto-loads team data. Click "Refresh team" to reload and see the version increment. Click "Invite member" to navigate to the invite form.
-3. **Invite** — Type an email address. The "Send invite" button is blocked until the email is valid. Press **Enter** to submit (the accessible hint appears automatically). After sending, the demo navigates back to team details with the member count updated.
-4. **Diagnostics panel** — Below each screen, `inspectScreen()` shows any graph diagnostics. Clean screens show "✓ No diagnostics."
+These are not hidden. They are the next architectural decisions.
 
-**Features demonstrated:**
-- Semantic screens (Home, Team Details, Invite, Not Found)
-- Typed router navigation with route params
-- Route context injection into action handlers and resource loaders
-- Runtime-scoped resource loading (`$.resource` with route-param-driven load)
-- Manual resource reload with visible version increment
-- Multiple independent actions per surface
-- Action blocked reasons (email validation blocks Send invite)
-- Action feedback (pending/success/failure states)
-- `$.flow` for interaction sequencing
-- Semantic asks with contact type, required, and private metadata
-- Keyboard Enter key default action with accessible hint
-- Screen name rendered as a semantic `<h1>` via the DOM renderer's `showScreenName` option
-- Graph diagnostics via `inspectScreen()`
+## Design rules
 
-## Architecture
+Intent should stay small and semantically sharp.
 
-Intent starts from the semantic graph, not the component tree.
+Core rules:
 
-```
-Developer authors intent → Semantic graph → DOM/resource/test materialization
-```
+* Core stays platformless.
+* DOM does not own product truth.
+* Router does not own product truth.
+* Server routes are transport.
+* Public behavior gets tests.
+* Types should stay precise.
+* Avoid `any`.
+* Avoid renderer-specific leakage into core.
+* Prefer semantic primitives over framework glue.
+
+## Roadmap
+
+Near-term work:
+
+* Harden the demo path
+* Improve graph diagnostics
+* Add better resource semantics
+* Add richer documentation
+* Explore DevTools-style graph inspection
+* Clarify server-side intent boundaries
+
+Not yet:
+
+* Compiler
+* Native renderer
+* SSR
+* Production persistence
+* Styling system
+* Component ecosystem
+
+## Project thesis
+
+Intent should let a product flow be authored once as meaning, then observed or materialized many ways.
+
+A screen should be understandable before it becomes DOM.
+
+An action should be testable before it becomes a button.
+
+A resource should be inspectable before it becomes a fetch call.
+
+A route should navigate the product graph, not become the product graph.
+
+That is the line Intent is trying to hold.
