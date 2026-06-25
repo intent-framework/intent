@@ -791,4 +791,361 @@ describe("DOM renderer", () => {
     await new Promise(r => setTimeout(r, 10))
     expect(capturedA).toBe("hello world")
   })
+
+  describe("Enter key default action", () => {
+    it("pressing Enter in an ask input runs the single primary action", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executed = false
+
+      const Screen = screen("EnterSinglePrimary", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {
+            executed = true
+          })
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      input.value = "Alice"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(executed).toBe(true)
+    })
+
+    it("pressing Enter in an ask input runs the only action when no primary exists", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executed = false
+
+      const Screen = screen("EnterOnlyAction", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Save")
+          .when(ask.valid)
+          .does(async () => {
+            executed = true
+          })
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      input.value = "Alice"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(executed).toBe(true)
+    })
+
+    it("pressing Enter does nothing when multiple actions exist and no single primary default", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executedA = false
+      let executedB = false
+
+      const Screen = screen("EnterMultipleActionsNoPrimary", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const actA = $.act("Action A")
+          .when(ask.valid)
+          .does(async () => {
+            executedA = true
+          })
+        const actB = $.act("Action B")
+          .when(ask.valid)
+          .does(async () => {
+            executedB = true
+          })
+        $.surface("main").contains(ask, actA, actB)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      input.value = "Alice"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(executedA).toBe(false)
+      expect(executedB).toBe(false)
+    })
+
+    it("pressing Enter does nothing when multiple primary actions exist", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executedA = false
+      let executedB = false
+
+      const Screen = screen("EnterMultiplePrimary", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const actA = $.act("Action A")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {
+            executedA = true
+          })
+        const actB = $.act("Action B")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {
+            executedB = true
+          })
+        $.surface("main").contains(ask, actA, actB)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      input.value = "Alice"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(executedA).toBe(false)
+      expect(executedB).toBe(false)
+    })
+
+    it("pressing Enter does not execute a blocked/disabled default action", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executed = false
+
+      const Screen = screen("EnterBlockedAction", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid, "Name is required.")
+          .does(async () => {
+            executed = true
+          })
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      // Do not fill the input — action remains blocked
+
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(executed).toBe(false)
+    })
+
+    it("ask state is updated before Enter-triggered action reads it", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let captured: string | undefined
+
+      const Screen = screen("EnterAskState", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {
+            captured = text.value
+          })
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      input.value = "Bob"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(captured).toBe("Bob")
+    })
+
+    it("Enter-triggered action uses runtime.executeAct, preserving resource invalidation", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let loadCount = 0
+
+      const Screen = screen("EnterInvalidates", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const team = $.resource("team", {
+          load: async () => {
+            loadCount++
+            return { id: "team_1", loadCount }
+          },
+        })
+
+        const refresh = $.act("Refresh")
+          .primary()
+          .when(ask.valid, "Enter name first.")
+          .when(team.ready, "Team must load.")
+          .invalidates(team)
+          .does(async () => {})
+
+        $.surface("main").contains(ask, refresh)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      // Wait for resource autoload
+      const ref = Screen.resourceConfigs[0]!.ref!
+      if (ref.status === "idle" || ref.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = ref.subscribe(() => {
+            if (ref.status === "ready" || ref.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(loadCount).toBe(1)
+
+      // Fill in the ask so the action is enabled
+      const input = root.querySelector("input")!
+      input.value = "Charlie"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      // Press Enter — should invalidate the resource via runtime.executeAct
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 50))
+
+      expect(ref.stale.current).toBe(true)
+      expect(loadCount).toBe(1)
+    })
+
+    it("no modifier-key Enter triggers the action", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executed = false
+
+      const Screen = screen("EnterModifier", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {
+            executed = true
+          })
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const input = root.querySelector("input")!
+      input.value = "Alice"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+
+      await new Promise(r => setTimeout(r, 10))
+
+      // Shift+Enter should not trigger
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true, bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(false)
+
+      // Meta+Enter should not trigger
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(false)
+
+      // Ctrl+Enter should not trigger
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(false)
+
+      // Alt+Enter should not trigger
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", altKey: true, bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(false)
+
+      // Plain Enter should trigger
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(true)
+    })
+
+    it("existing click-based independent action tests still pass", async () => {
+      // This test verifies that independent button click behavior from PR #23 is preserved.
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let refreshed = false
+      let invited = false
+
+      const Screen = screen("ExistingClickTest", $ => {
+        const refresh = $.act("Refresh")
+          .primary()
+          .when(true)
+          .does(async () => {
+            refreshed = true
+          })
+
+        const invite = $.act("Invite")
+          .when(true)
+          .does(async () => {
+            invited = true
+          })
+
+        $.surface("main").contains(refresh, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const buttons = root.querySelectorAll("button")
+
+      // Click Invite — only invite should execute
+      ;(buttons[1] as HTMLButtonElement).click()
+      await new Promise(r => setTimeout(r, 10))
+      expect(refreshed).toBe(false)
+      expect(invited).toBe(true)
+
+      // Reset and click Refresh
+      invited = false
+      ;(buttons[0] as HTMLButtonElement).click()
+      await new Promise(r => setTimeout(r, 10))
+      expect(refreshed).toBe(true)
+      expect(invited).toBe(false)
+    })
+  })
 })

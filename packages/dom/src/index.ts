@@ -5,6 +5,19 @@ function getReasonId(actId: string): string {
   return `${actId}-reason`
 }
 
+function findDefaultAction<TServices extends object = DefaultScreenServices>(
+  acts: ActNode<TServices>[]
+): ActNode<TServices> | undefined {
+  const primaryActs = acts.filter(a => a.primary)
+  if (primaryActs.length === 1) {
+    return primaryActs[0]
+  }
+  if (acts.length === 1) {
+    return acts[0]
+  }
+  return undefined
+}
+
 export type DomRendererOptions<TServices extends object = DefaultScreenServices> = {
   target: HTMLElement
   services?: TServices
@@ -74,6 +87,26 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
           runtime.executeAct(act)
         }
       })
+    }
+  }
+
+  // Enter key in an ask input triggers the default action
+  for (const ask of screenDef.asks) {
+    const input = form.querySelector(`#${ask.id}`) as HTMLElement | null
+    if (input) {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Enter") return
+        if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return
+        if (input.tagName === "TEXTAREA") return
+
+        const defaultAction = findDefaultAction(screenDef.acts)
+        if (!defaultAction || !defaultAction.enabled.current) return
+
+        event.preventDefault()
+        runtime.executeAct(defaultAction)
+      }
+      input.addEventListener("keydown", onKeyDown)
+      unsubscribers.push(() => input.removeEventListener("keydown", onKeyDown))
     }
   }
 

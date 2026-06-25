@@ -1457,4 +1457,51 @@ describe("renderRouter", () => {
       app.dispose()
     })
   })
+
+  describe("Enter key default action with renderRouter", () => {
+    it("renderRouter navigation works when default action is triggered via Enter", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+
+      const HomeScreen = screen("Home", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        $.act("Go to login")
+          .primary()
+          .when(ask.valid)
+          .does(({ navigate }) => {
+            navigate?.("login")
+          })
+        $.surface("main").contains(ask)
+      })
+
+      const LoginScreen = screen("Login", $ => {
+        $.act("Login action").primary()
+        $.surface("main").contains()
+      })
+
+      const router = createRouter()
+        .route("home", "/", HomeScreen)
+        .route("login", "/login", LoginScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, { target: root, window: win })
+
+      // Initially on home screen
+      expect(root.querySelector("button")?.textContent).toBe("Go to login")
+
+      // Fill in the ask to enable the action
+      const input = root.querySelector("input")!
+      input.value = "Alice"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      // Press Enter — should navigate to login
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(root.querySelector("button")?.textContent).toBe("Login action")
+      expect(win._getPathname()).toBe("/login")
+    })
+  })
 })
