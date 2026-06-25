@@ -25,8 +25,8 @@ const LoginScreen = screen("Login", $ => {
 
   const login = $.act("Log in")
     .primary()
-    .when(email)
-    .when(password)
+    .when(emailAsk.valid)
+    .when(passwordAsk.valid)
     .does(async () => {
       await loginUser({
         email: email.value,

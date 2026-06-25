@@ -40,7 +40,7 @@ export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
       kind: a.kind,
       required: a.required,
       isPrivate: a.isPrivate,
-      valid: a.valid,
+      valid: a.valid.current,
       error: a.error,
     })),
     acts: screenDef.acts.map(a => ({

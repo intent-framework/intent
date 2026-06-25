@@ -1,4 +1,4 @@
-import { signal, type Signal } from "./signal.js"
+import { signal, type Signal, isCondition, type Condition } from "./signal.js"
 import { registerActNode } from "./registry.js"
 
 export type FeedbackConfig = {
@@ -111,16 +111,23 @@ export class ActBuilder {
     return this
   }
 
-  when(condition: boolean | (() => boolean) | { valid: boolean }, message?: string): this {
+  when(condition: Condition | boolean | (() => boolean) | { valid: Condition | boolean }, message?: string): this {
     let check: () => boolean
     if (typeof condition === "function") {
       check = condition as () => boolean
     } else if (typeof condition === "object" && condition !== null && "valid" in condition) {
-      const state = condition as { valid: boolean }
-      check = () => state.valid
+      const state = condition as { valid: Condition | boolean }
+      if (isCondition(state.valid)) {
+        const cond = state.valid
+        check = () => cond.current
+      } else {
+        const val = state.valid
+        check = () => val
+      }
+    } else if (isCondition(condition)) {
+      check = () => condition.current
     } else {
-      const val = condition as boolean
-      check = () => val
+      check = () => condition as boolean
     }
     this.node.conditions.push({ check, message })
     return this

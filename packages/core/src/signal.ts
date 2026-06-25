@@ -1,3 +1,29 @@
+export type Condition = {
+  readonly current: boolean
+  readonly reason?: string
+  subscribe(fn: () => void): () => void
+}
+
+export function isCondition(value: unknown): value is Condition {
+  return typeof value === "object" && value !== null && "current" in value && "subscribe" in value
+}
+
+export function createCondition(
+  compute: () => boolean,
+  subscribeToChanges: (onChange: () => void) => () => void,
+  reason?: string,
+): Condition {
+  return {
+    get current() {
+      return compute()
+    },
+    reason,
+    subscribe(fn: () => void) {
+      return subscribeToChanges(() => fn())
+    },
+  }
+}
+
 export type Signal<T> = {
   get(): T
   set(value: T): void

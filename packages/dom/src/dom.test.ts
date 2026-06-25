@@ -26,8 +26,8 @@ describe("DOM renderer", () => {
 
       const login = $.act("Log in")
         .primary()
-        .when(email)
-        .when(password)
+        .when(emailAsk.valid)
+        .when(passwordAsk.valid)
         .does(async () => {
           await loginUser({ email: email.value, password: password.value })
         })
@@ -97,8 +97,8 @@ describe("DOM renderer", () => {
 
       const login = $.act("Log in")
         .primary()
-        .when(email)
-        .when(password)
+        .when(emailAsk.valid)
+        .when(passwordAsk.valid)
 
       $.surface("main")
         .contains(emailAsk, passwordAsk, login)
@@ -142,8 +142,8 @@ describe("DOM renderer", () => {
 
       const login = $.act("Log in")
         .primary()
-        .when(email)
-        .when(password)
+        .when(emailAsk.valid)
+        .when(passwordAsk.valid)
 
       $.surface("main")
         .contains(emailAsk, passwordAsk, login)
@@ -190,8 +190,8 @@ describe("DOM renderer", () => {
 
       const login = $.act("Log in")
         .primary()
-        .when(email)
-        .when(password)
+        .when(emailAsk.valid)
+        .when(passwordAsk.valid)
         .does(async () => {
           await Promise.resolve()
           resolved = true
@@ -236,7 +236,7 @@ describe("DOM renderer", () => {
     const TestScreen = screen("Cleanup", $ => {
       const email = $.state.text("email")
       const emailAsk = $.ask("Email", email).required()
-      const login = $.act("Log in").primary().when(email)
+      const login = $.act("Log in").primary().when(emailAsk.valid)
       $.surface("main").contains(emailAsk, login)
     })
 
