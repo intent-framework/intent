@@ -319,6 +319,8 @@ Not yet:
 * Styling system
 * Component ecosystem
 
+See [MVP Checkpoint](docs/MVP-Checkpoint.md) for the current implementation boundary.
+
 ## Project thesis
 
 Intent should let a product flow be authored once as meaning, then observed or materialized many ways.
