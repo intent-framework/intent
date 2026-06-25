@@ -1383,4 +1383,109 @@ describe("DOM renderer", () => {
       })
     })
   })
+
+  describe("showScreenName heading", () => {
+    it("does not render a screen name heading by default", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("MyScreen", $ => {
+        $.act("Do it").primary().when(true).does(async () => {})
+        $.surface("main").contains()
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const heading = root.querySelector("h1")
+      expect(heading).toBeNull()
+    })
+
+    it("renders <h1>{screen.name}</h1> when enabled", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Team Details", $ => {
+        $.act("Do it").primary().when(true).does(async () => {})
+        $.surface("main").contains()
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showScreenName: true })
+
+      const heading = root.querySelector("h1")
+      expect(heading).not.toBeNull()
+      expect(heading!.textContent).toBe("Team Details")
+    })
+
+    it("places heading before main/surface content", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("MyScreen", $ => {
+        $.act("Do it").primary().when(true).does(async () => {})
+        $.surface("main").contains()
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showScreenName: true })
+
+      const main = root.querySelector("main")!
+      const children = main.children
+      expect(children.length).toBeGreaterThanOrEqual(2)
+      expect(children[0]!.tagName).toBe("H1")
+      expect(children[0]!.textContent).toBe("MyScreen")
+      expect(children[1]!.tagName).toBe("FORM")
+    })
+
+    it("does not break ask/action rendering", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Login", $ => {
+        const text = $.state.text("email")
+        const ask = $.ask("Email", text).required()
+        const act = $.act("Log in").primary().when(ask.valid).does(async () => {})
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showScreenName: true })
+
+      const heading = root.querySelector("h1")
+      expect(heading).not.toBeNull()
+      expect(heading!.textContent).toBe("Login")
+
+      const label = root.querySelector("label")
+      expect(label).not.toBeNull()
+      expect(label!.textContent).toBe("Email")
+
+      const button = root.querySelector("button")
+      expect(button).not.toBeNull()
+      expect(button!.textContent).toBe("Log in")
+    })
+
+    it("does not duplicate heading after action execution", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("MyScreen", $ => {
+        $.act("Do it").primary().when(true).does(async () => {})
+        $.surface("main").contains()
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showScreenName: true })
+
+      // Should have exactly one heading
+      const headingsBefore = root.querySelectorAll("h1")
+      expect(headingsBefore).toHaveLength(1)
+      expect(headingsBefore[0]!.textContent).toBe("MyScreen")
+
+      // Execute the action
+      const button = root.querySelector("button") as HTMLButtonElement
+      button.click()
+      await new Promise(r => setTimeout(r, 10))
+
+      // Still exactly one heading
+      const headingsAfter = root.querySelectorAll("h1")
+      expect(headingsAfter).toHaveLength(1)
+      expect(headingsAfter[0]!.textContent).toBe("MyScreen")
+    })
+  })
 })

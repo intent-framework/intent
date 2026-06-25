@@ -29,6 +29,7 @@ function findDefaultAction<TServices extends object = DefaultScreenServices>(
 export type DomRendererOptions<TServices extends object = DefaultScreenServices> = {
   target: HTMLElement
   services?: TServices
+  showScreenName?: boolean
 }
 
 export { renderRouter } from "./dom-router.js"
@@ -38,9 +39,9 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
   options: DomRendererOptions<TServices>
 ): () => void {
-  const { target, services } = options
+  const { target, services, showScreenName } = options
   target.innerHTML = ""
-  const root = buildDom(screenDef)
+  const root = buildDom(screenDef, showScreenName)
   target.appendChild(root)
 
   const runtime = createScreenRuntime<TServices>(screenDef, { services })
@@ -161,12 +162,21 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
   }
 }
 
-function buildDom<TServices extends object = DefaultScreenServices>(screenDef: ScreenDefinition<TServices>): HTMLElement {
+function buildDom<TServices extends object = DefaultScreenServices>(
+  screenDef: ScreenDefinition<TServices>,
+  showScreenName?: boolean
+): HTMLElement {
   const surface = screenDef.surfaces[0]
   const main = document.createElement("main")
 
   if (surface) {
     main.id = surface.id
+  }
+
+  if (showScreenName) {
+    const heading = document.createElement("h1")
+    heading.textContent = screenDef.name
+    main.appendChild(heading)
   }
 
   const form = document.createElement("form")
