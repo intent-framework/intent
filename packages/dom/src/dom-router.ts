@@ -16,7 +16,7 @@ export type RenderRouterOptions<TServices extends object = DefaultScreenServices
   target: HTMLElement
   window?: Window
   notFound?: ScreenDefinition<TServices> | ((pathname: string) => ScreenDefinition<TServices>)
-  services?: Omit<TServices, "navigate">
+  services?: Omit<TServices, "navigate" | "route">
 }
 
 export function renderRouter<
@@ -43,9 +43,18 @@ export function renderRouter<
 
     const match = router.match(pathname)
 
+    const route = match.found
+      ? {
+          name: match.name as string,
+          path: match.path,
+          params: match.params,
+        }
+      : undefined
+
     const mergedServices = {
       ...options.services,
       navigate,
+      route,
     } as TServices
 
     if (match.found) {

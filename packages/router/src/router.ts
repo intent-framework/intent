@@ -25,6 +25,24 @@ export type RoutePathArgs<Path extends string> =
     ? []
     : [params: RouteParams<Path>]
 
+export type RouteParamsFor<
+  Routes extends Record<string, { path: string }>,
+  Name extends Extract<keyof Routes, string>
+> = RouteParams<Routes[Name]["path"]>
+
+export type RouteContextFor<
+  Routes extends Record<string, { path: string }>,
+  Name extends Extract<keyof Routes, string>
+> = {
+  name: Name
+  path: Routes[Name]["path"]
+  params: RouteParamsFor<Routes, Name>
+}
+
+export type RouteContext<Routes extends Record<string, { path: string }>> = {
+  [Name in Extract<keyof Routes, string>]: RouteContextFor<Routes, Name>
+}[Extract<keyof Routes, string>]
+
 export type RouterNavigate<Routes extends Record<string, { path: string }>> =
   <Name extends Extract<keyof Routes, string>>(
     name: Name,

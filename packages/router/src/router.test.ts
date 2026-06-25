@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { screen } from "@intent/core"
 import { createRouter } from "./router.js"
-import type { RouteParams, RoutesFromPaths, RouterNavigate, RouterServices } from "./router.js"
+import type { RouteParams, RoutesFromPaths, RouterNavigate, RouterServices, RouteParamsFor, RouteContextFor, RouteContext } from "./router.js"
 
 const HomeScreen = screen("Home", () => {})
 const LoginScreen = screen("Login", () => {})
@@ -589,5 +589,115 @@ describe("typed navigation service", () => {
     router.path("user", { userId: "abc" })
 
     expect(router).toBeDefined()
+  })
+})
+
+describe("route context types", () => {
+  const appPaths = {
+    home: "/",
+    login: "/login",
+    "team.invite": "/teams/:teamId/invite",
+  } as const
+
+  type AppRoutes = RoutesFromPaths<typeof appPaths>
+
+  it("RouteParamsFor extracts params for dynamic route", () => {
+    const r: RouteParamsFor<AppRoutes, "team.invite"> = { teamId: "abc" }
+    expect(r.teamId).toBe("abc")
+  })
+
+  it("RouteParamsFor produces {} for static route", () => {
+    const r: RouteParamsFor<AppRoutes, "home"> = {}
+    expect(r).toEqual({})
+  })
+
+  it("RouteContextFor has name, path, and typed params", () => {
+    const r: RouteContextFor<AppRoutes, "team.invite"> = {
+      name: "team.invite",
+      path: "/teams/:teamId/invite",
+      params: { teamId: "t1" },
+    }
+    expect(r.name).toBe("team.invite")
+    expect(r.path).toBe("/teams/:teamId/invite")
+    expect(r.params.teamId).toBe("t1")
+  })
+
+  it("RouteContextFor rejects unknown params", () => {
+    // @ts-expect-error - unknown param should fail
+    const r: RouteParamsFor<AppRoutes, "team.invite"> = { unknown: "x" }
+    expect(r).toBeDefined()
+  })
+
+  it("RouteContext is a discriminated union by name", () => {
+    function handleRoute(route: RouteContext<AppRoutes>) {
+      if (route.name === "team.invite") {
+        const teamId: string = route.params.teamId
+        expect(typeof teamId).toBe("string")
+      }
+    }
+    handleRoute({ name: "home", path: "/", params: {} })
+    expect(true).toBe(true)
+  })
+
+  it("narrowing route.name gives typed params", () => {
+    function handleRoute(route: RouteContext<AppRoutes>) {
+      if (route.name === "team.invite") {
+        expect(route.params.teamId).toBeDefined()
+      }
+    }
+    handleRoute({
+      name: "team.invite",
+      path: "/teams/:teamId/invite",
+      params: { teamId: "t1" },
+    })
+  })
+
+  it("cannot access unknown param without narrowing", () => {
+    const route = { name: "team.invite" as const, path: "/teams/:teamId/invite" as const, params: { teamId: "t1" } }
+    const r: RouteContext<AppRoutes> = route
+    // @ts-expect-error - nonexistent param not on any route
+    r.params.nonexistent
+  })
+
+  it("unknown route name fails", () => {
+    // @ts-expect-error - unknown route name
+    const r: RouteContextFor<AppRoutes, "nonexistent"> = null as never
+    expect(r).toBeNull()
+  })
+
+  it("RouterServices with route context exposes both navigate and route", () => {
+    type Extra = { route: RouteContext<AppRoutes> }
+    type Svc = RouterServices<AppRoutes, Extra>
+
+    const svc: Svc = {
+      navigate: vi.fn() as RouterNavigate<AppRoutes>,
+      route: { name: "home", path: "/", params: {} },
+    }
+
+    svc.navigate("home")
+    svc.route.params = {}
+
+    expect(svc.navigate).toHaveBeenCalledWith("home")
+  })
+
+  it("screen<RouterServices> with route context gets typed route in action context", () => {
+    type Svc = RouterServices<AppRoutes, { route: RouteContext<AppRoutes> }>
+
+    const Scr = screen<Svc>("Test", $ => {
+      $.act("Use route")
+        .does(({ route, navigate }) => {
+          if (route.name === "team.invite") {
+            route.params.teamId
+          }
+
+          // @ts-expect-error must narrow before accessing dynamic param
+          route.params.teamId
+
+          navigate("home")
+        })
+      $.surface("main").contains()
+    })
+
+    expect(Scr).toBeDefined()
   })
 })
