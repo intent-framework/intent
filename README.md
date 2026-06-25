@@ -223,11 +223,12 @@ type AppRoutes = RoutesFromPaths<typeof appPaths>
 type AppServices = RouterServices<AppRoutes>
 
 const Home = screen<AppServices>("Home", $ => {
-  $.act("Go login").does(({ navigate }) => {
+  const goLogin = $.act("Go login").does(({ navigate }) => {
     navigate("login")
     // navigate("login", {})  // type error: static route rejects params
   })
-  $.surface("main").contains()
+
+  $.surface("main").contains(goLogin)
 })
 ```
 
