@@ -155,15 +155,20 @@ const router = createRouter()
   .route("login", "/login", LoginScreen)
   .route("team.invite", "/teams/:teamId/invite", InviteMemberScreen)
 
+// Type-safe path building
+router.path("home")                                 // "/"
+router.path("team.invite", { teamId: "team_1" })    // "/teams/team_1/invite"
+// router.path("team.invite")                       // type error: missing params
+// router.path("team.invite", { wrong: "x" })       // type error: wrong param
+
+// Typed match results
 const match = router.match("/teams/team_1/invite")
 
 if (match.found) {
-  match.name       // "team.invite"
+  match.name       // "home" | "login" | "team.invite"
   match.params     // { teamId: "team_1" }
   match.screen     // InviteMemberScreen
 }
-
-router.path("team.invite", { teamId: "team_1" }) // "/teams/team_1/invite"
 ```
 
 ## Semantic Tests
