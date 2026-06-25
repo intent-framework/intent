@@ -210,6 +210,36 @@ navigate?.("team.details", { teamId: "team_1" }) // dynamic route
 
 Direct calls to `screen.act(...).execute()` without context still work.
 
+### Typed Navigation
+
+Route-map-derived types give typed navigation inside action context:
+
+```ts
+import { screen } from "@intent/core"
+import { type RouterServices, type RoutesFromPaths } from "@intent/router"
+
+const appPaths = { home: "/", login: "/login" } as const
+type AppRoutes = RoutesFromPaths<typeof appPaths>
+type AppServices = RouterServices<AppRoutes>
+
+const Home = screen<AppServices>("Home", $ => {
+  const goLogin = $.act("Go login").does(({ navigate }) => {
+    navigate("login")
+    // navigate("login", {})  // type error: static route rejects params
+  })
+
+  $.surface("main").contains(goLogin)
+})
+```
+
+Extra services can be added alongside typed navigate:
+
+```ts
+type AppServices = RouterServices<AppRoutes, {
+  analytics: { track(event: string): void }
+}>
+```
+
 ## Semantic Tests
 
 ```ts

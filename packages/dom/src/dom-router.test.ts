@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { screen } from "@intent/core"
 import { createRouter } from "@intent/router"
+import type { RouterServices, RoutesFromPaths } from "@intent/router"
 import { renderRouter, renderDom } from "./index.js"
 
 function createMockWindow(location: string = "/") {
@@ -569,5 +570,150 @@ describe("renderRouter", () => {
     expect(track).toHaveBeenCalledWith("navigated")
     expect(root.querySelector("button")?.textContent).toBe("Login action")
     expect(win._getPathname()).toBe("/login")
+  })
+
+  describe("typed RouterServices navigation", () => {
+    const appPaths = {
+      home: "/",
+      login: "/login",
+      "team.invite": "/teams/:teamId/invite",
+    } as const
+
+    type AppRoutes = RoutesFromPaths<typeof appPaths>
+    type AppServices = RouterServices<AppRoutes, {
+      analytics: { track(event: string): void }
+    }>
+
+    it("renderRouter injects typed navigate into action context", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+      const track = vi.fn()
+
+      const ScreenWithTypedNav = screen<AppServices>("Home", $ => {
+        $.act("Go to login")
+          .primary()
+          .when(true)
+          .does(({ navigate, analytics }) => {
+            analytics.track("clicked")
+            navigate("login")
+          })
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("home", "/", ScreenWithTypedNav)
+        .route("login", appPaths.login, screen<AppServices>("Login", $ => {
+          $.act("Login action").primary()
+          $.surface("main").contains()
+        }))
+
+      const root = document.getElementById("root")!
+      renderRouter(router, {
+        target: root,
+        window: win,
+        services: { analytics: { track } },
+      })
+
+      const form = root.querySelector("form")!
+      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(track).toHaveBeenCalledWith("clicked")
+      expect(root.querySelector("button")?.textContent).toBe("Login action")
+      expect(win._getPathname()).toBe("/login")
+    })
+
+    it("typed navigate to dynamic route works with params", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+      const track = vi.fn()
+
+      const ScreenWithDynamicNav = screen<AppServices>("Home", $ => {
+        $.act("Open invite")
+          .primary()
+          .when(true)
+          .does(({ navigate, analytics }) => {
+            analytics.track("invite_opened")
+            navigate("team.invite", { teamId: "team_1" })
+          })
+        $.surface("main").contains()
+      })
+
+      const InviteScreen = screen<AppServices>("Invite", $ => {
+        $.act("Invite action").primary()
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("home", "/", ScreenWithDynamicNav)
+        .route("team.invite", appPaths["team.invite"], InviteScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, {
+        target: root,
+        window: win,
+        services: { analytics: { track } },
+      })
+
+      const form = root.querySelector("form")!
+      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(track).toHaveBeenCalledWith("invite_opened")
+      expect(root.querySelector("button")?.textContent).toBe("Invite action")
+      expect(win._getPathname()).toBe("/teams/team_1/invite")
+    })
+
+    it("custom extra services pass through in typed router", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+      const track = vi.fn()
+
+      const CustomScreen = screen<AppServices>("Custom", $ => {
+        $.act("Track event")
+          .primary()
+          .when(true)
+          .does(({ analytics }) => {
+            analytics.track("custom_event")
+          })
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("home", "/", CustomScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, {
+        target: root,
+        window: win,
+        services: { analytics: { track } },
+      })
+
+      const form = root.querySelector("form")!
+      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      expect(track).toHaveBeenCalledWith("custom_event")
+    })
+
+    it("existing default-service renderRouter usage still works", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/login")
+
+      const router = createRouter()
+        .route("home", "/", screen("Home", $ => {
+          $.act("Home action").primary()
+          $.surface("main").contains()
+        }))
+        .route("login", "/login", screen("Login", $ => {
+          $.act("Login action").primary()
+          $.surface("main").contains()
+        }))
+
+      const root = document.getElementById("root")!
+      renderRouter(router, { target: root, window: win })
+
+      expect(root.querySelector("button")?.textContent).toBe("Login action")
+    })
   })
 })
