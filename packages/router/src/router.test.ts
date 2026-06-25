@@ -215,21 +215,56 @@ describe("route listing", () => {
   it("route objects are not mutable through the listing", () => {
     const router = createRouter().route("home", "/", HomeScreen)
     const routes = router.routes()
-    expect(routes).toHaveLength(1)
-    expect(routes[0]!.name).toBe("home")
+    routes[0]!.name = "hacked"
+    routes[0]!.path = "/hacked"
+    expect(router.routes()[0]!.name).toBe("home")
+    expect(router.routes()[0]!.path).toBe("/")
   })
 })
 
 describe("route name uniqueness", () => {
-  it("allows duplicate route names (last wins on path building)", () => {
+  it("throws when registering the same route name twice", () => {
+    const router = createRouter().route("home", "/", HomeScreen)
+    expect(() => router.route("home", "/home", LoginScreen)).toThrow(
+      'Route name "home" is already registered.'
+    )
+  })
+
+  it("throws when registering the same route path twice", () => {
+    const router = createRouter().route("home", "/home", HomeScreen)
+    expect(() => router.route("alt", "/home", LoginScreen)).toThrow(
+      'Route path "/home" is already registered.'
+    )
+  })
+
+  it("path() resolves a unique route name deterministically", () => {
     const router = createRouter()
       .route("home", "/", HomeScreen)
-      .route("home", "/alt", LoginScreen)
-
-    expect(() => router.path("home")).not.toThrow()
-    // path building uses first match
+      .route("login", "/login", LoginScreen)
     expect(router.path("home")).toBe("/")
+    expect(router.path("login")).toBe("/login")
+  })
+
+  it("route listing cannot mutate router internals", () => {
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+      .route("login", "/login", LoginScreen)
+    const list = router.routes()
+    // Mutating the returned array
+    list.length = 0
+    list.push({ name: "injected", path: "/evil", screen: HomeScreen })
     expect(router.routes()).toHaveLength(2)
+    expect(router.routes()[0]!.name).toBe("home")
+    expect(router.routes()[1]!.name).toBe("login")
+  })
+
+  it("route listing returns routes in registration order", () => {
+    const router = createRouter()
+      .route("login", "/login", LoginScreen)
+      .route("home", "/", HomeScreen)
+    const routes = router.routes()
+    expect(routes[0]!.name).toBe("login")
+    expect(routes[1]!.name).toBe("home")
   })
 })
 

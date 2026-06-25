@@ -58,12 +58,23 @@ export interface Router {
 
 export function createRouter(): Router {
   const routes: InternalRoute[] = []
+  const byName = new Map<string, InternalRoute>()
+  const byPath = new Map<string, true>()
 
   const api: Router = {
     route(name, path, screen) {
+      if (byName.has(name)) {
+        throw new Error(`Route name "${name}" is already registered.`)
+      }
       const normalized = normalizePath(path)
+      if (byPath.has(normalized)) {
+        throw new Error(`Route path "${normalized}" is already registered.`)
+      }
       const { pattern, paramNames } = compilePattern(normalized)
-      routes.push({ name, path: normalized, pattern, paramNames, screen })
+      const route: InternalRoute = { name, path: normalized, pattern, paramNames, screen }
+      byName.set(name, route)
+      byPath.set(normalized, true)
+      routes.push(route)
       return api
     },
 
@@ -94,7 +105,7 @@ export function createRouter(): Router {
     },
 
     path(name, params = {}) {
-      const route = routes.find((r) => r.name === name)
+      const route = byName.get(name)
       if (!route) {
         throw new Error(`Route "${name}" not found`)
       }
