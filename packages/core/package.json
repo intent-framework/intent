@@ -1,6 +1,8 @@
 {
   "name": "@intent/core",
   "version": "0.1.0",
+  "description": "Platformless semantic graph and runtime for Intent applications",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

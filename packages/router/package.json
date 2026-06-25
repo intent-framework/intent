@@ -1,6 +1,8 @@
 {
   "name": "@intent/router",
   "version": "0.1.0",
+  "description": "Typed route definitions and navigation for Intent",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

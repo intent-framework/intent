@@ -321,6 +321,8 @@ Not yet:
 
 See [MVP Checkpoint](docs/MVP-Checkpoint.md) for the current implementation boundary.
 
+See [Release Readiness](docs/Release-Readiness.md) for the current npm publishing and release plan.
+
 ## Project thesis
 
 Intent should let a product flow be authored once as meaning, then observed or materialized many ways.
