@@ -357,10 +357,12 @@ Root scripts should include:
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "lint": "tsc -p tsconfig.typecheck.json"
   }
 }
+
+Root `pnpm typecheck` must use `tsconfig.typecheck.json` with `noEmit: true` and `paths` mapping workspace packages to source. It must not require `pnpm build` first and must not emit `dist/` files.
 ```
 
 Each package should include package-level scripts where applicable.
