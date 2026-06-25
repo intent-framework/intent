@@ -6,6 +6,11 @@
   "version": "0.1.0",
   "description": "Typed route definitions and navigation for Intent",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intent-framework/intent.git",
+    "directory": "packages/router"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
