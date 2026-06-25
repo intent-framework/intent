@@ -1504,4 +1504,88 @@ describe("renderRouter", () => {
       expect(win._getPathname()).toBe("/login")
     })
   })
+
+  describe("showScreenName heading", () => {
+    it("does not render heading by default", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+
+      const router = createRouter()
+        .route("home", "/", HomeScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, { target: root, window: win })
+
+      const heading = root.querySelector("h1")
+      expect(heading).toBeNull()
+    })
+
+    it("renders current route screen heading when enabled", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/login")
+
+      const router = createRouter()
+        .route("home", "/", HomeScreen)
+        .route("login", "/login", LoginScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, { target: root, window: win, showScreenName: true })
+
+      const heading = root.querySelector("h1")
+      expect(heading).not.toBeNull()
+      expect(heading!.textContent).toBe("Login")
+    })
+
+    it("updates heading after navigation", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+
+      const router = createRouter()
+        .route("home", "/", HomeScreen)
+        .route("login", "/login", LoginScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win, showScreenName: true })
+
+      expect(root.querySelector("h1")!.textContent).toBe("Home")
+
+      app.navigate("login")
+
+      expect(root.querySelector("h1")!.textContent).toBe("Login")
+    })
+
+    it("renders notFound screen heading when enabled", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/unknown")
+
+      const router = createRouter()
+        .route("home", "/", HomeScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, { target: root, window: win, notFound: NotFoundScreen, showScreenName: true })
+
+      const heading = root.querySelector("h1")
+      expect(heading).not.toBeNull()
+      expect(heading!.textContent).toBe("NotFound")
+    })
+
+    it("does not duplicate headings after navigation", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/")
+
+      const router = createRouter()
+        .route("home", "/", HomeScreen)
+        .route("login", "/login", LoginScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, { target: root, window: win, showScreenName: true })
+
+      expect(root.querySelectorAll("h1")).toHaveLength(1)
+
+      app.navigate("login")
+
+      expect(root.querySelectorAll("h1")).toHaveLength(1)
+      expect(root.querySelector("h1")!.textContent).toBe("Login")
+    })
+  })
 })

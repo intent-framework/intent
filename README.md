@@ -333,6 +333,7 @@ Open `http://localhost:5173/` to explore the demo.
 - `$.flow` for interaction sequencing
 - Semantic asks with contact type, required, and private metadata
 - Keyboard Enter key default action with accessible hint
+- Screen name rendered as a semantic `<h1>` via the DOM renderer's `showScreenName` option
 - Graph diagnostics via `inspectScreen()`
 
 ## Architecture

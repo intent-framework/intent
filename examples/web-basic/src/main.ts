@@ -174,6 +174,7 @@ const root = document.getElementById("root")!
 renderRouter(router, {
   target: root,
   notFound: NotFoundScreen,
+  showScreenName: true,
 })
 
 function onRouteChanged() {
