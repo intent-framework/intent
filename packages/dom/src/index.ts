@@ -1,5 +1,9 @@
 import type { ScreenDefinition, ActNode } from "@intent/core"
 
+function getReasonId(actId: string): string {
+  return `${actId}-reason`
+}
+
 export type DomRendererOptions = {
   target: HTMLElement
 }
@@ -21,10 +25,21 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
     if (button) {
       const unsub = act.enabled.subscribe(() => {
         button.disabled = !act.enabled.current
+        const reasonId = getReasonId(act.id)
+        let reasonEl = form.querySelector(`#${reasonId}`) as HTMLElement | null
         if (!act.enabled.current && act.blockedReasons.length > 0) {
-          button.title = act.blockedReasons[0]!
+          button.setAttribute("aria-describedby", reasonId)
+          if (!reasonEl) {
+            reasonEl = document.createElement("p")
+            reasonEl.id = reasonId
+            form.appendChild(reasonEl)
+          }
+          reasonEl.textContent = act.blockedReasons[0]!
         } else {
-          button.removeAttribute("title")
+          button.removeAttribute("aria-describedby")
+          if (reasonEl) {
+            reasonEl.remove()
+          }
         }
       })
       unsubscribers.push(unsub)
@@ -121,7 +136,12 @@ function buildDom(screenDef: ScreenDefinition): HTMLElement {
     if (!act.enabled.current) {
       button.disabled = true
       if (act.blockedReasons.length > 0) {
-        button.title = act.blockedReasons[0]!
+        const reasonId = getReasonId(act.id)
+        button.setAttribute("aria-describedby", reasonId)
+        const reasonEl = document.createElement("p")
+        reasonEl.id = reasonId
+        reasonEl.textContent = act.blockedReasons[0]!
+        form.appendChild(reasonEl)
       }
     }
 
