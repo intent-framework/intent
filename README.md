@@ -240,6 +240,32 @@ type AppServices = RouterServices<AppRoutes, {
 }>
 ```
 
+### Route Context
+
+Routed screens can access matched route params inside action handlers:
+
+```ts
+import { type RouteContext, type RouterServices, type RoutesFromPaths } from "@intent/router"
+
+const appPaths = { home: "/", "team.invite": "/teams/:teamId/invite" } as const
+type AppRoutes = RoutesFromPaths<typeof appPaths>
+type AppServices = RouterServices<AppRoutes, {
+  route: RouteContext<AppRoutes>
+}>
+
+const Team = screen<AppServices>("Team", $ => {
+  $.act("Accept invite")
+    .does(({ route }) => {
+      if (route.name === "team.invite") {
+        console.log(route.params.teamId)
+      }
+    })
+  $.surface("main").contains()
+})
+```
+
+`renderRouter()` injects the route context automatically. For not-found screens, route is absent.
+
 ## Semantic Tests
 
 ```ts
