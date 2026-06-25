@@ -375,4 +375,67 @@ describe("testScreen", () => {
       expect(navigate).toHaveBeenCalledWith("home")
     }, { services: { analytics, navigate } })
   })
+
+  it("resource.load() through harness passes services to loader", async () => {
+    let received: unknown
+    type TestServices = { route: string }
+    const TestScreen = screen<TestServices>("HarnessResourceLoad", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+        autoLoad: false,
+      })
+    })
+
+    await testScreen<TestServices>(TestScreen, async screen => {
+      await screen.resource("team").load()
+      expect(received).toEqual({ route: "/teams/team_1" })
+    }, { services: { route: "/teams/team_1" } })
+  })
+
+  it("resource.reload() through harness passes services to loader", async () => {
+    let callCount = 0
+    let received: unknown
+    type TestServices = { route: string }
+    const TestScreen = screen<TestServices>("HarnessResourceReload", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          callCount++
+          received = context
+          return `data${callCount}`
+        },
+        autoLoad: false,
+      })
+    })
+
+    await testScreen<TestServices>(TestScreen, async screen => {
+      await screen.resource("team").load()
+      expect(received).toEqual({ route: "/teams/team_1" })
+      expect(callCount).toBe(1)
+
+      await screen.resource("team").reload()
+      expect(received).toEqual({ route: "/teams/team_1" })
+      expect(callCount).toBe(2)
+    }, { services: { route: "/teams/team_1" } })
+  })
+
+  it("resource autoload on testScreen start receives services", async () => {
+    let received: unknown
+    type TestServices = { route: string }
+    const TestScreen = screen<TestServices>("HarnessAutoloadServices", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+      })
+    })
+
+    await testScreen<TestServices>(TestScreen, async screen => {
+      expect(received).toEqual({ route: "/dashboard" })
+      expect(screen.resource("team").status()).toBe("ready")
+    }, { services: { route: "/dashboard" } })
+  })
 })

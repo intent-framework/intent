@@ -412,4 +412,39 @@ describe("DOM renderer", () => {
     // cleanup should call runtime.dispose() without error
     expect(() => cleanup()).not.toThrow()
   })
+
+  it("renderDom passes services to autoloading resource", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    let received: unknown
+    type TestServices = { value: string }
+
+    const TestScreen = screen<TestServices>("DOMResourceServices", $ => {
+      $.resource("profile", {
+        load: async (context) => {
+          received = context
+          return { name: "Mahyar" }
+        },
+      })
+    })
+
+    const root = document.getElementById("root")!
+    const cleanup = renderDom<TestServices>(TestScreen, { target: root, services: { value: "from-dom" } })
+
+    // Wait for autoload
+    const resource = TestScreen.resources[0]!
+    if (resource.status === "idle" || resource.status === "pending") {
+      await new Promise<void>(resolve => {
+        const unsub = resource.subscribe(() => {
+          if (resource.status === "ready" || resource.status === "failed") {
+            unsub()
+            resolve()
+          }
+        })
+      })
+    }
+
+    expect(received).toEqual({ value: "from-dom" })
+    expect(resource.status).toBe("ready")
+    cleanup()
+  })
 })

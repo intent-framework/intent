@@ -43,7 +43,8 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
       r => r.autoLoad && r.status === "idle",
     )
     if (toLoad.length > 0) {
-      await Promise.all(toLoad.map(r => r.load()))
+      const ctx = this.getExecutionContext()
+      await Promise.all(toLoad.map(r => r.load(ctx)))
     }
   }
 
