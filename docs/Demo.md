@@ -15,6 +15,12 @@ library, or an API route framework.
 ## How to run the demo
 
 ```sh
+pnpm dev:web-basic
+```
+
+Or from the example directory:
+
+```sh
 cd examples/web-basic
 pnpm dev
 ```
