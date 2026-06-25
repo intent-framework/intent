@@ -1,7 +1,9 @@
 import type { ScreenDefinition } from "./screen.js"
 import { inspectScreen, type InspectedScreen } from "./graph.js"
 import type { AnyResourceNode } from "./resource.js"
-import type { ActionExecutionContext, DefaultScreenServices } from "./act.js"
+import { createResourceNode } from "./resource.js"
+import { kResourceMap } from "./act.js"
+import type { ActionExecutionContext, DefaultScreenServices, ActNode } from "./act.js"
 
 export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
   private _screen: ScreenDefinition<TServices>
@@ -9,6 +11,8 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
   private _disposed = false
   private _unsubscribers: Array<() => void> = []
   private _services: TServices
+  private _resourceNodes: AnyResourceNode[] = []
+  private _resourceNodeMap: Map<string, AnyResourceNode> | null = null
   private autoloadedResources = new Set<string>()
 
   constructor(screen: ScreenDefinition<TServices>, services: TServices = {} as TServices) {
@@ -21,11 +25,11 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
   }
 
   get graph(): InspectedScreen {
-    return inspectScreen(this._screen)
+    return inspectScreen(this._screen, this._resourceNodes)
   }
 
   get resources(): AnyResourceNode[] {
-    return [...this._screen.resources]
+    return this._resourceNodes
   }
 
   get services(): TServices {
@@ -36,21 +40,47 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
     return this._services as ActionExecutionContext<TServices>
   }
 
+  executeAct(act: ActNode<TServices>, context?: ActionExecutionContext<TServices>): Promise<void> {
+    const ctx = context ?? this.getExecutionContext()
+    if (this._resourceNodeMap) {
+      return act.execute({ ...ctx, [kResourceMap]: this._resourceNodeMap } as ActionExecutionContext<TServices>)
+    }
+    return act.execute(ctx)
+  }
+
   async start(): Promise<void> {
     if (this._started) return
     this._started = true
 
-    const toLoad = this._screen.resources.filter(
-      r => r.autoLoad && !this.autoloadedResources.has(r.id),
-    )
+    const nodeMap = new Map<string, AnyResourceNode>()
+    for (const config of this._screen.resourceConfigs) {
+      const node = createResourceNode(config.id, config.name, config.loader, false)
+      this._resourceNodes.push(node)
+      nodeMap.set(config.id, node)
+    }
+    this._resourceNodeMap = nodeMap
+
+    // Connect ResourceRefs to runtime-scoped nodes
+    for (const config of this._screen.resourceConfigs) {
+      const node = nodeMap.get(config.id)
+      if (node && config.ref) {
+        config.ref._connect(node)
+      }
+    }
+
+    const pureServices = this._services as ActionExecutionContext<TServices>
+
+    const toLoad = this._resourceNodes.filter(r => {
+      const config = this._screen.resourceConfigs.find(c => c.id === r.id)
+      return (config?.autoLoad ?? false) && !this.autoloadedResources.has(r.id)
+    })
 
     for (const r of toLoad) {
       this.autoloadedResources.add(r.id)
     }
 
     if (toLoad.length > 0) {
-      const ctx = this.getExecutionContext()
-      await Promise.all(toLoad.map(r => r.load(ctx)))
+      await Promise.all(toLoad.map(r => r.load(pureServices)))
     }
   }
 
@@ -61,6 +91,14 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
       unsub()
     }
     this._unsubscribers = []
+    for (const config of this._screen.resourceConfigs) {
+      if (config.ref && this._resourceNodeMap) {
+        const node = this._resourceNodeMap.get(config.id)
+        if (node) {
+          config.ref._disconnect(node)
+        }
+      }
+    }
   }
 
   /** @internal */

@@ -2,14 +2,14 @@ import type { AnyAskNode } from "./ask.js"
 import type { ActNode, DefaultScreenServices } from "./act.js"
 import type { FlowNode } from "./flow.js"
 import type { SurfaceNode } from "./surface.js"
-import type { ResourceNode, AnyResourceNode, ResourceLoadContext } from "./resource.js"
+import type { ResourceConfig, ResourceLoadContext } from "./resource.js"
+import { ResourceRef } from "./resource.js"
 import { createTextState, createBooleanState, createChoiceState, type TextState, type BooleanState, type ChoiceState } from "./state.js"
 import { AskBuilder } from "./ask.js"
 import { ActBuilder } from "./act.js"
 import { FlowBuilder } from "./flow.js"
 import { SurfaceBuilder } from "./surface.js"
-import { createResourceNode } from "./resource.js"
-import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, resetResourceRegistry, getAsks, getActs, getFlows, getSurfaces, getResources, registerResourceNode } from "./registry.js"
+import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, resetResourceRegistry, getAsks, getActs, getFlows, getSurfaces } from "./registry.js"
 
 export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
   state: {
@@ -27,7 +27,7 @@ export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
       load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>)
       autoLoad?: boolean
     },
-  ) => ResourceNode<T, TServices>
+  ) => ResourceRef<T, TServices>
 }
 
 export type ScreenDefinition<TServices extends object = DefaultScreenServices> = {
@@ -36,7 +36,7 @@ export type ScreenDefinition<TServices extends object = DefaultScreenServices> =
   acts: ActNode<TServices>[]
   flows: FlowNode[]
   surfaces: SurfaceNode[]
-  resources: AnyResourceNode[]
+  resourceConfigs: ResourceConfig[]
 }
 
 export function screen<TServices extends object = DefaultScreenServices>(
@@ -48,6 +48,8 @@ export function screen<TServices extends object = DefaultScreenServices>(
   resetFlowRegistry()
   resetSurfaceRegistry()
   resetResourceRegistry()
+
+  const configs: ResourceConfig<any, any>[] = []
 
   const builder: ScreenBuilder<TServices> = {
     state: {
@@ -61,9 +63,9 @@ export function screen<TServices extends object = DefaultScreenServices>(
     surface: (n) => new SurfaceBuilder(n),
     resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean }) => {
       const id = `resource_${n}`
-      const node = createResourceNode<T, TServices>(id, n, config.load, config.autoLoad)
-      registerResourceNode(node as AnyResourceNode)
-      return node
+      const ref = new ResourceRef<T, TServices>(id, n, config.load, config.autoLoad ?? true)
+      configs.push({ id, name: n, autoLoad: config.autoLoad ?? true, loader: config.load, ref })
+      return ref
     },
   }
 
@@ -73,7 +75,6 @@ export function screen<TServices extends object = DefaultScreenServices>(
   const acts = getActs()
   const flows = getFlows()
   const surfaces = getSurfaces()
-  const resources = getResources()
 
   return {
     name,
@@ -81,6 +82,6 @@ export function screen<TServices extends object = DefaultScreenServices>(
     acts: Array.from(acts.values()) as ActNode<TServices>[],
     flows: Array.from(flows.values()),
     surfaces: Array.from(surfaces.values()),
-    resources: Array.from(resources.values()),
+    resourceConfigs: configs,
   }
 }

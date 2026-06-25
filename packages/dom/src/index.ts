@@ -70,7 +70,7 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
     e.preventDefault()
     const primaryAct = screenDef.acts.find(a => a.primary)
     if (primaryAct?.enabled.current) {
-      primaryAct.execute(runtime.getExecutionContext())
+      runtime.executeAct(primaryAct)
     }
   })
 

@@ -1,5 +1,6 @@
 import type { ScreenDefinition } from "./screen.js"
 import type { DefaultScreenServices } from "./act.js"
+import type { AnyResourceNode } from "./resource.js"
 
 export type InspectedScreen = {
   name: string
@@ -42,7 +43,10 @@ export type InspectedScreen = {
   }>
 }
 
-export function inspectScreen<TServices extends object = DefaultScreenServices>(screenDef: ScreenDefinition<TServices>): InspectedScreen {
+export function inspectScreen<TServices extends object = DefaultScreenServices>(
+  screenDef: ScreenDefinition<TServices>,
+  runtimeResources?: AnyResourceNode[],
+): InspectedScreen {
   return {
     name: screenDef.name,
     asks: screenDef.asks.map(a => ({
@@ -62,7 +66,7 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
       blockedReasons: a.blockedReasons,
       status: a.status,
       statusMessage: a.statusMessage,
-      invalidates: a.invalidates.map(r => r.name),
+      invalidates: a.invalidatedResourceIds,
     })),
     flows: screenDef.flows.map(f => ({
       id: f.id,
@@ -74,7 +78,7 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
       name: s.name,
       itemCount: s.items.length,
     })),
-    resources: screenDef.resources.map(r => ({
+    resources: (runtimeResources ?? []).map(r => ({
       id: r.id,
       name: r.name,
       status: r.status,
