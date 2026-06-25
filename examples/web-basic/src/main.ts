@@ -58,7 +58,7 @@ function updateTeamInfo(teamId: string | undefined) {
   }
 }
 
-function updateDiagnostics(screenDef: ScreenDefinition<any>) {
+function updateDiagnostics(screenDef: ScreenDefinition<AppServices>) {
   const el = document.getElementById("diagnostics")
   if (!el) return
   const inspected = inspectScreen(screenDef)
