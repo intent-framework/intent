@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { screen } from "@intent/core"
 import { createRouter } from "./router.js"
+import type { RouteParams } from "./router.js"
 
 const HomeScreen = screen("Home", () => {})
 const LoginScreen = screen("Login", () => {})
@@ -14,9 +15,9 @@ describe("createRouter", () => {
   })
 
   it("registers a route and returns the router for chaining", () => {
-    const router = createRouter()
-    const result = router.route("home", "/", HomeScreen)
-    expect(result).toBe(router)
+    const router = createRouter().route("home", "/", HomeScreen)
+    expect(router.routes()).toHaveLength(1)
+    expect(router.routes()[0]!.name).toBe("home")
   })
 
   it("allows chaining route registrations", () => {
@@ -109,9 +110,10 @@ describe("route matching", () => {
   })
 
   it("handles routes registered after earlier match calls", () => {
-    const router = createRouter().route("home", "/", HomeScreen)
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+      .route("login", "/login", LoginScreen)
     expect(router.match("/").found).toBe(true)
-    router.route("login", "/login", LoginScreen)
     expect(router.match("/login").found).toBe(true)
   })
 })
@@ -168,24 +170,24 @@ describe("path building", () => {
   })
 
   it("throws for an unknown route name", () => {
-    const router = createRouter()
+    const router = createRouter() as any
     expect(() => router.path("nonexistent")).toThrow('Route "nonexistent" not found')
   })
 
   it("throws when a required param is missing", () => {
-    const router = createRouter().route("user", "/users/:userId", HomeScreen)
+    const router = createRouter().route("user", "/users/:userId", HomeScreen) as any
     expect(() => router.path("user", {})).toThrow('Missing params for route "user": :userId')
   })
 
   it("throws when some required params are missing", () => {
-    const router = createRouter().route("org", "/orgs/:orgId/repos/:repoId", HomeScreen)
+    const router = createRouter().route("org", "/orgs/:orgId/repos/:repoId", HomeScreen) as any
     expect(() => router.path("org", { orgId: "acme" })).toThrow(
       'Missing params for route "org": :repoId'
     )
   })
 
   it("ignores extra params not in the path pattern", () => {
-    const router = createRouter().route("user", "/users/:userId", HomeScreen)
+    const router = createRouter().route("user", "/users/:userId", HomeScreen) as any
     const result = router.path("user", { userId: "abc", extra: "ignored" })
     expect(result).toBe("/users/abc")
   })
@@ -206,8 +208,8 @@ describe("route listing", () => {
   it("returns a new array each time", () => {
     const router = createRouter().route("home", "/", HomeScreen)
     const first = router.routes()
-    router.route("login", "/login", LoginScreen)
-    const second = router.routes()
+    const router2 = router.route("login", "/login", LoginScreen)
+    const second = router2.routes()
     expect(first).toHaveLength(1)
     expect(second).toHaveLength(2)
   })
@@ -291,5 +293,93 @@ describe("edge cases", () => {
     const router = createRouter().route("home", "home", HomeScreen)
     expect(router.match("/home").found).toBe(true)
     expect(router.path("home")).toBe("/home")
+  })
+})
+
+describe("type-safe path params", () => {
+  it("RouteParams produces {} for static routes", () => {
+    const r: RouteParams<"/"> = {}
+    expect(r).toEqual({})
+  })
+
+  it("RouteParams extracts single param", () => {
+    const r: RouteParams<"/users/:userId"> = { userId: "abc" }
+    expect(r.userId).toBe("abc")
+  })
+
+  it("RouteParams extracts multiple params", () => {
+    const r: RouteParams<"/teams/:teamId/members/:memberId"> = { teamId: "a", memberId: "b" }
+    expect(r.teamId).toBe("a")
+    expect(r.memberId).toBe("b")
+  })
+
+  it("static route accepts no params", () => {
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+
+    router.path("home")
+
+    // @ts-expect-error - static route rejects params
+    router.path("home", {} as any)
+  })
+
+  it("dynamic route requires params", () => {
+    const router = createRouter()
+      .route("user", "/users/:userId", HomeScreen)
+
+    router.path("user", { userId: "abc" })
+
+    // @ts-expect-error - dynamic route requires params (runtime throws)
+    expect(() => router.path("user")).toThrow()
+  })
+
+  it("missing params fail typechecking", () => {
+    const router = createRouter()
+      .route("org", "/orgs/:orgId/repos/:repoId", HomeScreen)
+
+    router.path("org", { orgId: "a", repoId: "b" })
+
+    // @ts-expect-error - missing repoId (runtime throws)
+    expect(() => router.path("org", { orgId: "a" })).toThrow()
+  })
+
+  it("wrong params fail typechecking", () => {
+    const router = createRouter()
+      .route("user", "/users/:userId", HomeScreen)
+
+    // @ts-expect-error - wrong param name (runtime throws)
+    expect(() => router.path("user", { wrong: "x" })).toThrow()
+  })
+
+  it("extra params fail typechecking", () => {
+    const router = createRouter()
+      .route("user", "/users/:userId", HomeScreen)
+
+    // @ts-expect-error - extra param (typecheck catches, runtime silently ignores)
+    router.path("user", { userId: "abc", extra: "x" })
+  })
+
+  it("valid route names only", () => {
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+      .route("team.invite", "/teams/:teamId/invite", InviteMemberScreen)
+
+    router.path("home")
+    router.path("team.invite", { teamId: "t1" })
+
+    // @ts-expect-error - unknown route name (runtime throws)
+    expect(() => router.path("nonexistent")).toThrow()
+  })
+
+  it("match returns typed route name union", () => {
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+      .route("login", "/login", LoginScreen)
+
+    const match = router.match("/")
+    if (match.found) {
+      const name: "home" | "login" = match.name
+      expect(name).toBe("home")
+    }
   })
 })
