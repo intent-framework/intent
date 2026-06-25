@@ -2,6 +2,12 @@ import { signal, createCondition, type Signal, isCondition, type Condition } fro
 import { registerActNode } from "./registry.js"
 import type { AnyResourceNode } from "./resource.js"
 
+export type NavigationService = (name: string, params?: Record<string, string>) => void
+
+export type ActionExecutionContext = {
+  navigate?: NavigationService
+}
+
 export type FeedbackConfig = {
   pending?: string
   success?: string
@@ -22,14 +28,14 @@ export type ActNode = {
   label: string
   primary: boolean
   conditions: ActCondition[]
-  handler: (() => Promise<void> | void) | null
+  handler: ((context: ActionExecutionContext) => Promise<void> | void) | null
   feedback?: FeedbackConfig
   invalidates: AnyResourceNode[]
   status: ActStatus
   statusMessage: string | null
   enabled: Condition
   blockedReasons: string[]
-  execute: () => Promise<void>
+  execute: (context?: ActionExecutionContext) => Promise<void>
   onStatusChange: (fn: () => void) => () => void
 }
 
@@ -37,7 +43,7 @@ export function createActNode(
   id: string,
   label: string,
   conditions: ActCondition[],
-  handler: (() => Promise<void> | void) | null,
+  handler: ((context: ActionExecutionContext) => Promise<void> | void) | null,
   feedback: FeedbackConfig | undefined,
   primary: boolean,
   invalidates: AnyResourceNode[] = [],
@@ -82,8 +88,8 @@ export function createActNode(
         .map(c => c.message)
         .filter((m): m is string => m !== undefined)
     },
-    execute: async () => {
-      await executeAct(node, notifyStatus)
+    execute: async (context?: ActionExecutionContext) => {
+      await executeAct(node, context, notifyStatus)
     },
     onStatusChange(fn: () => void) {
       return statusSignal.subscribe(fn)
@@ -101,7 +107,7 @@ function computeActEnabled(node: ActNode): boolean {
   return true
 }
 
-async function executeAct(node: ActNode, notify: () => void): Promise<void> {
+async function executeAct(node: ActNode, context: ActionExecutionContext | undefined, notify: () => void): Promise<void> {
   if (!node.enabled.current || !node.handler) {
     return
   }
@@ -111,7 +117,7 @@ async function executeAct(node: ActNode, notify: () => void): Promise<void> {
   notify()
 
   try {
-    await node.handler()
+    await node.handler(context ?? {})
     node.status = "success"
     node.statusMessage = node.feedback?.success ?? null
     notify()
@@ -175,7 +181,7 @@ export class ActBuilder {
     return this
   }
 
-  does(fn: () => Promise<void> | void): this {
+  does(fn: (context: ActionExecutionContext) => Promise<void> | void): this {
     this.node.handler = fn
     return this
   }

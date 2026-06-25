@@ -1,4 +1,4 @@
-import type { ScreenDefinition } from "@intent/core"
+import type { ScreenDefinition, ScreenRuntimeServices } from "@intent/core"
 import { createScreenRuntime } from "@intent/core"
 
 export type ScreenHandle = {
@@ -6,6 +6,7 @@ export type ScreenHandle = {
     toBeEnabled(): void
     toBeBlocked(): void
     toBeBlockedBy(...reasons: string[]): void
+    run(): Promise<void>
   }
   answer(label: string, value: string): Promise<void>
   feedback(): string | null
@@ -20,10 +21,18 @@ export type ScreenHandle = {
   start(): Promise<void>
 }
 
-export async function testScreen(name: string | ScreenDefinition, fn: (screen: ScreenHandle) => Promise<void>): Promise<void> {
+export type TestScreenOptions = {
+  services?: ScreenRuntimeServices
+}
+
+export async function testScreen(
+  name: string | ScreenDefinition,
+  fn: (screen: ScreenHandle) => Promise<void>,
+  options?: TestScreenOptions,
+): Promise<void> {
   const screenDef = typeof name === "string" ? { name, asks: [], acts: [], flows: [], surfaces: [], resources: [] } : name
 
-  const runtime = createScreenRuntime(screenDef)
+  const runtime = createScreenRuntime(screenDef, { services: options?.services })
 
   const handle: ScreenHandle = {
     act(label: string) {
@@ -64,6 +73,9 @@ export async function testScreen(name: string | ScreenDefinition, fn: (screen: S
               )
             }
           }
+        },
+        async run() {
+          await actNode.execute(runtime.getExecutionContext())
         },
       }
     },

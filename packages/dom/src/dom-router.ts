@@ -1,4 +1,4 @@
-import type { ScreenDefinition } from "@intent/core"
+import type { ScreenDefinition, NavigationService } from "@intent/core"
 import type { Router, RoutePathArgs } from "@intent/router"
 import { renderDom } from "./index.js"
 
@@ -25,6 +25,12 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
   const win = options.window ?? window
   let currentCleanup: (() => void) | undefined
 
+  function internalNavigate(name: string, params?: Record<string, string>) {
+    const path = (router.path as (name: string, params?: Record<string, string>) => string)(name, params)
+    win.history.pushState(null, "", path)
+    renderPath(path)
+  }
+
   function renderPath(pathname: string) {
     currentCleanup?.()
     currentCleanup = undefined
@@ -32,8 +38,13 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
 
     const match = router.match(pathname)
 
+    const navigateService: NavigationService = internalNavigate
+
     if (match.found) {
-      currentCleanup = renderDom(match.screen, { target: options.target })
+      currentCleanup = renderDom(match.screen, {
+        target: options.target,
+        services: { navigate: navigateService },
+      })
       return
     }
 
@@ -41,7 +52,10 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
       const screen = typeof options.notFound === "function"
         ? options.notFound(pathname)
         : options.notFound
-      currentCleanup = renderDom(screen, { target: options.target })
+      currentCleanup = renderDom(screen, {
+        target: options.target,
+        services: { navigate: navigateService },
+      })
     } else {
       options.target.textContent = "Not found"
     }
@@ -59,9 +73,7 @@ export function renderRouter<Routes extends Record<string, { path: string }>>(
       name: Name,
       ...args: RoutePathArgs<Routes[Name]["path"]>
     ) {
-      const path = router.path(name, ...args)
-      win.history.pushState(null, "", path)
-      renderPath(path)
+      internalNavigate(name, args[0] as Record<string, string> | undefined)
     },
     renderPath,
     dispose() {

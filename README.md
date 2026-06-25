@@ -183,6 +183,33 @@ app.navigate("team.invite", { teamId: "team_1" })
 app.dispose()
 ```
 
+## Action Navigation
+
+Actions can navigate using a runtime-provided service. When rendered through `renderRouter()`, the router provides navigation to actions:
+
+```ts
+import { screen } from "@intent/core"
+import { renderRouter } from "@intent/dom"
+
+const LoginScreen = screen("Login", $ => {
+  $.act("Go to home")
+    .primary()
+    .does(({ navigate }) => {
+      navigate?.("home")
+    })
+  $.surface("main").contains()
+})
+```
+
+The `navigate` function is available in the action execution context. The service is provided by the runtime — core only knows the abstract interface:
+
+```ts
+navigate?.("login")                              // static route
+navigate?.("team.details", { teamId: "team_1" }) // dynamic route
+```
+
+Direct calls to `screen.act(...).execute()` without context still work.
+
 ## Semantic Tests
 
 ```ts

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { screen } from "@intent/core"
 import { createRouter } from "@intent/router"
-import { renderRouter } from "./dom-router.js"
+import { renderRouter, renderDom } from "./index.js"
 
 function createMockWindow(location: string = "/") {
   const state: { pathname: string } = { pathname: location }
@@ -66,6 +66,46 @@ const InviteScreen = screen("Invite", $ => {
 const NotFoundScreen = screen("NotFound", $ => {
   $.act("Not found fallback").primary()
   $.surface("main").contains()
+})
+
+const HomeScreenWithNav = screen("Home", $ => {
+  $.act("Go to login")
+    .primary()
+    .when(true)
+    .does(({ navigate }) => {
+      navigate?.("login")
+    })
+  $.surface("main").contains()
+})
+
+const TeamScreenWithNav = screen("Team", $ => {
+  $.act("Open team invite")
+    .primary()
+    .when(true)
+    .does(({ navigate }) => {
+      navigate?.("team.details", { teamId: "team_1" })
+    })
+  $.surface("main").contains()
+})
+
+const TeamDetailScreen = screen("TeamDetail", $ => {
+  $.act("Team detail action")
+    .primary()
+    .when(true)
+    .does(() => {})
+  $.surface("main").contains()
+})
+
+const BlockedActionScreen = screen("Blocked", $ => {
+  const email = $.state.text("email")
+  const emailAsk = $.ask("Email", email).required()
+  $.act("Navigate when enabled")
+    .primary()
+    .when(emailAsk.valid, "Enter your email.")
+    .does(({ navigate }) => {
+      navigate?.("login")
+    })
+  $.surface("main").contains(emailAsk)
 })
 
 describe("renderRouter", () => {
@@ -254,5 +294,119 @@ describe("renderRouter", () => {
     expect(button?.textContent).toBe("Login action")
     // History should NOT have been updated
     expect(win._getPathname()).toBe("/")
+  })
+
+  it("action can navigate to a static route via context", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/")
+
+    const router = createRouter()
+      .route("home", "/", HomeScreenWithNav)
+      .route("login", "/login", LoginScreen)
+
+    const root = document.getElementById("root")!
+    renderRouter(router, { target: root, window: win })
+
+    expect(root.querySelector("button")?.textContent).toBe("Go to login")
+
+    // Submit the form to trigger the act's navigate
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    // Wait for async execution
+    await new Promise(r => setTimeout(r, 10))
+
+    // Should have navigated to login
+    const button = root.querySelector("button")
+    expect(button?.textContent).toBe("Login action")
+    expect(win._getPathname()).toBe("/login")
+  })
+
+  it("action can navigate to a dynamic route via context", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/")
+
+    const router = createRouter()
+      .route("home", "/", TeamScreenWithNav)
+      .route("team.details", "/teams/:teamId", TeamDetailScreen)
+
+    const root = document.getElementById("root")!
+    renderRouter(router, { target: root, window: win })
+
+    expect(root.querySelector("button")?.textContent).toBe("Open team invite")
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    const button = root.querySelector("button")
+    expect(button?.textContent).toBe("Team detail action")
+    expect(win._getPathname()).toBe("/teams/team_1")
+  })
+
+  it("previous screen is disposed when action navigation changes route", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/")
+
+    const router = createRouter()
+      .route("home", "/", HomeScreenWithNav)
+      .route("login", "/login", LoginScreen)
+
+    const root = document.getElementById("root")!
+    renderRouter(router, { target: root, window: win })
+
+    expect(root.querySelector("button")?.textContent).toBe("Go to login")
+
+    // Submit form to trigger navigation
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    // Only one button should exist (login), no stale elements from home screen
+    const buttons = root.querySelectorAll("button")
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0]?.textContent).toBe("Login action")
+  })
+
+  it("blocked action does not navigate", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    const win = createMockWindow("/")
+
+    const router = createRouter()
+      .route("home", "/", BlockedActionScreen)
+      .route("login", "/login", LoginScreen)
+
+    const root = document.getElementById("root")!
+    renderRouter(router, { target: root, window: win })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    // Should still be on the same screen (action was blocked)
+    expect(root.querySelector("button")?.textContent).toBe("Navigate when enabled")
+    expect(win._getPathname()).toBe("/")
+  })
+
+  it("renderDom passes services to runtime for action context", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const navigate: (name: string) => void = vi.fn()
+    const root = document.getElementById("root")!
+
+    const cleanup = renderDom(HomeScreenWithNav, {
+      target: root,
+      services: { navigate },
+    })
+
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+    await new Promise(r => setTimeout(r, 10))
+
+    expect(navigate).toHaveBeenCalledWith("login")
+
+    cleanup()
   })
 })

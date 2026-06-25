@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest"
-import { screen, inspectScreen, isCondition, createScreenRuntime } from "./index.js"
+import { describe, it, expect, vi } from "vitest"
+import { screen, inspectScreen, isCondition, createScreenRuntime, type NavigationService, type ActionExecutionContext } from "./index.js"
 
 async function loginUser(_params: { email: string; password: string }) {
   await Promise.resolve()
@@ -790,6 +790,145 @@ describe("resource type inference", () => {
         expect(v).toBeUndefined()
       }
     })
+  })
+})
+
+describe("action execution context", () => {
+  it("does(() => {...}) still works with no args", async () => {
+    let called = false
+    const TestScreen = screen("NoArgHandler", $ => {
+      $.act("Test")
+        .when(true)
+        .does(() => {
+          called = true
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    await actNode.execute()
+    expect(called).toBe(true)
+  })
+
+  it("does((context) => {...}) receives context when provided", async () => {
+    let received: unknown
+    const TestScreen = screen("ContextHandler", $ => {
+      $.act("Test")
+        .when(true)
+        .does((context) => {
+          received = context
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    const context: ActionExecutionContext = { navigate: (_name: string) => {} }
+    await actNode.execute(context)
+    expect(received).toBe(context)
+  })
+
+  it("does(() => {...}) still works when execute is called with context", async () => {
+    let called = false
+    const TestScreen = screen("NoArgWithContext", $ => {
+      $.act("Test")
+        .when(true)
+        .does(() => {
+          called = true
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    const context: ActionExecutionContext = { navigate: (_name: string) => {} }
+    await actNode.execute(context)
+    expect(called).toBe(true)
+  })
+
+  it("runtime.getExecutionContext() returns navigate service when provided", () => {
+    const navigate: NavigationService = (_name: string) => {}
+    const TestScreen = screen("RuntimeContext", $ => {
+      $.act("Test").when(true)
+    })
+
+    const runtime = createScreenRuntime(TestScreen, {
+      services: { navigate },
+    })
+
+    const ctx = runtime.getExecutionContext()
+    expect(ctx.navigate).toBe(navigate)
+  })
+
+  it("runtime.getExecutionContext() returns undefined navigate when not provided", () => {
+    const TestScreen = screen("NoNavigate", $ => {
+      $.act("Test").when(true)
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    const ctx = runtime.getExecutionContext()
+    expect(ctx.navigate).toBeUndefined()
+  })
+
+  it("action can call navigate through execution context", async () => {
+    const navigate: NavigationService = vi.fn() as unknown as NavigationService
+    const TestScreen = screen("ActionNavigates", $ => {
+      $.act("Go")
+        .when(true)
+        .does(({ navigate }) => {
+          navigate?.("login")
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    await actNode.execute({ navigate })
+    expect(navigate).toHaveBeenCalledWith("login")
+  })
+
+  it("no-arg does() handler ignores context", async () => {
+    const TestScreen = screen("IgnoreContext", $ => {
+      $.act("Test")
+        .when(true)
+        .does(async () => {
+          await Promise.resolve()
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    const context: ActionExecutionContext = {}
+    await actNode.execute(context)
+    expect(actNode.status).toBe("success")
+  })
+
+  it("blocked action does not receive context", async () => {
+    const navigate: NavigationService = vi.fn() as unknown as NavigationService
+    let handlerCalled = false
+    const TestScreen = screen("BlockedNoContext", $ => {
+      $.act("Test")
+        .when(false)
+        .does(() => {
+          handlerCalled = true
+        })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    await actNode.execute({ navigate })
+    expect(handlerCalled).toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it("failed action does not accidentally navigate after throwing", async () => {
+    const navigate: NavigationService = vi.fn() as unknown as NavigationService
+    const TestScreen = screen("FailNoNavigate", $ => {
+      $.act("Test")
+        .when(true)
+        .does(() => {
+          navigate?.("login")
+          throw new Error("fail")
+        })
+        .feedback({ failure: "Failed." })
+    })
+
+    const actNode = TestScreen.acts[0]!
+    await actNode.execute({ navigate })
+    // navigate was called but action is in failure state
+    expect(navigate).toHaveBeenCalledWith("login")
+    expect(actNode.status).toBe("failure")
   })
 })
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { screen } from "@intent/core"
 import { testScreen } from "./index.js"
 
@@ -254,5 +254,95 @@ describe("testScreen", () => {
       screen.resource("team").invalidate()
       expect(screen.resource("team").stale()).toBe(true)
     })
+  })
+
+  it("act.run() executes the action with runtime context", async () => {
+    let contextReceived = false
+    const TestScreen = screen("ActRun", $ => {
+      $.act("Run me")
+        .when(true)
+        .does((context) => {
+          contextReceived = true
+          expect(context).toBeDefined()
+        })
+      $.surface("main").contains()
+    })
+
+    await testScreen(TestScreen, async screen => {
+      await screen.act("Run me").run()
+      expect(contextReceived).toBe(true)
+    })
+  })
+
+  it("testScreen passes services to runtime", async () => {
+    const navigate: (name: string) => void = vi.fn()
+    const TestScreen = screen("Services", $ => {
+      $.act("Navigate")
+        .when(true)
+        .does(({ navigate }) => {
+          navigate?.("login")
+        })
+      $.surface("main").contains()
+    })
+
+    await testScreen(TestScreen, async screen => {
+      await screen.act("Navigate").run()
+      expect(navigate).toHaveBeenCalledWith("login")
+    }, { services: { navigate } })
+  })
+
+  it("mock navigate service can be asserted in testing", async () => {
+    const navigate: (name: string, params?: Record<string, string>) => void = vi.fn()
+    const TestScreen = screen("MockNav", $ => {
+      $.act("Go")
+        .when(true)
+        .does(({ navigate }) => {
+          navigate?.("team.details", { teamId: "t1" })
+        })
+      $.surface("main").contains()
+    })
+
+    await testScreen(TestScreen, async screen => {
+      await screen.act("Go").run()
+      expect(navigate).toHaveBeenCalledWith("team.details", { teamId: "t1" })
+    }, { services: { navigate } })
+  })
+
+  it("act.run() on blocked action does not navigate", async () => {
+    const navigate: (name: string) => void = vi.fn()
+    const TestScreen = screen("BlockedNav", $ => {
+      const email = $.state.text("email")
+      const ask = $.ask("Email", email).required()
+      $.act("Go")
+        .when(ask.valid)
+        .does(({ navigate }) => {
+          navigate?.("somewhere")
+        })
+      $.surface("main").contains(ask)
+    })
+
+    await testScreen(TestScreen, async screen => {
+      await screen.act("Go").run()
+      expect(navigate).not.toHaveBeenCalled()
+    }, { services: { navigate } })
+  })
+
+  it("failed action does not accidentally navigate after throwing", async () => {
+    const navigate: (name: string) => void = vi.fn()
+    const TestScreen = screen("FailNav", $ => {
+      $.act("Go")
+        .when(true)
+        .does(({ navigate }) => {
+          navigate?.("somewhere")
+          throw new Error("fail")
+        })
+        .feedback({ failure: "Failed." })
+      $.surface("main").contains()
+    })
+
+    await testScreen(TestScreen, async screen => {
+      await screen.act("Go").run()
+      expect(navigate).toHaveBeenCalledWith("somewhere")
+    }, { services: { navigate } })
   })
 })
