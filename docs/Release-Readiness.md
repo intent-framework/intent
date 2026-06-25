@@ -33,7 +33,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `exports` | `{ ".": { types, import, default } }` | Correct |
 | `files` | `["dist"]` | Correct — only `dist/` and `package.json` included in tarball |
 | `description` | Present | Added in this audit |
-| `license` | MIT field present | Root LICENSE file still needed |
+| `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended for npm listing |
 | `engines` | Missing | Should document minimum Node version |
 | `dependencies` | None | Good — core is platformless |
@@ -51,7 +51,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `exports` | `{ ".": { types, import, default } }` | Correct |
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
-| `license` | MIT field present | Root LICENSE file still needed |
+| `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
 | `dependencies` | `@intent/core`, `@intent/router` | Uses `workspace:*` — correct for monorepo |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
@@ -67,7 +67,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `exports` | `{ ".": { types, import, default } }` | Correct |
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
-| `license` | MIT field present | Root LICENSE file still needed |
+| `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
 | `dependencies` | `@intent/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
@@ -83,7 +83,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `exports` | `{ ".": { types, import, default } }` | Correct |
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
-| `license` | MIT field present | Root LICENSE file still needed |
+| `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
 | `dependencies` | `@intent/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
@@ -99,7 +99,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `exports` | `{ ".": { types, import, default } }` | Correct |
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
-| `license` | MIT field present | Root LICENSE file still needed |
+| `license` | MIT field present | Root LICENSE file present |
 | `repository` | Missing | Recommended |
 | `dependencies` | `@intent/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
@@ -228,7 +228,7 @@ Do not manually create GitHub Releases.
 ## First alpha release checklist
 
 - [ ] Confirm npm scope/package names (verify `@intent` org ownership)
-- [ ] Confirm license by adding a root `LICENSE` file matching the package license fields
+- [ ] Reconfirm MIT is the intended public license before publishing
 - [ ] Confirm package metadata (`repository` field in all packages)
 - [ ] Confirm package exports (all point to correct `dist/` paths — already correct)
 - [ ] Confirm package files (`files: ["dist"]` — already correct)
@@ -244,12 +244,11 @@ Do not manually create GitHub Releases.
 
 Before first alpha release, the following must be resolved:
 
-1. **No root LICENSE file** — Package `license` fields now say MIT, but the repository still needs a root `LICENSE` file before publishing.
-2. **Missing `repository` fields** — Recommended for npm listing and source links.
-3. **`@intent` npm scope availability** — Must be verified. If unavailable, a fallback scope must be chosen before first release.
-4. **No release workflow** — Changesets and a GitHub Action must be added before publishing.
-5. **Server package is very early** — `@intent/server` has global registries and minimal API surface. Consider whether to publish it or mark it as private until more mature.
-6. **Version is `0.1.0` across all packages** — Consistent, but no pre-release tag (e.g., `0.1.0-alpha.0`) for the first publish.
+1. **Missing `repository` fields** — Recommended for npm listing and source links.
+2. **`@intent` npm scope availability** — Must be verified. If unavailable, a fallback scope must be chosen before first release.
+3. **No release workflow** — Changesets and a GitHub Action must be added before publishing.
+4. **Server package is very early** — `@intent/server` has global registries and minimal API surface. Consider whether to publish it or mark it as private until more mature.
+5. **Version is `0.1.0` across all packages** — Consistent, but no pre-release tag (e.g., `0.1.0-alpha.0`) for the first publish.
 
 ## Do not do yet
 
