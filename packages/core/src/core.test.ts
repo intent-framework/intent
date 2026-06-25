@@ -466,6 +466,141 @@ describe("graph inspection", () => {
   })
 })
 
+describe("graph diagnostics", () => {
+  it("returns no diagnostics for a simple valid screen", () => {
+    const screenDef = screen("ValidScreen", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.diagnostics).toEqual([])
+  })
+
+  it("reports multiple-primary-actions when screen has more than one primary action", () => {
+    const screenDef = screen("MultiPrimary", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      const signup = $.act("Sign up").primary()
+      $.surface("main").contains(emailAsk, login, signup)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.diagnostics).toHaveLength(1)
+    expect(inspected.diagnostics[0]?.code).toBe("multiple-primary-actions")
+    expect(inspected.diagnostics[0]?.severity).toBe("warning")
+    expect(inspected.diagnostics[0]?.nodeId).toBeUndefined()
+  })
+
+  it("does not report multiple-primary-actions when screen has one primary action", () => {
+    const screenDef = screen("SinglePrimary", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    const multiPrimary = inspected.diagnostics.filter(d => d.code === "multiple-primary-actions")
+    expect(multiPrimary).toHaveLength(0)
+  })
+
+  it("reports secret-ask-not-private for secret ask without private", () => {
+    const screenDef = screen("SecretNotPrivate", $ => {
+      const pwd = $.state.text("password")
+      const pwdAsk = $.ask("Password", pwd).asSecret()
+      $.surface("main").contains(pwdAsk)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.diagnostics).toHaveLength(1)
+    expect(inspected.diagnostics[0]?.code).toBe("secret-ask-not-private")
+    expect(inspected.diagnostics[0]?.severity).toBe("warning")
+    expect(inspected.diagnostics[0]?.nodeId).toBe("ask_password")
+  })
+
+  it("does not report secret-ask-not-private for secret private ask", () => {
+    const screenDef = screen("SecretPrivate", $ => {
+      const pwd = $.state.text("password")
+      const pwdAsk = $.ask("Password", pwd).asSecret().private()
+      $.surface("main").contains(pwdAsk)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    const secretNotPrivate = inspected.diagnostics.filter(d => d.code === "secret-ask-not-private")
+    expect(secretNotPrivate).toHaveLength(0)
+  })
+
+  it("reports primary-action-without-blocked-reason when primary action has condition with no message", () => {
+    const screenDef = screen("NoBlockedReason", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid)
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.diagnostics).toHaveLength(1)
+    expect(inspected.diagnostics[0]?.code).toBe("primary-action-without-blocked-reason")
+    expect(inspected.diagnostics[0]?.severity).toBe("info")
+    expect(inspected.diagnostics[0]?.nodeId).toBe("act_log_in")
+  })
+
+  it("does not report primary-action-without-blocked-reason when primary action has explicit blocked reason", () => {
+    const screenDef = screen("HasBlockedReason", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    const noReason = inspected.diagnostics.filter(d => d.code === "primary-action-without-blocked-reason")
+    expect(noReason).toHaveLength(0)
+  })
+
+  it("includes diagnostics alongside existing inspectScreen output", () => {
+    const screenDef = screen("Combined", $ => {
+      const pwd = $.state.text("password")
+      const pwdAsk = $.ask("Password", pwd).asSecret()
+      const login = $.act("Log in").primary()
+      const signup = $.act("Sign up").primary()
+      $.surface("main").contains(pwdAsk, login, signup)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.name).toBe("Combined")
+    expect(inspected.asks).toHaveLength(1)
+    expect(inspected.acts).toHaveLength(2)
+    expect(inspected.diagnostics.length).toBeGreaterThan(0)
+    expect(inspected.diagnostics.some(d => d.code === "secret-ask-not-private")).toBe(true)
+    expect(inspected.diagnostics.some(d => d.code === "multiple-primary-actions")).toBe(true)
+  })
+
+  it("returns diagnostics in deterministic order", () => {
+    const screenDef = screen("DeterministicOrder", $ => {
+      const pwd = $.state.text("password")
+      const pwdAsk = $.ask("Password", pwd).asSecret()
+      const login = $.act("Log in").primary()
+      const signup = $.act("Sign up").primary()
+      $.surface("main").contains(pwdAsk, login, signup)
+    })
+
+    const first = inspectScreen(screenDef)
+    const second = inspectScreen(screenDef)
+    expect(first.diagnostics.map(d => d.code)).toEqual(second.diagnostics.map(d => d.code))
+  })
+})
+
 describe("resource", () => {
   it("registers resource in screen definition", () => {
     const TeamScreen = screen("TeamScreen", $ => {
