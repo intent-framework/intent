@@ -1039,7 +1039,7 @@ describe("screen runtime", () => {
     expect(actNode.blockedReasons).toEqual([])
   })
 
-  it("start() does not duplicate load for already ready resources", async () => {
+  it("start() does not duplicate load for the same runtime instance", async () => {
     let loadCount = 0
     const TestScreen = screen("NoDuplicateLoad", $ => {
       $.resource("team", {
@@ -1050,14 +1050,12 @@ describe("screen runtime", () => {
       })
     })
 
-    const resource = TestScreen.resources[0]!
-    await resource.load()
-    expect(loadCount).toBe(1)
-
     const runtime = createScreenRuntime(TestScreen)
     await runtime.start()
+    expect(loadCount).toBe(1)
 
-    // start() should not re-load already ready resources
+    // Second start on the same runtime should not re-load
+    await runtime.start()
     expect(loadCount).toBe(1)
   })
 
@@ -1397,6 +1395,123 @@ screen<_TypeTestAppServices>("TypeTestScreen", $ => {
   })
 }
 
+// --- Resource Loader Context Type Tests (verified during pnpm typecheck) ---
+
+// 1. No-arg resource loaders still typecheck
+screen("TypeNoArgResource", $ => {
+  $.resource("team", {
+    load: async () => ({ id: "team_1", name: "Intent Labs" }),
+  })
+})
+
+// 2. Resource loader with default services context
+screen("TypeDefaultResourceContext", $ => {
+  $.resource("profile", {
+    load: async (context) => {
+      void(context.navigate satisfies ((name: string, params?: Record<string, string>) => void) | undefined)
+      return "data"
+    },
+  })
+})
+
+type _ResourceAppServices = {
+  route: { name: string; path: string; params: Record<string, string> }
+  navigate: (name: string) => void
+  auth: { token(): string }
+}
+
+// 3. Custom app services visible in resource loader context
+screen<_ResourceAppServices>("TypeCustomResourceContext", $ => {
+  $.resource("profile", {
+    load: async ({ auth, route, navigate }) => {
+      const token = auth.token()
+      navigate("home")
+      return { token, routeName: route.name }
+    },
+  })
+})
+
+// 4. Unknown service access fails
+{
+  screen<_ResourceAppServices>("TypeUnknownResourceService", $ => {
+    $.resource("profile", {
+      load: async (context) => {
+        // @ts-expect-error unknown property
+        context.unknownService
+        return "data"
+      },
+    })
+  })
+}
+
+// 5. Custom service method argument types are enforced
+{
+  type _StrictAppServices = {
+    analytics: { track(event: "click" | "view"): void }
+  }
+
+  screen<_StrictAppServices>("TypeStrictResourceService", $ => {
+    $.resource("profile", {
+      load: async ({ analytics }) => {
+        analytics.track("click")
+        // @ts-expect-error wrong event name
+        analytics.track("invalid_event")
+        return "data"
+      },
+    })
+  })
+}
+
+// 6. screen<AppServices>() resource loader gets typed context
+screen<_ResourceAppServices>("TypeTypedResourceScreen", $ => {
+  $.resource("team", {
+    load: async ({ route }) => {
+      void(route.name satisfies string)
+      return { name: route.name }
+    },
+  })
+})
+
+// 7. Route context narrowing and typed params
+{
+  type _RouteAwareServices = {
+    route:
+      | { name: "home"; path: "/"; params: {} }
+      | { name: "team.details"; path: "/teams/:teamId"; params: { teamId: string } }
+    navigate: (name: string) => void
+  }
+
+  screen<_RouteAwareServices>("TypeRouteNarrowing", $ => {
+    $.resource("team", {
+      load: async ({ route }) => {
+        if (route.name === "team.details") {
+          void(route.params.teamId satisfies string)
+          // @ts-expect-error wrong param name
+          void(route.params.wrongParam satisfies string)
+          return { teamId: route.params.teamId }
+        }
+        throw new Error("Expected team.details route")
+      },
+    })
+  })
+}
+
+// 8. Existing value type inference still works
+{
+  screen("TypeValueInference", $ => {
+    const team = $.resource("team", {
+      load: async () => ({ id: "team_1", name: "Intent Labs" }),
+    })
+
+    const v = team.value
+    if (v) {
+      expect(v.id).toBe("team_1")
+    } else {
+      expect(v).toBeUndefined()
+    }
+  })
+}
+
 describe("generic runtime services", () => {
   type AppAnalytics = {
     track(event: string): void
@@ -1503,5 +1618,260 @@ describe("generic runtime services", () => {
     const ctx = runtime.getExecutionContext()
     expect(ctx.analytics).toBe(analytics)
     expect(ctx.navigate).toBe(navigate)
+  })
+})
+
+describe("resource loader context", () => {
+  type TestServices = {
+    value: string
+  }
+
+  it("no-arg resource loader still runs", async () => {
+    let called = false
+    const TestScreen = screen("NoArgLoader", $ => {
+      $.resource("team", {
+        load: async () => {
+          called = true
+          return "data"
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load()
+    expect(called).toBe(true)
+    expect(resource.status).toBe("ready")
+  })
+
+  it("resource loader receives runtime services", async () => {
+    let received: unknown
+    const TestScreen = screen<TestServices>("ContextReceiver", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    const services: TestServices = { value: "hello" }
+    await resource.load(services)
+    expect(received).toBe(services)
+    expect(resource.status).toBe("ready")
+  })
+
+  it("runtime autoload passes services to loader", async () => {
+    let received: unknown
+    const TestScreen = screen<TestServices>("AutoloadContext", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+      })
+    })
+
+    const runtime = createScreenRuntime<TestServices>(TestScreen, {
+      services: { value: "autoload" },
+    })
+
+    await runtime.start()
+
+    expect(received).toEqual({ value: "autoload" })
+  })
+
+  it("manual resource.load() passes services from runtime context", async () => {
+    let received: unknown
+    const TestScreen = screen<TestServices>("ManualLoadContext", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+        autoLoad: false,
+      })
+    })
+
+    const runtime = createScreenRuntime<TestServices>(TestScreen, {
+      services: { value: "manual" },
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load(runtime.getExecutionContext())
+    expect(received).toEqual({ value: "manual" })
+  })
+
+  it("manual resource.reload() passes services from runtime context", async () => {
+    let received: unknown
+    const TestScreen = screen<TestServices>("ReloadContext", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+        autoLoad: false,
+      })
+    })
+
+    const runtime = createScreenRuntime<TestServices>(TestScreen, {
+      services: { value: "reload" },
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.reload(runtime.getExecutionContext())
+    expect(received).toEqual({ value: "reload" })
+  })
+
+  it("resource.load() with no arg still works and gets empty context", async () => {
+    let received: unknown
+    const TestScreen = screen("NoArgContext", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load()
+    expect(received).toEqual({})
+  })
+
+  it("loader failure behavior remains unchanged", async () => {
+    const TestScreen = screen("FailUnchanged", $ => {
+      $.resource("team", {
+        load: async () => {
+          throw new Error("Fetch failed")
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load()
+    expect(resource.status).toBe("failed")
+    expect(resource.error).toBeInstanceOf(Error)
+    expect((resource.error as Error).message).toBe("Fetch failed")
+  })
+
+  it("successful load clears stale status", async () => {
+    const TestScreen = screen("LoadClearsStaleContext", $ => {
+      $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load()
+    expect(resource.status).toBe("ready")
+    expect(resource.stale.current).toBe(false)
+
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    await resource.reload()
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("act.invalidates(resource) still works", async () => {
+    const TestScreen = screen("InvalidatesContext", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+
+      $.act("Save")
+        .when(true)
+        .does(async () => {})
+        .invalidates(team)
+    })
+
+    const resource = TestScreen.resources[0]!
+    const actNode = TestScreen.acts[0]!
+    await resource.load()
+    expect(resource.stale.current).toBe(false)
+
+    await actNode.execute()
+    expect(resource.stale.current).toBe(true)
+  })
+
+  it("no-arg resource loader is callable with context arg", async () => {
+    let called = false
+    const TestScreen = screen("NoArgWithContextArg", $ => {
+      $.resource("team", {
+        load: async () => {
+          called = true
+          return "data"
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load({ navigate: (_name: string) => {} })
+    expect(called).toBe(true)
+    expect(resource.status).toBe("ready")
+  })
+
+  it("resource.load() defaults to empty context when called from testing without services", async () => {
+    let received: unknown
+    const TestScreen = screen("EmptyContextDefault", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load()
+    expect(received).toEqual({})
+  })
+
+  it("runtime autoload with default services (no extra services)", async () => {
+    let received: unknown
+    const TestScreen = screen("AutoloadDefaultServices", $ => {
+      $.resource("team", {
+        load: async (context) => {
+          received = context
+          return "data"
+        },
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+    expect(received).toEqual({})
+    expect(TestScreen.resources[0]!.status).toBe("ready")
+  })
+
+  it("fresh runtime autoloads resource even if previous runtime already loaded it", async () => {
+    let callCount = 0
+    const TestScreen = screen("FreshRuntimeAutoload", $ => {
+      $.resource("counter", {
+        load: async () => {
+          callCount++
+          return `data${callCount}`
+        },
+      })
+    })
+
+    // First runtime — loads the resource
+    const runtime1 = createScreenRuntime(TestScreen)
+    await runtime1.start()
+    expect(callCount).toBe(1)
+    expect(TestScreen.resources[0]!.status).toBe("ready")
+    runtime1.dispose()
+
+    // Second runtime on the same screen definition — should autoload again
+    const runtime2 = createScreenRuntime(TestScreen, { services: {} })
+    expect(TestScreen.resources[0]!.status).toBe("ready") // still ready from runtime1
+    await runtime2.start()
+    // The resource should have been loaded again despite being ready
+    expect(callCount).toBe(2)
+    expect(TestScreen.resources[0]!.value).toBe("data2")
+    runtime2.dispose()
   })
 })

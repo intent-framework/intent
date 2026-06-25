@@ -110,8 +110,8 @@ export async function testScreen<TServices extends object = DefaultScreenService
 
       return {
         status: () => resourceNode.status,
-        load: () => resourceNode.load(),
-        reload: () => resourceNode.reload(),
+        load: () => resourceNode.load(runtime.getExecutionContext()),
+        reload: () => resourceNode.reload(runtime.getExecutionContext()),
         invalidate: () => resourceNode.invalidate(),
         stale: () => resourceNode.stale.current,
       }

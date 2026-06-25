@@ -1,37 +1,45 @@
 import { signal, createCondition, type Signal, type Condition } from "./signal.js"
+import type { ActionExecutionContext, DefaultScreenServices } from "./act.js"
 
 export type ResourceStatus = "idle" | "pending" | "ready" | "failed"
 
-export type ResourceNode<T> = {
+export type ResourceLoadContext<TServices extends object = DefaultScreenServices> =
+  ActionExecutionContext<TServices>
+
+type ResourceLoader<TValue, TServices extends object> =
+  | (() => TValue | Promise<TValue>)
+  | ((context: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)
+
+export type ResourceNode<TValue, TServices extends object = DefaultScreenServices> = {
   id: string
   name: string
   autoLoad: boolean
   status: ResourceStatus
-  value: T | undefined
+  value: TValue | undefined
   error: unknown | undefined
   ready: Condition
   pending: Condition
   failed: Condition
   stale: Condition
-  load: () => Promise<void>
-  reload: () => Promise<void>
+  load: (context?: ResourceLoadContext<TServices>) => Promise<void>
+  reload: (context?: ResourceLoadContext<TServices>) => Promise<void>
   invalidate: () => void
   subscribe: (fn: () => void) => () => void
 }
 
-export type AnyResourceNode = ResourceNode<unknown>
+export type AnyResourceNode = ResourceNode<unknown, any>
 
-export function createResourceNode<T>(
+export function createResourceNode<TValue, TServices extends object = DefaultScreenServices>(
   id: string,
   name: string,
-  loader: () => Promise<T>,
+  loader: ResourceLoader<TValue, TServices>,
   autoLoad = true,
-): ResourceNode<T> {
+): ResourceNode<TValue, TServices> {
   const statusSignal: Signal<number> = signal(0)
   const staleSignal: Signal<number> = signal(0)
 
   let currentStatus: ResourceStatus = "idle"
-  let currentValue: T | undefined = undefined
+  let currentValue: TValue | undefined = undefined
   let currentError: unknown = undefined
   let currentStale = false
 
@@ -83,7 +91,7 @@ export function createResourceNode<T>(
     return _stale
   }
 
-  async function executeLoad(): Promise<void> {
+  async function executeLoad(context?: ResourceLoadContext<TServices>): Promise<void> {
     currentStale = false
     staleNotify()
     currentStatus = "pending"
@@ -92,7 +100,11 @@ export function createResourceNode<T>(
     notify()
 
     try {
-      const result = await loader()
+      const result = await Promise.resolve(
+        (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(
+          context ?? ({} as ResourceLoadContext<TServices>)
+        )
+      )
       currentValue = result
       currentStatus = "ready"
       currentStale = false
@@ -114,7 +126,7 @@ export function createResourceNode<T>(
     }
   }
 
-  const node: ResourceNode<T> = {
+  const node: ResourceNode<TValue, TServices> = {
     id,
     name,
     autoLoad,

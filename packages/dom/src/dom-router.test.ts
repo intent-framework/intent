@@ -992,5 +992,177 @@ describe("renderRouter", () => {
       expect(root.querySelector("button")?.textContent).toBe("Login action")
       expect(win._getPathname()).toBe("/login")
     })
+
+    it("renderRouter passes route context to autoloading resource", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/abc-123/invite")
+
+      let capturedContext: unknown
+
+      const TeamResourceScreen = screen<AppServices>("TeamResource", $ => {
+        $.resource("team", {
+          load: async (context) => {
+            capturedContext = context
+            return { id: "team_1" }
+          },
+        })
+        $.act("View")
+          .primary()
+          .when(true)
+          .does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("team.invite", "/teams/:teamId/invite", TeamResourceScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, {
+        target: root,
+        window: win,
+      })
+
+      // Wait for autoload
+      const resource = TeamResourceScreen.resources[0]!
+      if (resource.status === "idle" || resource.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = resource.subscribe(() => {
+            if (resource.status === "ready" || resource.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      const ctx = capturedContext as { route?: { name: string; params: Record<string, string> } }
+      expect(ctx).toBeDefined()
+      expect(ctx.route?.name).toBe("team.invite")
+      expect(ctx.route?.params.teamId).toBe("abc-123")
+      expect(resource.status).toBe("ready")
+    })
+
+    it("same screen definition with different route param re-runs resource autoload", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/teams/team_1/invite")
+
+      const calls: string[] = []
+
+      const TeamScreen = screen<AppServices>("TeamScreen", $ => {
+        $.resource("team", {
+          load: async ({ route }) => {
+            if (route.name === "team.invite") {
+              calls.push(route.params.teamId)
+              return { id: route.params.teamId }
+            }
+            throw new Error("Expected team.invite")
+          },
+        })
+        $.act("View")
+          .primary()
+          .when(true)
+          .does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("team.invite", "/teams/:teamId/invite", TeamScreen)
+
+      const root = document.getElementById("root")!
+      const app = renderRouter(router, {
+        target: root,
+        window: win,
+      })
+
+      // Wait for first autoload
+      const resource = TeamScreen.resources[0]!
+      if (resource.status === "idle" || resource.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = resource.subscribe(() => {
+            if (resource.status === "ready" || resource.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      expect(calls).toEqual(["team_1"])
+      expect(resource.value).toEqual({ id: "team_1" })
+
+      // Navigate to same route with different param
+      app.navigate("team.invite", { teamId: "team_2" })
+      await new Promise(r => setTimeout(r, 50))
+
+      // After navigation, the resource should have been autoloaded again
+      // with the new route param
+      expect(calls).toEqual(["team_1", "team_2"])
+      expect(resource.value).toEqual({ id: "team_2" })
+    })
+
+    it("renderRouter passes route context to resource loader via navigate", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+      const win = createMockWindow("/home")
+
+      let capturedContext: unknown
+
+      const HomeWithNav = screen<AppServices>("Home", $ => {
+        $.act("Go to team")
+          .primary()
+          .when(true)
+          .does(({ navigate }) => {
+            navigate("team.invite", { teamId: "t-42" })
+          })
+        $.surface("main").contains()
+      })
+
+      const TeamResourceScreen = screen<AppServices>("TeamResource", $ => {
+        $.resource("team", {
+          load: async (context) => {
+            capturedContext = context
+            return { id: "team_data" }
+          },
+        })
+        $.act("View")
+          .primary()
+          .when(true)
+          .does(() => {})
+        $.surface("main").contains()
+      })
+
+      const router = createRouter<AppServices>()
+        .route("home", "/home", HomeWithNav)
+        .route("team.invite", "/teams/:teamId/invite", TeamResourceScreen)
+
+      const root = document.getElementById("root")!
+      renderRouter(router, {
+        target: root,
+        window: win,
+      })
+
+      // Navigate to team screen
+      const form = root.querySelector("form")!
+      form.dispatchEvent(new Event("submit", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 50))
+
+      // Wait for resource autoload on the new screen
+      const resource = TeamResourceScreen.resources[0]!
+      if (resource.status === "idle" || resource.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = resource.subscribe(() => {
+            if (resource.status === "ready" || resource.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+
+      const ctx = capturedContext as { route?: { name: string; params: Record<string, string> } }
+      expect(ctx).toBeDefined()
+      expect(ctx.route?.name).toBe("team.invite")
+      expect(ctx.route?.params.teamId).toBe("t-42")
+      expect(resource.status).toBe("ready")
+    })
   })
 })

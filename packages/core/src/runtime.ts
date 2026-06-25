@@ -9,6 +9,7 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
   private _disposed = false
   private _unsubscribers: Array<() => void> = []
   private _services: TServices
+  private autoloadedResources = new Set<string>()
 
   constructor(screen: ScreenDefinition<TServices>, services: TServices = {} as TServices) {
     this._screen = screen
@@ -40,10 +41,16 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
     this._started = true
 
     const toLoad = this._screen.resources.filter(
-      r => r.autoLoad && r.status === "idle",
+      r => r.autoLoad && !this.autoloadedResources.has(r.id),
     )
+
+    for (const r of toLoad) {
+      this.autoloadedResources.add(r.id)
+    }
+
     if (toLoad.length > 0) {
-      await Promise.all(toLoad.map(r => r.load()))
+      const ctx = this.getExecutionContext()
+      await Promise.all(toLoad.map(r => r.load(ctx)))
     }
   }
 

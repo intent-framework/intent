@@ -2,7 +2,7 @@ import type { AnyAskNode } from "./ask.js"
 import type { ActNode, DefaultScreenServices } from "./act.js"
 import type { FlowNode } from "./flow.js"
 import type { SurfaceNode } from "./surface.js"
-import type { ResourceNode, AnyResourceNode } from "./resource.js"
+import type { ResourceNode, AnyResourceNode, ResourceLoadContext } from "./resource.js"
 import { createTextState, createBooleanState, createChoiceState, type TextState, type BooleanState, type ChoiceState } from "./state.js"
 import { AskBuilder } from "./ask.js"
 import { ActBuilder } from "./act.js"
@@ -21,7 +21,13 @@ export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
   act: (label: string) => ActBuilder<TServices>
   flow: (name: string) => FlowBuilder
   surface: (name: string) => SurfaceBuilder
-  resource: <T>(name: string, config: { load: () => Promise<T>; autoLoad?: boolean }) => ResourceNode<T>
+  resource: <T>(
+    name: string,
+    config: {
+      load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>)
+      autoLoad?: boolean
+    },
+  ) => ResourceNode<T, TServices>
 }
 
 export type ScreenDefinition<TServices extends object = DefaultScreenServices> = {
@@ -53,9 +59,9 @@ export function screen<TServices extends object = DefaultScreenServices>(
     act: (label) => new ActBuilder<TServices>(label),
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
-    resource: <T>(n: string, config: { load: () => Promise<T>; autoLoad?: boolean }) => {
+    resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean }) => {
       const id = `resource_${n}`
-      const node = createResourceNode<T>(id, n, config.load, config.autoLoad)
+      const node = createResourceNode<T, TServices>(id, n, config.load, config.autoLoad)
       registerResourceNode(node as AnyResourceNode)
       return node
     },
