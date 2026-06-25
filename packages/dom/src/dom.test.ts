@@ -124,4 +124,137 @@ describe("DOM renderer", () => {
 
     expect(button.disabled).toBe(false)
   })
+
+  it("updates button state on programmatic state changes via subscription", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const LoginScreen = screen("LoginSub", $ => {
+      const email = $.state.text("email")
+      const password = $.state.text("password")
+
+      const emailAsk = $.ask("Email", email)
+        .asContact("email")
+        .required()
+
+      const passwordAsk = $.ask("Password", password)
+        .asSecret()
+        .required()
+
+      const login = $.act("Log in")
+        .primary()
+        .when(email)
+        .when(password)
+
+      $.surface("main")
+        .contains(emailAsk, passwordAsk, login)
+    })
+
+    const root = document.getElementById("root")
+    if (!root) throw new Error("no root element")
+
+    renderDom(LoginScreen, { target: root })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+
+    // Set state programmatically — subscription re-evaluates buttons
+    const emailState0 = LoginScreen.asks[0]
+    const passwordState0 = LoginScreen.asks[1]
+    const emailState = emailState0!.state as unknown as { set: (v: string) => void }
+    const passwordState = passwordState0!.state as unknown as { set: (v: string) => void }
+    emailState.set("user@example.com")
+
+    expect(button.disabled).toBe(true) // password still empty
+
+    passwordState.set("secret")
+
+    expect(button.disabled).toBe(false)
+  })
+
+  it("updates feedback output after act execution", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    let resolved = false
+
+    const LoginScreen = screen("LoginFeedback", $ => {
+      const email = $.state.text("email")
+      const password = $.state.text("password")
+
+      const emailAsk = $.ask("Email", email)
+        .asContact("email")
+        .required()
+
+      const passwordAsk = $.ask("Password", password)
+        .asSecret()
+        .required()
+
+      const login = $.act("Log in")
+        .primary()
+        .when(email)
+        .when(password)
+        .does(async () => {
+          await Promise.resolve()
+          resolved = true
+        })
+        .feedback({
+          pending: "Logging in...",
+          success: "Logged in.",
+        })
+
+      $.surface("main")
+        .contains(emailAsk, passwordAsk, login)
+    })
+
+    const root = document.getElementById("root")
+    if (!root) throw new Error("no root element")
+
+    renderDom(LoginScreen, { target: root })
+
+    const output = root.querySelector("output")!
+    expect(output.textContent).toBe("")
+
+    // Enable the act by filling in fields
+    const emailState2 = LoginScreen.asks[0]!.state as unknown as { set: (v: string) => void }
+    const passwordState2 = LoginScreen.asks[1]!.state as unknown as { set: (v: string) => void }
+    emailState2.set("a@b.com")
+    passwordState2.set("pwd")
+
+    // Submit the form
+    const form = root.querySelector("form")!
+    form.dispatchEvent(new Event("submit", { bubbles: true }))
+
+    // Wait for the async handler
+    await new Promise(r => setTimeout(r, 50))
+
+    expect(resolved).toBe(true)
+    expect(output.textContent).toBe("Logged in.")
+  })
+
+  it("returns a cleanup function that unsubscribes listeners", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const TestScreen = screen("Cleanup", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).required()
+      const login = $.act("Log in").primary().when(email)
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const root = document.getElementById("root")
+    if (!root) throw new Error("no root element")
+
+    const cleanup = renderDom(TestScreen, { target: root })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+
+    // After cleanup, state changes should not update buttons
+    cleanup()
+
+    const emailState3 = TestScreen.asks[0]!.state as unknown as { set: (v: string) => void }
+    emailState3.set("test@test.com")
+
+    // Button should still be disabled because subscription was removed
+    expect(button.disabled).toBe(true)
+  })
 })

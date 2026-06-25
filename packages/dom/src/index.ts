@@ -1,24 +1,50 @@
-import type { ScreenDefinition } from "@intent/core"
+import type { ScreenDefinition, ActNode } from "@intent/core"
 
 export type DomRendererOptions = {
   target: HTMLElement
 }
 
-export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptions): void {
+export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptions): () => void {
   const { target } = options
   target.innerHTML = ""
   const root = buildDom(screenDef)
   target.appendChild(root)
 
-  const form = target.querySelector("form")
-  if (form) {
-    form.addEventListener("submit", (e: Event) => {
-      e.preventDefault()
-      const primaryAct = screenDef.acts.find(a => a.primary)
-      if (primaryAct?.enabled) {
-        primaryAct.execute()
-      }
+  const form = target.querySelector("form")!
+  const output = target.querySelector("output#feedback-output")!
+
+  const unsubscribers: Array<() => void> = []
+
+  // Subscribe to state changes — re-evaluate all action buttons
+  for (const ask of screenDef.asks) {
+    const unsub = ask.subscribe(() => {
+      updateActionButtons(screenDef, form)
     })
+    unsubscribers.push(unsub)
+  }
+
+  // Subscribe to act status changes — update feedback output
+  for (const act of screenDef.acts) {
+    const unsub = act.onStatusChange(() => {
+      updateFeedback(act, output)
+    })
+    unsubscribers.push(unsub)
+  }
+
+  // Handle form submission
+  form.addEventListener("submit", (e: Event) => {
+    e.preventDefault()
+    const primaryAct = screenDef.acts.find(a => a.primary)
+    if (primaryAct?.enabled) {
+      primaryAct.execute()
+    }
+  })
+
+  // Return cleanup function
+  return () => {
+    for (const unsub of unsubscribers) {
+      unsub()
+    }
   }
 }
 
@@ -56,11 +82,10 @@ function buildDom(screenDef: ScreenDefinition): HTMLElement {
     }
 
     input.addEventListener("input", () => {
-      const stateObj = ask.state as { value: string; set: (v: string) => void }
+      const stateObj = ask.state as unknown as { value: string; set: (v: string) => void }
       if (typeof stateObj.set === "function") {
         stateObj.set(input.value)
       }
-      updateActionButtons(screenDef, form)
     })
 
     container.appendChild(input)
@@ -108,6 +133,15 @@ function updateActionButtons(screenDef: ScreenDefinition, form: HTMLElement): vo
     if (button) {
       button.disabled = !act.enabled
     }
+  }
+}
+
+function updateFeedback(act: ActNode, output: Element): void {
+  const msg = act.feedback && act.statusMessage ? act.statusMessage : ""
+  if (msg) {
+    output.textContent = msg
+  } else {
+    output.textContent = ""
   }
 }
 

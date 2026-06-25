@@ -1,3 +1,4 @@
+import { signal, type Signal } from "./signal.js"
 import { registerActNode } from "./registry.js"
 
 export type FeedbackConfig = {
@@ -24,6 +25,7 @@ export type ActNode = {
   statusMessage: string | null
   enabled: boolean
   execute: () => Promise<void>
+  onStatusChange: (fn: () => void) => () => void
 }
 
 export function createActNode(
@@ -34,6 +36,10 @@ export function createActNode(
   feedback: FeedbackConfig | undefined,
   primary: boolean,
 ): ActNode {
+  const statusSignal: Signal<number> = signal(0)
+
+  const notifyStatus = () => statusSignal.set(statusSignal.get() + 1)
+
   const node: ActNode = {
     id,
     label,
@@ -47,7 +53,10 @@ export function createActNode(
       return computeActEnabled(node)
     },
     execute: async () => {
-      await executeAct(node)
+      await executeAct(node, notifyStatus)
+    },
+    onStatusChange(fn: () => void) {
+      return statusSignal.subscribe(fn)
     },
   }
   return node
@@ -62,18 +71,20 @@ function computeActEnabled(node: ActNode): boolean {
   return true
 }
 
-async function executeAct(node: ActNode): Promise<void> {
+async function executeAct(node: ActNode, notify: () => void): Promise<void> {
   if (!node.enabled || !node.handler) {
     return
   }
 
   node.status = "pending"
   node.statusMessage = node.feedback?.pending ?? null
+  notify()
 
   try {
     await node.handler()
     node.status = "success"
     node.statusMessage = node.feedback?.success ?? null
+    notify()
   } catch (error: unknown) {
     node.status = "failure"
     const fb = node.feedback?.failure
@@ -82,6 +93,7 @@ async function executeAct(node: ActNode): Promise<void> {
     } else {
       node.statusMessage = fb ?? null
     }
+    notify()
   }
 }
 

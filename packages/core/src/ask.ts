@@ -1,3 +1,4 @@
+import { signal, type Signal } from "./signal.js"
 import { registerAskNode } from "./registry.js"
 
 export type AskKind = "text" | "contact" | "secret" | "choice"
@@ -15,6 +16,7 @@ export type AskNode<T> = {
   state: { value: T }
   valid: boolean
   error: string | null
+  subscribe: (fn: () => void) => () => void
 }
 
 export type AnyAskNode = AskNode<unknown>
@@ -23,7 +25,13 @@ export function createAskNode<T>(
   id: string,
   label: string,
   stateRef: { value: T },
+  notifySub?: (fn: () => void) => () => void,
 ): AskNode<T> {
+  const notifySignal: Signal<number> = signal(0)
+  notifySub?.(() => {
+    notifySignal.set(notifySignal.get() + 1)
+  })
+
   const node: AskNode<T> = {
     id,
     label,
@@ -37,6 +45,9 @@ export function createAskNode<T>(
     },
     get error() {
       return computeAskError(node)
+    },
+    subscribe(fn: () => void) {
+      return notifySignal.subscribe(fn)
     },
   }
   return node
@@ -73,9 +84,13 @@ function computeAskError<T>(node: AskNode<T>): string | null {
 export class AskBuilder<T> {
   private node: AskNode<T>
 
-  constructor(label: string, stateRef: { value: T }) {
+  constructor(label: string, stateRef: { value: T; onChange?: (fn: (value: T) => void) => () => void }) {
     const id = `ask_${label.toLowerCase().replace(/\s+/g, "_")}`
-    this.node = createAskNode(id, label, stateRef)
+    const onChange = stateRef.onChange
+    const subscribeToState = onChange
+      ? (fn: () => void) => onChange((_v: T) => fn())
+      : undefined
+    this.node = createAskNode(id, label, stateRef, subscribeToState)
     registerAskNode(this.node as unknown as AnyAskNode)
   }
 
