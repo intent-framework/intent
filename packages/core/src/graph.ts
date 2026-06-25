@@ -30,6 +30,13 @@ export type InspectedScreen = {
     name: string
     itemCount: number
   }>
+  resources: Array<{
+    id: string
+    name: string
+    status: string
+    hasValue: boolean
+    error: string | undefined
+  }>
 }
 
 export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
@@ -62,6 +69,15 @@ export function inspectScreen(screenDef: ScreenDefinition): InspectedScreen {
       id: s.id,
       name: s.name,
       itemCount: s.items.length,
+    })),
+    resources: screenDef.resources.map(r => ({
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      hasValue: r.value !== undefined,
+      error: r.status === "failed"
+        ? (r.error instanceof Error ? r.error.message : String(r.error))
+        : undefined,
     })),
   }
 }

@@ -2,12 +2,14 @@ import type { AnyAskNode } from "./ask.js"
 import type { ActNode } from "./act.js"
 import type { FlowNode } from "./flow.js"
 import type { SurfaceNode } from "./surface.js"
+import type { ResourceNode, AnyResourceNode } from "./resource.js"
 import { createTextState, createBooleanState, createChoiceState, type TextState, type BooleanState, type ChoiceState } from "./state.js"
 import { AskBuilder } from "./ask.js"
 import { ActBuilder } from "./act.js"
 import { FlowBuilder } from "./flow.js"
 import { SurfaceBuilder } from "./surface.js"
-import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, getAsks, getActs, getFlows, getSurfaces } from "./registry.js"
+import { createResourceNode } from "./resource.js"
+import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, resetResourceRegistry, getAsks, getActs, getFlows, getSurfaces, getResources, registerResourceNode } from "./registry.js"
 
 export type ScreenBuilder = {
   state: {
@@ -19,6 +21,7 @@ export type ScreenBuilder = {
   act: (label: string) => ActBuilder
   flow: (name: string) => FlowBuilder
   surface: (name: string) => SurfaceBuilder
+  resource: <T>(name: string, config: { load: () => Promise<T> }) => ResourceNode<T>
 }
 
 export type ScreenDefinition = {
@@ -27,6 +30,7 @@ export type ScreenDefinition = {
   acts: ActNode[]
   flows: FlowNode[]
   surfaces: SurfaceNode[]
+  resources: AnyResourceNode[]
 }
 
 export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefinition {
@@ -34,6 +38,7 @@ export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefi
   resetActRegistry()
   resetFlowRegistry()
   resetSurfaceRegistry()
+  resetResourceRegistry()
 
   const builder: ScreenBuilder = {
     state: {
@@ -45,6 +50,12 @@ export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefi
     act: (label) => new ActBuilder(label),
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
+    resource: <T>(n: string, config: { load: () => Promise<T> }) => {
+      const id = `resource_${n}`
+      const node = createResourceNode<T>(id, n, config.load)
+      registerResourceNode(node as AnyResourceNode)
+      return node
+    },
   }
 
   fn(builder)
@@ -53,6 +64,7 @@ export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefi
   const acts = getActs()
   const flows = getFlows()
   const surfaces = getSurfaces()
+  const resources = getResources()
 
   return {
     name,
@@ -60,5 +72,6 @@ export function screen(name: string, fn: ($: ScreenBuilder) => void): ScreenDefi
     acts: Array.from(acts.values()),
     flows: Array.from(flows.values()),
     surfaces: Array.from(surfaces.values()),
+    resources: Array.from(resources.values()),
   }
 }

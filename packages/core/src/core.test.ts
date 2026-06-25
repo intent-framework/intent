@@ -464,3 +464,331 @@ describe("graph inspection", () => {
     expect(inspected.acts[0]?.blockedReasons).toEqual(["Enter your email."])
   })
 })
+
+describe("resource", () => {
+  it("registers resource in screen definition", () => {
+    const TeamScreen = screen("TeamScreen", $ => {
+      $.resource("team", {
+        load: async () => ({ id: "team_1", name: "Intent Labs" }),
+      })
+    })
+
+    expect(TeamScreen.resources).toHaveLength(1)
+    expect(TeamScreen.resources[0]?.name).toBe("team")
+  })
+
+  it("starts in idle status", () => {
+    screen("IdleTest", $ => {
+      const team = $.resource("team", {
+        load: async () => ({ id: "team_1", name: "Intent Labs" }),
+      })
+
+      expect(team.status).toBe("idle")
+      expect(team.ready.current).toBe(false)
+      expect(team.pending.current).toBe(false)
+      expect(team.failed.current).toBe(false)
+      expect(team.value).toBeUndefined()
+      expect(team.error).toBeUndefined()
+    })
+  })
+
+  it("transitions to ready on successful load", async () => {
+    let loaded = false
+    const TeamScreen = screen("LoadTest", $ => {
+      $.resource("team", {
+        load: async () => {
+          loaded = true
+          return { id: "team_1", name: "Intent Labs" }
+        },
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    expect(resource.status).toBe("idle")
+    await resource.load()
+    expect(loaded).toBe(true)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toEqual({ id: "team_1", name: "Intent Labs" })
+    expect(resource.error).toBeUndefined()
+  })
+
+  it("transitions to failed on load error", async () => {
+    const TeamScreen = screen("FailTest", $ => {
+      $.resource("team", {
+        load: async () => {
+          throw new Error("Network error")
+        },
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    await resource.load()
+    expect(resource.status).toBe("failed")
+    expect(resource.value).toBeUndefined()
+    expect(resource.error).toBeInstanceOf(Error)
+    expect((resource.error as Error).message).toBe("Network error")
+  })
+
+  it("reload resets and re-fetches", async () => {
+    let callCount = 0
+    const TeamScreen = screen("ReloadTest", $ => {
+      $.resource("team", {
+        load: async () => {
+          callCount++
+          return { id: "team_1", name: `Load ${callCount}` }
+        },
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    await resource.load()
+    expect(callCount).toBe(1)
+    expect(resource.value).toEqual({ id: "team_1", name: "Load 1" })
+
+    await resource.reload()
+    expect(callCount).toBe(2)
+    expect(resource.value).toEqual({ id: "team_1", name: "Load 2" })
+  })
+
+  it("exposes ready/pending/failed conditions that update reactively", async () => {
+    let resolveLoad!: (value: string) => void
+    const loadPromise = new Promise<string>(resolve => {
+      resolveLoad = resolve
+    })
+
+    const TeamScreen = screen("ConditionTest", $ => {
+      $.resource("team", {
+        load: async () => loadPromise,
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    expect(resource.ready.current).toBe(false)
+    expect(resource.pending.current).toBe(false)
+    expect(resource.failed.current).toBe(false)
+
+    const loadDone = resource.load()
+    expect(resource.status).toBe("pending")
+    expect(resource.ready.current).toBe(false)
+    expect(resource.pending.current).toBe(true)
+    expect(resource.failed.current).toBe(false)
+
+    resolveLoad("data")
+    await loadDone
+
+    expect(resource.status).toBe("ready")
+    expect(resource.ready.current).toBe(true)
+    expect(resource.pending.current).toBe(false)
+    expect(resource.failed.current).toBe(false)
+  })
+
+  it("exposes failed condition when load errors", async () => {
+    const TeamScreen = screen("FailedCondition", $ => {
+      $.resource("team", {
+        load: async () => {
+          throw new Error("fail")
+        },
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    await resource.load()
+    expect(resource.failed.current).toBe(true)
+    expect(resource.ready.current).toBe(false)
+    expect(resource.pending.current).toBe(false)
+  })
+
+  it("caches condition identities", () => {
+    screen("CachedConditions", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      expect(team.ready).toBe(team.ready)
+      expect(team.pending).toBe(team.pending)
+      expect(team.failed).toBe(team.failed)
+    })
+  })
+
+  it("condition.subscribe notifies on status changes", async () => {
+    let resolveLoad!: (value: string) => void
+    const loadPromise = new Promise<string>(resolve => {
+      resolveLoad = resolve
+    })
+
+    const TeamScreen = screen("SubscribeTest", $ => {
+      $.resource("team", {
+        load: async () => loadPromise,
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    const readyValues: boolean[] = []
+    const unsubReady = resource.ready.subscribe(() => {
+      readyValues.push(resource.ready.current)
+    })
+
+    const pendingValues: boolean[] = []
+    const unsubPending = resource.pending.subscribe(() => {
+      pendingValues.push(resource.pending.current)
+    })
+
+    expect(readyValues).toEqual([])
+    expect(pendingValues).toEqual([])
+
+    const loadDone = resource.load()
+    // load() notifies synchronously when transitioning to pending
+    expect(pendingValues).toEqual([true])
+    expect(readyValues).toEqual([false])
+
+    resolveLoad("data")
+    await loadDone
+
+    expect(readyValues).toEqual([false, true])
+    expect(pendingValues).toEqual([true, false])
+
+    unsubReady()
+    unsubPending()
+  })
+
+  it("action can depend on resource ready condition", async () => {
+    let resolveLoad!: (value: string) => void
+    const loadPromise = new Promise<string>(resolve => {
+      resolveLoad = resolve
+    })
+
+    const TeamScreen = screen("ActionResourceDep", $ => {
+      const team = $.resource("team", {
+        load: async () => loadPromise,
+      })
+
+      const invite = $.act("Send invite")
+        .when(team.ready, "Team must load first.")
+
+      $.surface("main").contains(invite)
+    })
+
+    const actNode = TeamScreen.acts[0]
+    const resource = TeamScreen.resources[0]
+    if (!actNode || !resource) throw new Error("nodes not found")
+
+    expect(actNode.enabled.current).toBe(false)
+    expect(actNode.blockedReasons).toEqual(["Team must load first."])
+
+    const loadDone = resource.load()
+    // Still pending, not ready
+    expect(actNode.enabled.current).toBe(false)
+
+    resolveLoad("team_data")
+    await loadDone
+
+    expect(actNode.enabled.current).toBe(true)
+    expect(actNode.blockedReasons).toEqual([])
+  })
+
+  it("action blocked reason clears after resource loads", async () => {
+    const TeamScreen = screen("BlockedReasonClear", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      const invite = $.act("Send invite")
+        .when(team.ready, "Team must load first.")
+
+      $.surface("main").contains(invite)
+    })
+
+    const actNode = TeamScreen.acts[0]
+    const resource = TeamScreen.resources[0]
+    if (!actNode || !resource) throw new Error("nodes not found")
+
+    expect(actNode.blockedReasons).toEqual(["Team must load first."])
+
+    await resource.load()
+
+    expect(actNode.blockedReasons).toEqual([])
+  })
+
+  it("inspectScreen includes resource status", async () => {
+    let resolveLoad!: (value: string) => void
+    const loadPromise = new Promise<string>(resolve => {
+      resolveLoad = resolve
+    })
+
+    const TeamScreen = screen("InspectResource", $ => {
+      $.resource("team", {
+        load: async () => loadPromise,
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    // Before load
+    let inspected = inspectScreen(TeamScreen)
+    expect(inspected.resources).toHaveLength(1)
+    expect(inspected.resources[0]?.name).toBe("team")
+    expect(inspected.resources[0]?.status).toBe("idle")
+    expect(inspected.resources[0]?.hasValue).toBe(false)
+
+    // After successful load
+    const loadDone = resource.load()
+    resolveLoad("data")
+    await loadDone
+
+    inspected = inspectScreen(TeamScreen)
+    expect(inspected.resources[0]?.status).toBe("ready")
+    expect(inspected.resources[0]?.hasValue).toBe(true)
+    expect(inspected.resources[0]?.error).toBeUndefined()
+  })
+
+  it("inspectScreen includes error when resource failed", async () => {
+    const TeamScreen = screen("InspectError", $ => {
+      $.resource("team", {
+        load: async () => {
+          throw new Error("Fetch failed")
+        },
+      })
+    })
+
+    const resource = TeamScreen.resources[0]
+    if (!resource) throw new Error("no resource node")
+
+    await resource.load()
+
+    const inspected = inspectScreen(TeamScreen)
+    expect(inspected.resources[0]?.status).toBe("failed")
+    expect(inspected.resources[0]?.hasValue).toBe(false)
+    expect(inspected.resources[0]?.error).toBe("Fetch failed")
+  })
+})
+
+describe("resource type inference", () => {
+  it("infers value type from loader", () => {
+    screen("TypeInference", $ => {
+      const team = $.resource("team", {
+        load: async () => ({ id: "team_1", name: "Intent Labs" }),
+      })
+
+      // Capture value to test type narrowing after guard
+      const v = team.value
+      if (v) {
+        expect(v.id).toBe("team_1")
+      } else {
+        expect(v).toBeUndefined()
+      }
+    })
+  })
+})

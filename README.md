@@ -14,10 +14,11 @@ What works:
 - `state.text`, `state.boolean`, `state.choice` - reactive state with getter/setter
 - `ask` - semantic questions with required validation, custom validation, privacy, input types
 - `act` - actions with reactive conditions, async handlers, feedback states
+- `resource` - async resources with load/reload lifecycle and reactive conditions
 - `flow` - interaction sequencing
 - `surface` - presentation grouping
 - `@intent/dom` - real semantic HTML renderer (form, label, input, button, output)
-- `@intent/testing` - semantic test harness (answer asks, assert act state)
+- `@intent/testing` - semantic test harness (answer asks, assert act state, load resources)
 - `@intent/server` - typed action/resource/policy skeleton
 - `examples/web-basic` - Login screen without JSX or manual DOM
 
@@ -58,6 +59,27 @@ Outputs real semantic HTML:
     <output aria-live="polite"></output>
   </form>
 </main>
+```
+
+## Resources
+
+Resources let screens declare async data dependencies semantically:
+
+```ts
+const team = $.resource("team", {
+  load: async () => getTeam(teamId.value)
+})
+
+// Reactive conditions
+const invite = $.act("Send invite")
+  .when(team.ready, "Team must load first.")
+
+// Lifecycle
+await team.load()       // idle → pending → ready/failed
+await team.reload()     // re-fetch
+team.status             // "idle" | "pending" | "ready" | "failed"
+team.value              // T | undefined
+team.ready.current      // boolean
 ```
 
 ## Semantic Tests
