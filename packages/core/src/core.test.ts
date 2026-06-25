@@ -599,6 +599,141 @@ describe("graph diagnostics", () => {
     const second = inspectScreen(screenDef)
     expect(first.diagnostics.map(d => d.code)).toEqual(second.diagnostics.map(d => d.code))
   })
+
+  it("does not report ask-not-in-surface when ask is in a surface", () => {
+    const screenDef = screen("AskInSurface", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      $.surface("main").contains(emailAsk, login)
+    })
+    const inspected = inspectScreen(screenDef)
+    const unsurfaced = inspected.diagnostics.filter(d => d.code === "ask-not-in-surface")
+    expect(unsurfaced).toHaveLength(0)
+  })
+
+  it("reports ask-not-in-surface when ask is not in any surface", () => {
+    const screenDef = screen("AskNotInSurface", $ => {
+      const email = $.state.text("email")
+      $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      $.surface("main").contains(login)
+    })
+    const inspected = inspectScreen(screenDef)
+    const unsurfaced = inspected.diagnostics.filter(d => d.code === "ask-not-in-surface")
+    expect(unsurfaced).toHaveLength(1)
+    expect(unsurfaced[0]?.severity).toBe("warning")
+    expect(unsurfaced[0]?.nodeId).toBe("ask_email")
+  })
+
+  it("does not report action-not-in-surface when action is in a surface", () => {
+    const screenDef = screen("ActInSurface", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      $.surface("main").contains(emailAsk, login)
+    })
+    const inspected = inspectScreen(screenDef)
+    const unsurfaced = inspected.diagnostics.filter(d => d.code === "action-not-in-surface")
+    expect(unsurfaced).toHaveLength(0)
+  })
+
+  it("reports action-not-in-surface when action is not in any surface", () => {
+    const screenDef = screen("ActNotInSurface", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      $.act("Hidden").primary()
+      $.surface("main").contains(emailAsk, login)
+    })
+    const inspected = inspectScreen(screenDef)
+    const unsurfaced = inspected.diagnostics.filter(d => d.code === "action-not-in-surface")
+    expect(unsurfaced).toHaveLength(1)
+    expect(unsurfaced[0]?.severity).toBe("warning")
+    expect(unsurfaced[0]?.nodeId).toBe("act_hidden")
+  })
+
+  it("reports multiple missing asks/actions in deterministic order", () => {
+    const screenDef = screen("MultipleMissing", $ => {
+      const email = $.state.text("email")
+      const pwd = $.state.text("password")
+      $.ask("Email", email).private()
+      $.ask("Password", pwd).private()
+      const login = $.act("Log in").primary()
+      $.act("Sign up").primary()
+      $.surface("main").contains(login)
+    })
+    const inspected = inspectScreen(screenDef)
+    const surfaceDiags = inspected.diagnostics.filter(
+      d => d.code === "ask-not-in-surface" || d.code === "action-not-in-surface"
+    )
+    expect(surfaceDiags).toHaveLength(3)
+    expect(surfaceDiags[0]?.nodeId).toBe("ask_email")
+    expect(surfaceDiags[1]?.nodeId).toBe("ask_password")
+    expect(surfaceDiags[2]?.nodeId).toBe("act_sign_up")
+  })
+
+  it("considers ask surfaced when in one of multiple surfaces", () => {
+    const screenDef = screen("MultiSurface", $ => {
+      const email = $.state.text("email")
+      const pwd = $.state.text("password")
+      const emailAsk = $.ask("Email", email).private()
+      const pwdAsk = $.ask("Password", pwd).private()
+      const login = $.act("Log in").primary()
+      $.surface("main").contains(emailAsk, login)
+      $.surface("secondary").contains(pwdAsk)
+    })
+    const inspected = inspectScreen(screenDef)
+    const unsurfacedAsks = inspected.diagnostics.filter(d => d.code === "ask-not-in-surface")
+    const unsurfacedActs = inspected.diagnostics.filter(d => d.code === "action-not-in-surface")
+    expect(unsurfacedAsks).toHaveLength(0)
+    expect(unsurfacedActs).toHaveLength(0)
+  })
+
+  it("does not duplicate diagnostics when node is in multiple surfaces", () => {
+    const screenDef = screen("NodeInMultiSurface", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in").primary()
+      $.surface("main").contains(emailAsk, login)
+      $.surface("sidebar").contains(emailAsk, login)
+    })
+    const inspected = inspectScreen(screenDef)
+    const unsurfacedAsks = inspected.diagnostics.filter(d => d.code === "ask-not-in-surface")
+    const unsurfacedActs = inspected.diagnostics.filter(d => d.code === "action-not-in-surface")
+    expect(unsurfacedAsks).toHaveLength(0)
+    expect(unsurfacedActs).toHaveLength(0)
+  })
+
+  it("includes existing diagnostics alongside surface membership diagnostics", () => {
+    const screenDef = screen("CombinedDiagnostics", $ => {
+      const pwd = $.state.text("password")
+      $.ask("Password", pwd).asSecret()
+      $.act("Log in").primary()
+      $.act("Sign up").primary()
+    })
+    const inspected = inspectScreen(screenDef)
+    const codes = inspected.diagnostics.map(d => d.code)
+    expect(codes).toContain("secret-ask-not-private")
+    expect(codes).toContain("multiple-primary-actions")
+    expect(codes).toContain("ask-not-in-surface")
+    expect(codes).toContain("action-not-in-surface")
+    expect(inspected.diagnostics.filter(d => d.code === "ask-not-in-surface")).toHaveLength(1)
+    expect(inspected.diagnostics.filter(d => d.code === "action-not-in-surface")).toHaveLength(2)
+  })
+
+  it("returns no diagnostics for a simple screen with surfaced ask and action", () => {
+    const screenDef = screen("CleanScreen", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email).private()
+      const login = $.act("Log in")
+        .primary()
+        .when(emailAsk.valid, "Enter your email.")
+      $.surface("main").contains(emailAsk, login)
+    })
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.diagnostics).toEqual([])
+  })
 })
 
 describe("resource", () => {
