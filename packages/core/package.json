@@ -6,6 +6,11 @@
   "version": "0.1.0",
   "description": "Platformless semantic graph and runtime for Intent applications",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intent-framework/intent.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

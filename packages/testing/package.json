@@ -6,6 +6,11 @@
   "version": "0.1.0",
   "description": "Semantic test harness for Intent screens",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intent-framework/intent.git",
+    "directory": "packages/testing"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

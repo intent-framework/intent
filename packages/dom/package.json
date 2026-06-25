@@ -6,6 +6,11 @@
   "version": "0.1.0",
   "description": "DOM materializer for Intent screens and router",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intent-framework/intent.git",
+    "directory": "packages/dom"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

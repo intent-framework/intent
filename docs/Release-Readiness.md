@@ -34,7 +34,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `files` | `["dist"]` | Correct — only `dist/` and `package.json` included in tarball |
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
-| `repository` | Missing | Recommended for npm listing |
+| `repository` | Present | Points to `intent-framework/intent` (`packages/core`) |
 | `engines` | Missing | Should document minimum Node version |
 | `dependencies` | None | Good — core is platformless |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
@@ -52,7 +52,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
-| `repository` | Missing | Recommended |
+| `repository` | Present | Points to `intent-framework/intent` (`packages/dom`) |
 | `dependencies` | `@intent-framework/core`, `@intent-framework/router` | Uses `workspace:*` — correct for monorepo |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 
@@ -68,7 +68,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
-| `repository` | Missing | Recommended |
+| `repository` | Present | Points to `intent-framework/intent` (`packages/router`) |
 | `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 
@@ -84,7 +84,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
-| `repository` | Missing | Recommended |
+| `repository` | Present | Points to `intent-framework/intent` (`packages/testing`) |
 | `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 
@@ -100,7 +100,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `files` | `["dist"]` | Correct |
 | `description` | Present | Added in this audit |
 | `license` | MIT field present | Root LICENSE file present |
-| `repository` | Missing | Recommended |
+| `repository` | Present | Points to `intent-framework/intent` (`packages/server`) |
 | `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
 | Note | Early stage | Server package has global registries and basic action/resource/policy types. Not yet production-ready. |
@@ -223,7 +223,7 @@ Do not manually create GitHub Releases.
 
 - [x] npm scope is `@intent-framework/*` — `intent-framework` org created, packages renamed
 - [ ] Reconfirm MIT is the intended public license before publishing
-- [ ] Confirm package metadata (`repository` field in all packages)
+- [x] Confirm package metadata (`repository` field in all packages)
 - [ ] Confirm package exports (all point to correct `dist/` paths — already correct)
 - [ ] Confirm package files (`files: ["dist"]` — already correct)
 - [ ] Confirm declaration files (`dist/index.d.ts` exists — already correct)
@@ -236,12 +236,9 @@ Do not manually create GitHub Releases.
 
 ## Current blockers
 
-Before first alpha release, the following must be resolved:
-
-1. **Missing `repository` fields** — Recommended for npm listing and source links.
-2. **No release workflow** — Changesets and a GitHub Action must be added before publishing.
-3. **Server package is very early** — `@intent-framework/server` has global registries and minimal API surface. Consider whether to publish it or mark it as private until more mature.
-4. **Version is `0.1.0` across all packages** — Consistent, but no pre-release tag (e.g., `0.1.0-alpha.0`) for the first publish.
+- repository fields are present
+- GitHub repository home is https://github.com/intent-framework/intent
+- remaining blockers are release workflow, server maturity, alpha prerelease versioning, and human confirmation of MIT license if still listed
 
 ## Do not do yet
 
