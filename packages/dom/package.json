@@ -18,8 +18,8 @@
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
-    "typecheck": "tsc -b --noEmit",
-    "lint": "tsc -b --noEmit"
+    "typecheck": "tsc -b",
+    "lint": "tsc -b"
   },
   "dependencies": {
     "@intent/core": "workspace:*"

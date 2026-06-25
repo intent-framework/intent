@@ -171,9 +171,10 @@ await testScreen(LoginScreen, async screen => {
 
 ```sh
 pnpm install
-pnpm build
-pnpm test
 pnpm typecheck
+pnpm test
+pnpm build
+pnpm lint
 ```
 
 ## Examples
