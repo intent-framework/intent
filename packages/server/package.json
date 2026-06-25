@@ -1,6 +1,8 @@
 {
   "name": "@intent/server",
   "version": "0.1.0",
+  "description": "Early server-side package for Intent",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

@@ -1,6 +1,8 @@
 {
   "name": "@intent/testing",
   "version": "0.1.0",
+  "description": "Semantic test harness for Intent screens",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
