@@ -20,6 +20,9 @@ importers:
       '@intent/dom':
         specifier: workspace:*
         version: link:../../packages/dom
+      '@intent/router':
+        specifier: workspace:*
+        version: link:../../packages/router
     devDependencies:
       typescript:
         specifier: ^5.7.0

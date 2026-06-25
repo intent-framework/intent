@@ -23,7 +23,7 @@ export class SurfaceBuilder {
     registerSurfaceNode(this.node)
   }
 
-  contains(...items: Array<AnyAskNode | ActNode | AskBuilder<any> | ActBuilder>): this {
+  contains(...items: Array<AnyAskNode | ActNode | AskBuilder<any> | ActBuilder<any>>): this {
     for (const item of items) {
       if (item instanceof ActBuilder) {
         this.node.items.push(item.toNode())

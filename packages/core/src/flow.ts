@@ -31,7 +31,7 @@ export class FlowBuilder {
     return this
   }
 
-  then(item: AnyAskNode | ActNode | AskBuilder<any> | ActBuilder): this {
+  then(item: AnyAskNode | ActNode | AskBuilder<any> | ActBuilder<any>): this {
     if (item instanceof ActBuilder) {
       this.node.steps.push({ type: "act", node: item.toNode() })
     } else if (item instanceof AskBuilder) {
