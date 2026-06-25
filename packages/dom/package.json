@@ -1,5 +1,8 @@
 {
-  "name": "@intent/dom",
+  "name": "@intent-framework/dom",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.1.0",
   "description": "DOM materializer for Intent screens and router",
   "license": "MIT",
@@ -24,8 +27,8 @@
     "lint": "tsc -b"
   },
   "dependencies": {
-    "@intent/core": "workspace:*",
-    "@intent/router": "workspace:*"
+    "@intent-framework/core": "workspace:*",
+    "@intent-framework/router": "workspace:*"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

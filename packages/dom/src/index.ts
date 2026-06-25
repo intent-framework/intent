@@ -1,5 +1,5 @@
-import type { ScreenDefinition, ActNode, DefaultScreenServices } from "@intent/core"
-import { createScreenRuntime } from "@intent/core"
+import type { ScreenDefinition, ActNode, DefaultScreenServices } from "@intent-framework/core"
+import { createScreenRuntime } from "@intent-framework/core"
 
 function getReasonId(actId: string): string {
   return `${actId}-reason`

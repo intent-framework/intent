@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { screen } from "@intent/core"
+import { screen } from "@intent-framework/core"
 import { createRouter } from "./router.js"
 import type { RouteParams, RoutesFromPaths, RouterNavigate, RouterServices, RouteParamsFor, RouteContextFor, RouteContext } from "./router.js"
 

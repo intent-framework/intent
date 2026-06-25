@@ -1,5 +1,5 @@
-import type { ScreenDefinition, DefaultScreenServices } from "@intent/core"
-import { createScreenRuntime } from "@intent/core"
+import type { ScreenDefinition, DefaultScreenServices } from "@intent-framework/core"
+import { createScreenRuntime } from "@intent-framework/core"
 
 export type ScreenHandle<TServices extends object = DefaultScreenServices> = {
   act(label: string): {

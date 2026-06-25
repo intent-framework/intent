@@ -1,4 +1,4 @@
-import { createRouter } from "@intent/router"
+import { createRouter } from "@intent-framework/router"
 import { appPaths, type AppServices } from "./types.js"
 import { HomeScreen, TeamDetailScreen, InviteScreen } from "./screens.js"
 

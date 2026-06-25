@@ -1,4 +1,4 @@
-import { screen } from "@intent/core"
+import { screen } from "@intent-framework/core"
 import type { AppServices } from "./types.js"
 import { loadTeam, inviteMember } from "./data.js"
 

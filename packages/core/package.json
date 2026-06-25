@@ -1,5 +1,8 @@
 {
-  "name": "@intent/core",
+  "name": "@intent-framework/core",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.1.0",
   "description": "Platformless semantic graph and runtime for Intent applications",
   "license": "MIT",

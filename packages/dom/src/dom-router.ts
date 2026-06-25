@@ -1,5 +1,5 @@
-import type { ScreenDefinition, DefaultScreenServices } from "@intent/core"
-import type { Router, RoutePathArgs, RouterNavigate } from "@intent/router"
+import type { ScreenDefinition, DefaultScreenServices } from "@intent-framework/core"
+import type { Router, RoutePathArgs, RouterNavigate } from "@intent-framework/router"
 import { renderDom } from "./index.js"
 
 export type RouterDomHandle<Routes extends Record<string, { path: string }>> = {

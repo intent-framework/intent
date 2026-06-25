@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { screen } from "@intent/core"
+import { screen } from "@intent-framework/core"
 import { testScreen } from "./index.js"
 
 async function loginUser(_params: { email: string; password: string }) {

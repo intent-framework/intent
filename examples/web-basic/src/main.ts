@@ -1,4 +1,4 @@
-import { renderRouter } from "@intent/dom"
+import { renderRouter } from "@intent-framework/dom"
 import { router } from "./router.js"
 import { NotFoundScreen } from "./screens.js"
 import { updateTeamInfo, updateDiagnostics } from "./demo-panels.js"

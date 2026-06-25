@@ -14,13 +14,13 @@ importers:
 
   examples/web-basic:
     dependencies:
-      '@intent/core':
+      '@intent-framework/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@intent/dom':
+      '@intent-framework/dom':
         specifier: workspace:*
         version: link:../../packages/dom
-      '@intent/router':
+      '@intent-framework/router':
         specifier: workspace:*
         version: link:../../packages/router
     devDependencies:
@@ -45,10 +45,10 @@ importers:
 
   packages/dom:
     dependencies:
-      '@intent/core':
+      '@intent-framework/core':
         specifier: workspace:*
         version: link:../core
-      '@intent/router':
+      '@intent-framework/router':
         specifier: workspace:*
         version: link:../router
     devDependencies:
@@ -67,7 +67,7 @@ importers:
 
   packages/router:
     dependencies:
-      '@intent/core':
+      '@intent-framework/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -83,7 +83,7 @@ importers:
 
   packages/server:
     dependencies:
-      '@intent/core':
+      '@intent-framework/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -99,7 +99,7 @@ importers:
 
   packages/testing:
     dependencies:
-      '@intent/core':
+      '@intent-framework/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
