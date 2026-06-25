@@ -22,6 +22,7 @@ What works:
 - `@intent/testing` - semantic test harness (answer asks, assert act state, load resources)
 - `@intent/server` - typed action/resource/policy skeleton
 - `examples/web-basic` - Login screen + route-driven team invite app demonstrating typed navigation, route context, runtime-scoped resources, action blocked reasons, semantic asks/acts/surfaces, and multiple independent actions per screen
+- `inspectScreen()` includes semantic diagnostics for common graph footguns.
 
 ## Quick Example
 

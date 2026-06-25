@@ -1,7 +1,7 @@
 export { screen } from "./screen.js"
 export type { ScreenDefinition, ScreenBuilder } from "./screen.js"
 export { inspectScreen } from "./graph.js"
-export type { InspectedScreen } from "./graph.js"
+export type { InspectedScreen, GraphDiagnostic, DiagnosticSeverity } from "./graph.js"
 export type { TextState, BooleanState, ChoiceState } from "./state.js"
 export type { AskNode, AnyAskNode, AskKind, AskBuilder } from "./ask.js"
 export type { ActNode, ActCondition, ActStatus, FeedbackConfig, ActBuilder, NavigationService, ActionExecutionContext, DefaultScreenServices } from "./act.js"

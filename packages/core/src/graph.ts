@@ -1,6 +1,15 @@
 import type { ScreenDefinition } from "./screen.js"
-import type { DefaultScreenServices } from "./act.js"
+import type { DefaultScreenServices, ActCondition } from "./act.js"
 import type { AnyResourceNode } from "./resource.js"
+
+export type DiagnosticSeverity = "info" | "warning" | "error"
+
+export type GraphDiagnostic = {
+  severity: DiagnosticSeverity
+  code: string
+  message: string
+  nodeId?: string
+}
 
 export type InspectedScreen = {
   name: string
@@ -41,6 +50,46 @@ export type InspectedScreen = {
     stale: boolean
     error: string | undefined
   }>
+  diagnostics: GraphDiagnostic[]
+}
+
+function computeDiagnostics<TServices extends object = DefaultScreenServices>(
+  screenDef: ScreenDefinition<TServices>,
+): GraphDiagnostic[] {
+  const diagnostics: GraphDiagnostic[] = []
+
+  const primaryActions = screenDef.acts.filter(a => a.primary)
+  if (primaryActions.length > 1) {
+    diagnostics.push({
+      severity: "warning",
+      code: "multiple-primary-actions",
+      message: "Screen has multiple primary actions, so default action behavior is ambiguous.",
+    })
+  }
+
+  for (const ask of screenDef.asks) {
+    if (ask.kind === "secret" && !ask.isPrivate) {
+      diagnostics.push({
+        severity: "warning",
+        code: "secret-ask-not-private",
+        message: "Secret ask should also be marked private.",
+        nodeId: ask.id,
+      })
+    }
+  }
+
+  for (const act of screenDef.acts) {
+    if (act.primary && act.conditions.length > 0 && act.conditions.every((c: ActCondition) => c.message === undefined)) {
+      diagnostics.push({
+        severity: "info",
+        code: "primary-action-without-blocked-reason",
+        message: "Primary action can be blocked without an explainable reason.",
+        nodeId: act.id,
+      })
+    }
+  }
+
+  return diagnostics
 }
 
 export function inspectScreen<TServices extends object = DefaultScreenServices>(
@@ -88,5 +137,6 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
         ? (r.error instanceof Error ? r.error.message : String(r.error))
         : undefined,
     })),
+    diagnostics: computeDiagnostics(screenDef),
   }
 }
