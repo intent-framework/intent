@@ -1,5 +1,5 @@
-import type { ScreenDefinition, NavigationService, DefaultScreenServices } from "@intent/core"
-import type { Router, RoutePathArgs } from "@intent/router"
+import type { ScreenDefinition, DefaultScreenServices } from "@intent/core"
+import type { Router, RoutePathArgs, RouterNavigate } from "@intent/router"
 import { renderDom } from "./index.js"
 
 export type RouterDomHandle<Routes extends Record<string, { path: string }>> = {
@@ -29,8 +29,9 @@ export function renderRouter<
   const win = options.window ?? window
   let currentCleanup: (() => void) | undefined
 
-  function internalNavigate(name: string, params?: Record<string, string>) {
-    const path = (router.path as (name: string, params?: Record<string, string>) => string)(name, params)
+  const navigate: RouterNavigate<Routes> = (name, ...args) => {
+    const routerPath = router.path as (name: string, params?: Record<string, string>) => string
+    const path = routerPath(name, args[0])
     win.history.pushState(null, "", path)
     renderPath(path)
   }
@@ -42,10 +43,9 @@ export function renderRouter<
 
     const match = router.match(pathname)
 
-    const navigateService: NavigationService = internalNavigate
     const mergedServices = {
       ...options.services,
-      navigate: navigateService,
+      navigate,
     } as TServices
 
     if (match.found) {
@@ -77,12 +77,7 @@ export function renderRouter<
   win.addEventListener("popstate", onPopState)
 
   return {
-    navigate<Name extends Extract<keyof Routes, string>>(
-      name: Name,
-      ...args: RoutePathArgs<Routes[Name]["path"]>
-    ) {
-      internalNavigate(name, args[0] as Record<string, string> | undefined)
-    },
+    navigate,
     renderPath,
     dispose() {
       currentCleanup?.()

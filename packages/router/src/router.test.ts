@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { screen } from "@intent/core"
 import { createRouter } from "./router.js"
-import type { RouteParams } from "./router.js"
+import type { RouteParams, RoutesFromPaths, RouterNavigate, RouterServices } from "./router.js"
 
 const HomeScreen = screen("Home", () => {})
 const LoginScreen = screen("Login", () => {})
@@ -466,5 +466,128 @@ describe("generic services", () => {
     expect(match.found).toBe(false)
 
     expect(router.match("/").found).toBe(true)
+  })
+})
+
+describe("typed navigation service", () => {
+  const appPaths = {
+    home: "/",
+    login: "/login",
+    "team.invite": "/teams/:teamId/invite",
+  } as const
+
+  type AppRoutes = RoutesFromPaths<typeof appPaths>
+
+  it("RoutesFromPaths produces expected route map shape", () => {
+    const r: AppRoutes = {} as AppRoutes
+    expect(r).toBeDefined()
+  })
+
+  it("RouterNavigate<AppRoutes> accepts static route with no params", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    n("home")
+    n("login")
+    expect(n).toHaveBeenCalledTimes(2)
+  })
+
+  it("static route rejects params", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    n("home")
+    // @ts-expect-error - static route rejects params
+    n("home", {} as Record<string, string>)
+    expect(n).toBeDefined()
+  })
+
+  it("dynamic route requires params", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    n("team.invite", { teamId: "t1" })
+    expect(n).toBeDefined()
+  })
+
+  it("dynamic route rejects missing params", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    // @ts-expect-error - dynamic route requires params
+    n("team.invite")
+    expect(n).toBeDefined()
+  })
+
+  it("dynamic route rejects wrong params", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    // @ts-expect-error - wrong param name
+    n("team.invite", { wrong: "x" })
+    expect(n).toBeDefined()
+  })
+
+  it("dynamic route rejects extra params", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    // @ts-expect-error - extra params not allowed
+    n("team.invite", { teamId: "t1", extra: "x" })
+    expect(n).toBeDefined()
+  })
+
+  it("unknown route name is rejected", () => {
+    const n = vi.fn() as RouterNavigate<AppRoutes>
+    const bad: string = "missing"
+    // @ts-expect-error - unknown route
+    n(bad)
+    expect(n).toBeDefined()
+  })
+
+  it("RouterServices exposes both navigate and extra services", () => {
+    type Extra = { analytics: { track(event: string): void } }
+    type Svc = RouterServices<AppRoutes, Extra>
+
+    const svc: Svc = {
+      navigate: vi.fn() as RouterNavigate<AppRoutes>,
+      analytics: { track: vi.fn() },
+    }
+    svc.navigate("home")
+    svc.analytics.track("test")
+    expect(svc.navigate).toHaveBeenCalledWith("home")
+    expect(svc.analytics.track).toHaveBeenCalledWith("test")
+  })
+
+  it("RouterServices without extras exposes only navigate", () => {
+    type Svc = RouterServices<AppRoutes>
+
+    const svc: Svc = {
+      navigate: vi.fn() as RouterNavigate<AppRoutes>,
+    }
+    svc.navigate("home")
+    expect(svc.navigate).toHaveBeenCalledWith("home")
+  })
+
+  it("screen<RouterServices> gets typed navigate in action context", () => {
+    type Svc = RouterServices<AppRoutes, { analytics: { track(event: string): void } }>
+
+    const Scr = screen<Svc>("Test", $ => {
+      $.act("Go")
+        .does(({ navigate, analytics }) => {
+          navigate("home")
+          navigate("team.invite", { teamId: "t1" })
+          analytics.track("test")
+
+          // @ts-expect-error missing required params
+          navigate("team.invite")
+
+          const bad: string = "missing"
+          // @ts-expect-error unknown route name
+          navigate(bad)
+        })
+      $.surface("main").contains()
+    })
+
+    expect(Scr).toBeDefined()
+  })
+
+  it("existing router .path() type tests still pass", () => {
+    const router = createRouter()
+      .route("home", "/", HomeScreen)
+      .route("user", "/users/:userId", HomeScreen)
+
+    router.path("home")
+    router.path("user", { userId: "abc" })
+
+    expect(router).toBeDefined()
   })
 })
