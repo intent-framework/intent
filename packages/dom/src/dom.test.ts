@@ -350,4 +350,66 @@ describe("DOM renderer", () => {
     // Button should still be disabled because subscription was removed
     expect(button.disabled).toBe(true)
   })
+
+  it("creates a runtime and auto-loads resources on renderDom", async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    let loaded = false
+    const ResourceTest = screen("DOMResourceAutoLoad", $ => {
+      const team = $.resource("team", {
+        load: async () => {
+          loaded = true
+          return { id: "team_1" }
+        },
+      })
+
+      $.act("Save")
+        .primary()
+        .when(team.ready, "Team must load first.")
+
+      $.surface("main").contains(team as unknown as never)
+    })
+
+    const root = document.getElementById("root")!
+    const cleanup = renderDom(ResourceTest, { target: root })
+
+    const button = root.querySelector("button") as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+
+    // Resources load in background — wait for them
+    for (const r of ResourceTest.resources) {
+      // The resource is auto-loaded by the runtime, so we just wait for it
+      if (r.status === "idle" || r.status === "pending") {
+        await new Promise<void>(resolve => {
+          const unsub = r.subscribe(() => {
+            if (r.status === "ready" || r.status === "failed") {
+              unsub()
+              resolve()
+            }
+          })
+        })
+      }
+    }
+
+    expect(loaded).toBe(true)
+    expect(button.disabled).toBe(false)
+
+    cleanup()
+  })
+
+  it("disposes runtime on cleanup", () => {
+    document.body.innerHTML = '<div id="root"></div>'
+
+    const TestScreen = screen("DOMDisposeRuntime", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    const root = document.getElementById("root")!
+    const cleanup = renderDom(TestScreen, { target: root })
+
+    // cleanup should call runtime.dispose() without error
+    expect(() => cleanup()).not.toThrow()
+  })
 })

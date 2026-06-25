@@ -8,6 +8,8 @@ export type { ActNode, ActCondition, ActStatus, FeedbackConfig, ActBuilder } fro
 export type { FlowNode, FlowStep, FlowBuilder } from "./flow.js"
 export type { SurfaceNode, SurfaceBuilder } from "./surface.js"
 export type { ResourceNode, ResourceStatus, AnyResourceNode } from "./resource.js"
+export { createScreenRuntime } from "./runtime.js"
+export type { ScreenRuntime } from "./runtime.js"
 
 export {
   resetAskRegistry,

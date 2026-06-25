@@ -14,7 +14,8 @@ What works:
 - `state.text`, `state.boolean`, `state.choice` - reactive state with getter/setter
 - `ask` - semantic questions with required validation, custom validation, privacy, input types
 - `act` - actions with reactive conditions, async handlers, feedback states
-- `resource` - async resources with load/reload lifecycle and reactive conditions
+- `resource` - async resources with load/reload lifecycle, auto-load policy, and reactive conditions
+- `createScreenRuntime` - runtime lifecycle (start auto-loads resources, dispose cleans up)
 - `flow` - interaction sequencing
 - `surface` - presentation grouping
 - `@intent/dom` - real semantic HTML renderer (form, label, input, button, output)
@@ -80,6 +81,44 @@ await team.reload()     // re-fetch
 team.status             // "idle" | "pending" | "ready" | "failed"
 team.value              // T | undefined
 team.ready.current      // boolean
+```
+
+Resources support an auto-load policy (default `true`):
+
+```ts
+// Auto-loads when the screen starts
+const team = $.resource("team", {
+  load: async () => getTeam()
+})
+
+// Manual/lazy — load only when explicitly triggered
+const searchResults = $.resource("searchResults", {
+  load: async () => search(query.value),
+  autoLoad: false
+})
+```
+
+## Screen Runtime
+
+A runtime starts a screen instance and triggers lifecycle behavior such as resource auto-loading:
+
+```ts
+import { createScreenRuntime } from "@intent/core"
+import { screen } from "@intent/core"
+import { renderDom } from "@intent/dom"
+
+const MyScreen = screen("MyScreen", $ => { /* ... */ })
+
+// Manual runtime
+const runtime = createScreenRuntime(MyScreen)
+await runtime.start()     // auto-loads resources
+runtime.screen            // ScreenDefinition
+runtime.graph             // snapshot via inspectScreen
+runtime.resources         // resource nodes
+runtime.dispose()         // cleanup
+
+// DOM renderer creates and starts a runtime automatically
+renderDom(MyScreen, { target: document.getElementById("root")! })
 ```
 
 ## Semantic Tests

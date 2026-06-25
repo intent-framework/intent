@@ -1,4 +1,5 @@
 import type { ScreenDefinition, ActNode } from "@intent/core"
+import { createScreenRuntime } from "@intent/core"
 
 function getReasonId(actId: string): string {
   return `${actId}-reason`
@@ -13,6 +14,9 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
   target.innerHTML = ""
   const root = buildDom(screenDef)
   target.appendChild(root)
+
+  const runtime = createScreenRuntime(screenDef)
+  runtime.start()
 
   const form = target.querySelector("form")!
   const output = target.querySelector("output#feedback-output")!
@@ -68,6 +72,7 @@ export function renderDom(screenDef: ScreenDefinition, options: DomRendererOptio
     for (const unsub of unsubscribers) {
       unsub()
     }
+    runtime.dispose()
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { screen, inspectScreen, isCondition } from "./index.js"
+import { screen, inspectScreen, isCondition, createScreenRuntime } from "./index.js"
 
 async function loginUser(_params: { email: string; password: string }) {
   await Promise.resolve()
@@ -790,5 +790,190 @@ describe("resource type inference", () => {
         expect(v).toBeUndefined()
       }
     })
+  })
+})
+
+describe("screen runtime", () => {
+  it("creates a runtime from a screen definition", () => {
+    const TestScreen = screen("RuntimeTest", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    expect(runtime.screen).toBe(TestScreen)
+    expect(runtime.resources).toHaveLength(1)
+    expect(runtime.graph.name).toBe("RuntimeTest")
+  })
+
+  it("start() auto-loads resources with autoLoad: true (default)", async () => {
+    let loaded = false
+    const TestScreen = screen("AutoLoadTest", $ => {
+      $.resource("team", {
+        load: async () => {
+          loaded = true
+          return "data"
+        },
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    expect(loaded).toBe(false)
+    expect(runtime.graph.resources[0]?.status).toBe("idle")
+
+    await runtime.start()
+
+    expect(loaded).toBe(true)
+    expect(runtime.graph.resources[0]?.status).toBe("ready")
+  })
+
+  it("resources are not loaded during screen() definition", () => {
+    let loaded = false
+    screen("NoLoadDuringDef", $ => {
+      $.resource("team", {
+        load: async () => {
+          loaded = true
+          return "data"
+        },
+      })
+    })
+
+    expect(loaded).toBe(false)
+  })
+
+  it("autoLoad: false resources stay idle after start()", async () => {
+    let loaded = false
+    const TestScreen = screen("ManualLoadTest", $ => {
+      $.resource("searchResults", {
+        load: async () => {
+          loaded = true
+          return "results"
+        },
+        autoLoad: false,
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    expect(loaded).toBe(false)
+    expect(runtime.graph.resources[0]?.status).toBe("idle")
+  })
+
+  it("failed auto-load sets failed status", async () => {
+    const TestScreen = screen("FailedAutoLoad", $ => {
+      $.resource("team", {
+        load: async () => {
+          throw new Error("Load failed")
+        },
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    expect(runtime.graph.resources[0]?.status).toBe("failed")
+    expect(runtime.graph.resources[0]?.error).toBe("Load failed")
+  })
+
+  it("resource conditions update action enabled state after auto-load", async () => {
+    const TestScreen = screen("ResourceUpdatesAction", $ => {
+      const team = $.resource("team", {
+        load: async () => "data",
+      })
+
+      $.act("Save")
+        .when(team.ready, "Team must load first.")
+
+      $.surface("main").contains(team as unknown as never)
+    })
+
+    const actNode = TestScreen.acts[0]!
+    expect(actNode.enabled.current).toBe(false)
+    expect(actNode.blockedReasons).toEqual(["Team must load first."])
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    expect(actNode.enabled.current).toBe(true)
+    expect(actNode.blockedReasons).toEqual([])
+  })
+
+  it("start() does not duplicate load for already ready resources", async () => {
+    let loadCount = 0
+    const TestScreen = screen("NoDuplicateLoad", $ => {
+      $.resource("team", {
+        load: async () => {
+          loadCount++
+          return `data${loadCount}`
+        },
+      })
+    })
+
+    const resource = TestScreen.resources[0]!
+    await resource.load()
+    expect(loadCount).toBe(1)
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+
+    // start() should not re-load already ready resources
+    expect(loadCount).toBe(1)
+  })
+
+  it("start() guards against double invocation", async () => {
+    let loadCount = 0
+    const TestScreen = screen("DoubleStart", $ => {
+      $.resource("team", {
+        load: async () => {
+          loadCount++
+          await Promise.resolve()
+          return "data"
+        },
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+    expect(loadCount).toBe(1)
+
+    await runtime.start()
+    expect(loadCount).toBe(1)
+  })
+
+  it("dispose() is callable and does not throw", () => {
+    const TestScreen = screen("DisposeTest", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    expect(() => runtime.dispose()).not.toThrow()
+  })
+
+  it("dispose() can be called multiple times safely", () => {
+    const TestScreen = screen("DoubleDispose", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    runtime.dispose()
+    expect(() => runtime.dispose()).not.toThrow()
+  })
+
+  it("start() then dispose() does not throw", async () => {
+    const TestScreen = screen("StartThenDispose", $ => {
+      $.resource("team", {
+        load: async () => "data",
+      })
+    })
+
+    const runtime = createScreenRuntime(TestScreen)
+    await runtime.start()
+    expect(() => runtime.dispose()).not.toThrow()
   })
 })
