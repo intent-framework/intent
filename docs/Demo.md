@@ -72,11 +72,12 @@ The panel is updated by a `MutationObserver` on `#root` that debounces through
 
 ## What to notice in the code
 
-Open `examples/web-basic/src/main.ts` (201 lines, single file).
+Open `examples/web-basic/src/` to see the demo split into screens, data, router,
+and demo-only DOM panel helpers.
 
 The entire app — four screens, router, data layer, diagnostics, and DOM updates
-— fits in one file because the framework handles rendering, reactivity,
-validation, and lifecycle.
+— fits in a small, responsibility-oriented structure because the framework
+handles rendering, reactivity, validation, and lifecycle.
 
 Key patterns:
 
