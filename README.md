@@ -149,6 +149,7 @@ renderDom(MyScreen, { target: document.getElementById("root")! })
 
 ```ts
 import { createRouter } from "@intent/router"
+import { renderRouter } from "@intent/dom"
 
 const router = createRouter()
   .route("home", "/", HomeScreen)
@@ -169,6 +170,17 @@ if (match.found) {
   match.params     // { teamId: "team_1" }
   match.screen     // InviteMemberScreen
 }
+
+// Browser router shell — renders matched screens to the DOM
+const app = renderRouter(router, {
+  target: document.getElementById("root")!,
+})
+
+// Typed imperative navigation
+app.navigate("login")
+app.navigate("team.invite", { teamId: "team_1" })
+
+app.dispose()
 ```
 
 ## Semantic Tests
