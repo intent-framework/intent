@@ -1,6 +1,6 @@
 # Examples Roadmap — Design Proposal
 
-**Status:** Implementing — Example 1 (`choice-form`) done in #108, Example 2 (`resource-lifecycle`) done in #111, Example 3 (`secret-vault`) done in #<TBD> 
+**Status:** Complete — Example 1 (`choice-form`) done in #108, Example 2 (`resource-lifecycle`) done in #111, Example 3 (`secret-vault`) done in #112 
 **Date:** 2026-06-26  
 **Author:** Big Pickle  
 **Affected packages:** `@intent-framework/core`, `@intent-framework/dom`, `@intent-framework/router`, `@intent-framework/testing`  
