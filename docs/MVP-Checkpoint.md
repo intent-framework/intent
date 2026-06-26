@@ -137,9 +137,14 @@ Do not jump into these without a very specific narrow PR:
 ## Proven
 
 - ✅ Canonical example app (`examples/canonical-invite`) — new developers can clone and run after the quickstart. See [Canonical Invite Example](../examples/canonical-invite).
+- ✅ `inspectScreen()` diagnostics guide (`docs/Inspect-Screen.md`) — documents all five current diagnostics, semantic ID behavior, development workflow, and boundaries.
+
+## Documented
+
+- ✅ `inspectScreen()` diagnostic guide (`docs/Inspect-Screen.md`) — covers graph contents, all five current diagnostics, semantic ID behavior, development workflow, and current boundaries.
 
 ## Recommended next moves
 
-1. Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.
+1. ~~Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.~~ (Covered by the diagnostic guide documenting the `demo-panels.ts` pattern.)
 2. Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.
 3. Add one or two graph diagnostics that catch real authoring mistakes before adding any new package.
