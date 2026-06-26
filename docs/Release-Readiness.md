@@ -211,6 +211,21 @@ A [publish-alpha.yml](../.github/workflows/publish-alpha.yml) workflow exists fo
 - Use `Changesets` pre-release mode for alpha/beta
 - Graduate to stable after API surface is settled and real-world usage begins
 
+### Prerelease mode requirement
+
+Changesets must remain in alpha prerelease mode for the duration of the alpha phase. This is controlled by the `.changeset/pre.json` file, which is created by running:
+
+```sh
+pnpm changeset pre enter alpha
+```
+
+Key rules:
+
+  - During alpha, Changesets must stay in alpha prerelease mode.
+  - Version Packages PRs must not bump packages to stable versions.
+  - Stable versions are only allowed after intentionally exiting prerelease mode via `pnpm changeset pre exit`.
+  - The GitHub Actions PR creation setting (`GITHUB_TOKEN` permissions for creating and approving PRs) may need manual enabling after alpha versioning is fixed.
+
 ### Validation gates
 
 Publishing should only happen after:
