@@ -315,6 +315,8 @@ CI runs the same clean-dist validation on every pull request and every push to `
 
 The clean-dist step matters. It prevents tests from accidentally passing because of stale package output.
 
+OpenCode workflow commands live in `.opencode/README.md`.
+
 ## Current limitations
 
 Intent is still missing many things on purpose.
