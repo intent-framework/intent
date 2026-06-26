@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "description": "DOM materializer for Intent screens and router",
   "license": "MIT",
   "repository": {
@@ -32,8 +32,8 @@
     "lint": "tsc -b"
   },
   "dependencies": {
-    "@intent-framework/core": "workspace:^0.1.0-alpha.5",
-    "@intent-framework/router": "workspace:^0.1.0-alpha.5"
+    "@intent-framework/core": "workspace:^0.1.0-alpha.6",
+    "@intent-framework/router": "workspace:^0.1.0-alpha.6"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

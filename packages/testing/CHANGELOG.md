@@ -1,5 +1,11 @@
 # @intent-framework/testing
 
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- @intent-framework/core@0.1.0-alpha.6
+
 ## 0.1.0-alpha.5
 
 ### Patch Changes
