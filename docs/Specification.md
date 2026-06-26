@@ -841,6 +841,41 @@ type IntentGraph = {
 
 The graph is what enables semantic reactivity, generated runtime behavior, target-specific materialization, DevTools, testing, documentation, privacy redaction, accessibility warnings, OpenAPI generation, and AI inspection.
 
+### Graph Node Identifiers
+
+Every semantic node in `inspectScreen()` output carries a stable, deterministic `semanticId`:
+
+```ts
+type InspectedNode = {
+  id: string          // internal format: "ask_email", "act_log_in"
+  semanticId: string  // stable format: "ask:email", "action:log-in"
+  // ...
+}
+```
+
+Semantic IDs are:
+
+- deterministic for the same screen definition
+- unique within a single inspected screen
+- human-readable
+- stable across repeated `inspectScreen()` calls
+- stable even if another screen is created before this screen
+- independent of runtime instances and resource connection state
+
+Example IDs by node type:
+
+```
+screen:invite-member      → screen
+ask:email                 → ask
+ask:email-2               → duplicate ask with suffixed ID
+action:send-invite        → act
+resource:team             → resource
+surface:main              → surface
+flow:primary              → flow
+```
+
+Diagnostics reference nodes through both `nodeId` (internal format) and `semanticNodeId` (stable format). These IDs are intended for inspection, diagnostics, tests, and future DevTools. They may change when the screen structure, labels, or names change.
+
 ## Reactivity Model
 
 Intent UI should not use component rerendering as its main reactive unit.

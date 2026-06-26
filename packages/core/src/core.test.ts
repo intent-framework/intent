@@ -1605,6 +1605,114 @@ describe("resource invalidation", () => {
   })
 })
 
+describe("stable semantic node IDs", () => {
+  it("inspectScreen includes semanticId for all node types", () => {
+    const screenDef = screen("TestScreen", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email)
+      const login = $.act("Log in")
+      $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+      $.flow("login").startsWith(emailAsk).then(login)
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.semanticId).toBe("screen:test-screen")
+    expect(inspected.asks[0]?.semanticId).toBe("ask:email")
+    expect(inspected.acts[0]?.semanticId).toBe("action:log-in")
+    expect(inspected.flows[0]?.semanticId).toBe("flow:login")
+    expect(inspected.surfaces[0]?.semanticId).toBe("surface:main")
+  })
+
+  it("calling inspectScreen twice on the same screen returns the same IDs", () => {
+    const screenDef = screen("LoginScreen", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email)
+      const login = $.act("Log in")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const first = inspectScreen(screenDef)
+    const second = inspectScreen(screenDef)
+
+    expect(first.semanticId).toBe(second.semanticId)
+    expect(first.asks[0]?.semanticId).toBe(second.asks[0]?.semanticId)
+    expect(first.acts[0]?.semanticId).toBe(second.acts[0]?.semanticId)
+  })
+
+  it("creating an unrelated screen before the target screen does not change semantic IDs", () => {
+    screen("UnrelatedScreen", $ => {
+      $.ask("Name", $.state.text("name"))
+      $.act("Save")
+      $.surface("main").contains()
+    })
+
+    const screenDef = screen("LoginScreen", $ => {
+      const email = $.state.text("email")
+      const emailAsk = $.ask("Email", email)
+      const login = $.act("Log in")
+      $.surface("main").contains(emailAsk, login)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.semanticId).toBe("screen:login-screen")
+    expect(inspected.asks[0]?.semanticId).toBe("ask:email")
+    expect(inspected.acts[0]?.semanticId).toBe("action:log-in")
+  })
+
+  it("duplicate labels get deterministic suffixed semantic IDs", () => {
+    const screenDef = screen("Duplicates", $ => {
+      const name1 = $.state.text("name1")
+      const name2 = $.state.text("name2")
+      const ask1 = $.ask("Email", name1)
+      const ask2 = $.ask("Email", name2)
+      const act1 = $.act("Save")
+      const act2 = $.act("Save")
+      $.surface("main").contains(ask1, ask2, act1, act2)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    expect(inspected.asks).toHaveLength(2)
+    expect(inspected.asks[0]?.semanticId).toBe("ask:email")
+    expect(inspected.asks[1]?.semanticId).toBe("ask:email-2")
+    expect(inspected.acts).toHaveLength(2)
+    expect(inspected.acts[0]?.semanticId).toBe("action:save")
+    expect(inspected.acts[1]?.semanticId).toBe("action:save-2")
+  })
+
+  it("diagnostics include semanticNodeId alongside nodeId", () => {
+    const screenDef = screen("DiagSemanticId", $ => {
+      const pwd = $.state.text("password")
+      const pwdAsk = $.ask("Password", pwd).asSecret()
+      $.surface("main").contains(pwdAsk)
+    })
+
+    const inspected = inspectScreen(screenDef)
+    const secretDiag = inspected.diagnostics.find(d => d.code === "secret-ask-not-private")
+    expect(secretDiag).toBeDefined()
+    expect(secretDiag?.nodeId).toBe("ask_password")
+    expect(secretDiag?.semanticNodeId).toBe("ask:password")
+  })
+
+  it("resource semanticId is stable and independent of runtime state", async () => {
+    const screenDef = screen("ResourceStable", $ => {
+      $.resource("team", {
+        load: async () => "data",
+        autoLoad: false,
+      })
+    })
+
+    const runtime = createScreenRuntime(screenDef)
+    await runtime.start()
+    const inspected = inspectScreen(screenDef, runtime.resources)
+    expect(inspected.resources[0]?.semanticId).toBe("resource:team")
+    expect(inspected.resources[0]?.id).toBe("resource_team")
+  })
+})
+
 // Type-only test helpers — these are verified during pnpm typecheck
 type _TypeTestAppServices = {
   analytics: { track(event: "login_clicked"): void }

@@ -34,7 +34,7 @@ It now has:
 - Resources can be runtime-scoped and reloaded.
 - Router can inject typed navigation and route context.
 - Tests can assert semantic behavior.
-- `inspectScreen()` can surface graph diagnostics.
+- `inspectScreen()` can surface graph diagnostics with deterministic semantic node IDs.
 - A small reviewer-friendly demo can be run locally.
 - CI can enforce clean-dist validation.
 

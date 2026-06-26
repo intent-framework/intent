@@ -9,12 +9,15 @@ export type GraphDiagnostic = {
   code: string
   message: string
   nodeId?: string
+  semanticNodeId?: string
 }
 
 export type InspectedScreen = {
   name: string
+  semanticId: string
   asks: Array<{
     id: string
+    semanticId: string
     label: string
     kind: string
     required: boolean
@@ -24,6 +27,7 @@ export type InspectedScreen = {
   }>
   acts: Array<{
     id: string
+    semanticId: string
     label: string
     primary: boolean
     enabled: boolean
@@ -34,16 +38,19 @@ export type InspectedScreen = {
   }>
   flows: Array<{
     id: string
+    semanticId: string
     name: string
     stepCount: number
   }>
   surfaces: Array<{
     id: string
+    semanticId: string
     name: string
     itemCount: number
   }>
   resources: Array<{
     id: string
+    semanticId: string
     name: string
     status: string
     hasValue: boolean
@@ -51,6 +58,31 @@ export type InspectedScreen = {
     error: string | undefined
   }>
   diagnostics: GraphDiagnostic[]
+}
+
+const NODE_KINDS: Record<string, string> = {
+  ask: "ask",
+  act: "action",
+  flow: "flow",
+  surface: "surface",
+  resource: "resource",
+}
+
+function slugify(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+}
+
+function semanticNodeId(kind: string, id: string): string {
+  const prefix = NODE_KINDS[kind] ?? kind
+  const internalPrefix = `${kind}_`
+  const slug = id.startsWith(internalPrefix)
+    ? id.slice(internalPrefix.length).replace(/_/g, "-")
+    : id
+  return `${prefix}:${slug}`
 }
 
 function computeDiagnostics<TServices extends object = DefaultScreenServices>(
@@ -125,10 +157,27 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
   runtimeResources?: AnyResourceNode[],
 ): InspectedScreen {
+  const diagnostics = computeDiagnostics(screenDef)
+
+  const idToSemantic = new Map<string, string>()
+  for (const a of screenDef.asks) {
+    idToSemantic.set(a.id, semanticNodeId("ask", a.id))
+  }
+  for (const a of screenDef.acts) {
+    idToSemantic.set(a.id, semanticNodeId("act", a.id))
+  }
+
+  const augmentedDiagnostics: GraphDiagnostic[] = diagnostics.map(d => ({
+    ...d,
+    semanticNodeId: d.nodeId ? idToSemantic.get(d.nodeId) : undefined,
+  }))
+
   return {
     name: screenDef.name,
+    semanticId: `screen:${slugify(screenDef.name)}`,
     asks: screenDef.asks.map(a => ({
       id: a.id,
+      semanticId: semanticNodeId("ask", a.id),
       label: a.label,
       kind: a.kind,
       required: a.required,
@@ -138,6 +187,7 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     })),
     acts: screenDef.acts.map(a => ({
       id: a.id,
+      semanticId: semanticNodeId("act", a.id),
       label: a.label,
       primary: a.primary,
       enabled: a.enabled.current,
@@ -148,16 +198,19 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     })),
     flows: screenDef.flows.map(f => ({
       id: f.id,
+      semanticId: semanticNodeId("flow", f.id),
       name: f.name,
       stepCount: f.steps.length,
     })),
     surfaces: screenDef.surfaces.map(s => ({
       id: s.id,
+      semanticId: semanticNodeId("surface", s.id),
       name: s.name,
       itemCount: s.items.length,
     })),
     resources: (runtimeResources ?? []).map(r => ({
       id: r.id,
+      semanticId: semanticNodeId("resource", r.id),
       name: r.name,
       status: r.status,
       hasValue: r.value !== undefined,
@@ -166,6 +219,6 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
         ? (r.error instanceof Error ? r.error.message : String(r.error))
         : undefined,
     })),
-    diagnostics: computeDiagnostics(screenDef),
+    diagnostics: augmentedDiagnostics,
   }
 }

@@ -1,5 +1,5 @@
 import { signal, type Signal, type Condition } from "./signal.js"
-import { registerAskNode } from "./registry.js"
+import { registerAskNode, getAsks, nextSuffix } from "./registry.js"
 
 export type AskKind = "text" | "contact" | "secret" | "choice"
 
@@ -94,7 +94,11 @@ export class AskBuilder<T> {
   private node: AskNode<T>
 
   constructor(label: string, stateRef: { value: T; onChange?: (fn: (value: T) => void) => () => void }) {
-    const id = `ask_${label.toLowerCase().replace(/\s+/g, "_")}`
+    const baseId = `ask_${label.toLowerCase().replace(/\s+/g, "_")}`
+    const existing = getAsks()
+    const id = existing.has(baseId)
+      ? nextSuffix(baseId, (id) => existing.has(id))
+      : baseId
     const onChange = stateRef.onChange
     const subscribeToState = onChange
       ? (fn: () => void) => onChange((_v: T) => fn())
