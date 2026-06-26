@@ -244,6 +244,8 @@ The demo shows a small team invite flow:
 
 For a guided walkthrough, see [Demo Guide](docs/Demo.md).
 
+For a deep dive into resource semantics — load, reload, invalidation, staleness, and runtime scoping — see the [Resources Guide](docs/Resources.md).
+
 ## What the demo demonstrates
 
 The demo is intentionally small. It is a dagger, not a cathedral.
