@@ -831,6 +831,155 @@ describe("graph diagnostics", () => {
       expect(diags[0]?.semanticNodeId).toBe("action:hidden")
     })
   })
+
+  describe("flow-step-not-surfaced diagnostic", () => {
+    it("does not emit flow-step-not-surfaced when all flow steps are surfaced", () => {
+      const screenDef = screen("AllStepsSurfaced", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("emits flow-step-not-surfaced for unsurfaced ask step in flow", () => {
+      const screenDef = screen("UnsurfacedAskInFlow", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(login)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.severity).toBe("warning")
+      expect(diags[0]?.nodeId).toBe("ask_email")
+    })
+
+    it("emits flow-step-not-surfaced for unsurfaced action step in flow", () => {
+      const screenDef = screen("UnsurfacedActInFlow", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.severity).toBe("warning")
+      expect(diags[0]?.nodeId).toBe("act_log_in")
+    })
+
+    it("only reports unsurfaced steps when some are surfaced and some are not", () => {
+      const screenDef = screen("MixedSurfaced", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.nodeId).toBe("ask_password")
+    })
+
+    it("does not emit flow-step-not-surfaced when there are no flows", () => {
+      const screenDef = screen("NoFlowsAtAll", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("emits deterministic flow-step-not-surfaced diagnostics across multiple flows", () => {
+      const screenDef = screen("MultipleFlowsDet", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        const signup = $.act("Sign up")
+        $.surface("main").contains(emailAsk, login, signup)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk).then(login)
+        $.flow("register").startsWith(pwdAsk).then(signup)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(2)
+      expect(diags[0]?.nodeId).toBe("ask_password")
+      expect(diags[0]?.flow?.flowNodeId).toBe("flow_login")
+      expect(diags[1]?.nodeId).toBe("ask_password")
+      expect(diags[1]?.flow?.flowNodeId).toBe("flow_register")
+    })
+
+    it("includes nodeId and semanticNodeId for the unsurfaced step", () => {
+      const screenDef = screen("WithSemanticStep", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(login)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.nodeId).toBe("ask_email")
+      expect(diags[0]?.semanticNodeId).toBe("ask:email")
+    })
+
+    it("includes nested flow.flowNodeId and flow.flowSemanticNodeId", () => {
+      const screenDef = screen("NestedFlowMeta", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(login)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.flow?.flowNodeId).toBe("flow_login")
+      expect(diags[0]?.flow?.flowSemanticNodeId).toBe("flow:login")
+    })
+
+    it("coexists with surfaced-node-not-in-any-flow without breaking determinism", () => {
+      const screenDef = screen("CoexistFlow", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in").primary()
+        const signup = $.act("Sign up").primary()
+        $.surface("main").contains(emailAsk, login, signup)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk).then(login)
+      })
+      const first = inspectScreen(screenDef)
+      const second = inspectScreen(screenDef)
+      expect(first.diagnostics.map(d => d.code)).toEqual(second.diagnostics.map(d => d.code))
+      const codes = first.diagnostics.map(d => d.code)
+      expect(codes).toContain("flow-step-not-surfaced")
+      expect(codes).toContain("surfaced-node-not-in-any-flow")
+      const flowDiags = first.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(flowDiags).toHaveLength(1)
+      expect(flowDiags[0]?.nodeId).toBe("ask_password")
+      const reachDiags = first.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(reachDiags).toHaveLength(1)
+      expect(reachDiags[0]?.nodeId).toBe("act_sign_up")
+    })
+  })
 })
 
 describe("resource", () => {
