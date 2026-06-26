@@ -6,7 +6,7 @@
 **Affected package:** `@intent-framework/core`  
 **Related docs:** `docs/Resources.md`, `docs/Specification.md`
 
-> **Phase 1 implementation** (PR #??): `cache.staleTime` and `cache.deduplicate` are implemented in `@intent-framework/core@0.1.0-alpha.8`.  
+> **Phase 1 implementation** (PR #119): `cache.staleTime` and `cache.deduplicate` are implemented in `@intent-framework/core@0.1.0-alpha.8`.  
 > Remaining features (cache.key, cacheTime, swr, cross-navigation cache) remain as proposal/future work.
 
 ---
