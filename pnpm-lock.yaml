@@ -84,6 +84,31 @@ importers:
         specifier: ^3.1.1
         version: 3.2.6(jiti@2.7.0)(jsdom@29.1.1)(tsx@4.22.4)
 
+  examples/secret-vault:
+    dependencies:
+      '@intent-framework/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@intent-framework/dom':
+        specifier: workspace:*
+        version: link:../../packages/dom
+      '@intent-framework/router':
+        specifier: workspace:*
+        version: link:../../packages/router
+    devDependencies:
+      '@intent-framework/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(jiti@2.7.0)(tsx@4.22.4)
+      vitest:
+        specifier: ^3.1.1
+        version: 3.2.6(jiti@2.7.0)(jsdom@29.1.1)(tsx@4.22.4)
+
   examples/web-basic:
     dependencies:
       '@intent-framework/core':
