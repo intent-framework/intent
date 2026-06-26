@@ -204,7 +204,7 @@ This repository currently contains:
 
 The core package must remain platformless. It should not import DOM, React, router internals, server framework code, or native APIs.
 
-## Run the demo
+## Run the canonical example
 
 Install dependencies:
 
@@ -212,7 +212,17 @@ Install dependencies:
 pnpm install
 ```
 
-Run the web demo:
+Run the canonical example (matches the Quickstart one-to-one):
+
+```sh
+pnpm dev:canonical
+```
+
+Open the local URL printed by Vite.
+
+The example shows a single InviteMember screen — an email ask, a primary invite action blocked until the email is valid, and `inspectScreen()` output displayed on the page.
+
+For a more complete demo with routing, resources, and diagnostics, see:
 
 ```sh
 pnpm dev:web-basic
