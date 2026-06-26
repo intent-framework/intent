@@ -1,0 +1,55 @@
+name: opencode
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  opencode:
+    if: |
+      contains(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, '/opencode')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        with:
+          model: opencode/big-pickle
+          use_github_token: true
+          prompt: |
+            You are Big Pickle working in intent-framework/intent.
+
+            ## Repository rules
+            - Always read AGENTS.md first.
+            - Prefer small PRs.
+            - Do not publish packages.
+            - Do not change package versions unless explicitly requested.
+            - Do not run destructive git commands.
+            - Do not force-push.
+            - Do not read or print secrets.
+            - Do not merge risky runtime/API/release/security-sensitive PRs unless explicitly approved.
+            - Docs/examples/tooling PRs may be merged after green CI if the user explicitly asked for that behavior.
+            - For ambiguous requests, comment with a short plan before making broad changes.
+
+            ## Intent-specific workflow
+            When asked to implement work:
+            - inspect relevant files first
+            - create or update the appropriate branch
+            - keep changes scoped
+            - run pnpm test, typecheck, build, lint, pack:check, and changeset status
+            - open or update a PR
+            - observe CI
+            - report clearly
