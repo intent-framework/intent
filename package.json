@@ -12,7 +12,8 @@
     "pack:check": "pnpm -r --filter @intent-framework/core --filter @intent-framework/dom --filter @intent-framework/router --filter @intent-framework/testing exec npm pack --dry-run",
     "dev:web-basic": "pnpm --dir examples/web-basic dev",
     "dev:canonical": "pnpm --dir examples/canonical-invite dev",
-    "dev:choice-form": "pnpm --dir examples/choice-form dev"
+    "dev:choice-form": "pnpm --dir examples/choice-form dev",
+    "dev:resource-lifecycle": "pnpm --dir examples/resource-lifecycle dev"
   },
   "engines": {
     "node": ">=18"
