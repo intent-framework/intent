@@ -92,9 +92,17 @@ required). The token is granted these permissions in the workflow:
 - `pull-requests: write`
 - `issues: write`
 
-No additional secrets are required unless the model provider needs an API key.
-For `opencode/big-pickle`, the OpenCode GitHub Action handles authentication
-internally.
+The workflow requires the `OPENCODE_API_KEY` secret (set at the org or repo
+level) for the `opencode/big-pickle` model. It is passed to the action via:
+
+```yaml
+env:
+  OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+`GITHUB_TOKEN` is passed so the action can authenticate as the workflow runner
+when `use_github_token: true`.
 
 ### Merge behavior
 
