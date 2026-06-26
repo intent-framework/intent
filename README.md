@@ -299,6 +299,8 @@ Diagnostics are not lint rules for HTML. They are semantic graph feedback.
 
 For a detailed walkthrough of diagnostics, semantic IDs, and development workflow, see the [Inspect Screen and Diagnostics Guide](docs/Inspect-Screen.md).
 
+For a focused guide on debugging rendered DOM by mapping semantic IDs to `data-intent-*` attributes, see the [Semantic DOM Debugging Guide](docs/Semantic-DOM-Debugging.md).
+
 ## Development
 
 Run clean validation locally:

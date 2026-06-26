@@ -57,6 +57,7 @@ DOM is a renderer for Intent screens. It depends on `@intent-framework/core` and
 
 - [Root README](../../README.md) — project overview and philosophy
 - [Quickstart](../../docs/Quickstart.md) — step-by-step guide with DOM rendering
+- [Semantic DOM Debugging](../../docs/Semantic-DOM-Debugging.md) — how `showSemanticIds` maps `inspectScreen()` IDs to DOM data attributes
 - [Canonical runnable example](../../examples/canonical-invite) — matches the Quickstart one-to-one
 
 ## Status
