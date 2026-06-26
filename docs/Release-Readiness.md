@@ -2,7 +2,7 @@
 
 ## Status
 
-Three public alpha releases have been published: `0.1.0-alpha.0`, `0.1.0-alpha.1`, and `0.1.0-alpha.2`.
+Seven public alpha releases have been published: `0.1.0-alpha.0` through `0.1.0-alpha.7`.
 
 Five packages are under the `@intent-framework/*` scope, four of which are published to npm. The server package `@intent-framework/server` remains private and unpublished.
 
@@ -29,7 +29,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0-alpha.1` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.7` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -47,7 +47,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0-alpha.2` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.7` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -63,7 +63,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0-alpha.1` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.7` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -79,7 +79,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0-alpha.1` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.7` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -214,7 +214,7 @@ All post-publish steps use the `NPM_TOKEN` / `NODE_AUTH_TOKEN` from the `npm` en
 
 ### Publish cadence
 
-- Currently publishing **alpha releases** (`0.1.0-alpha.0` through `0.1.0-alpha.2` so far)
+- Currently publishing **alpha releases** (`0.1.0-alpha.0` through `0.1.0-alpha.7` so far)
 - Use `Changesets` pre-release mode for alpha/beta
 - Graduate to stable after API surface is settled and real-world usage begins
 
@@ -273,20 +273,20 @@ Do not manually create GitHub Releases.
   - Manual Publish Alpha workflow (manual dispatch only)
 - [x] NPM_TOKEN secret added to GitHub repository secrets
 - [x] First alpha published (v0.1.0-alpha.0)
-- [x] Subsequent alpha releases published (v0.1.0-alpha.1, v0.1.0-alpha.2)
+- [x] Subsequent alpha releases published (v0.1.0-alpha.1 through v0.1.0-alpha.7)
 
 ## Post-release verification
 
 Published packages (latest alpha):
 
-- `@intent-framework/core@0.1.0-alpha.2`
-- `@intent-framework/dom@0.1.0-alpha.3`
-- `@intent-framework/router@0.1.0-alpha.2`
-- `@intent-framework/testing@0.1.0-alpha.2`
+- `@intent-framework/core@0.1.0-alpha.7`
+- `@intent-framework/dom@0.1.0-alpha.7`
+- `@intent-framework/router@0.1.0-alpha.7`
+- `@intent-framework/testing@0.1.0-alpha.7`
 
 Verified:
 
-- npm install smoke test passed for alpha.0, alpha.1, alpha.2
+- npm install smoke test passed for alpha.0 through alpha.7
 - `alpha` dist-tag points to the latest published alpha version (set by workflow post-publish step)
 - `latest` dist-tag points to the latest alpha (changeset behavior — publishes to `latest` when no regular release exists)
 - Git tags (`@intent-framework/pkg@version`) are present on remote (pushed by workflow post-publish step)
