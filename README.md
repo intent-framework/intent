@@ -39,16 +39,19 @@ It is not production-ready yet. The goal right now is to keep the foundation sma
 Intent is available as experimental alpha packages on npm:
 
 ```sh
-pnpm add @intent-framework/core@alpha @intent-framework/dom@alpha @intent-framework/router@alpha @intent-framework/testing@alpha
+pnpm add @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alpha.1 @intent-framework/router@0.1.0-alpha.1 @intent-framework/testing@0.1.0-alpha.1
 ```
 
 ```sh
-npm install @intent-framework/core@alpha @intent-framework/dom@alpha @intent-framework/router@alpha @intent-framework/testing@alpha
+npm install @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alpha.1 @intent-framework/router@0.1.0-alpha.1 @intent-framework/testing@0.1.0-alpha.1
 ```
 
+The quickstart pins the current alpha version so examples match the published APIs.
+
 ```txt
-First public alpha: v0.1.0-alpha.1
-GitHub Release: https://github.com/intent-framework/intent/releases/tag/v0.1.0-alpha.1
+Current alpha: v0.1.0-alpha.1
+First public alpha: v0.1.0-alpha.0
+GitHub Releases: https://github.com/intent-framework/intent/releases
 ```
 
 Published packages:
