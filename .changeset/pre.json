@@ -11,9 +11,13 @@
     "canonical-invite": "0.0.0"
   },
   "changesets": [
+    "five-ducks-sleep",
+    "fresh-jokes-flow",
     "goofy-oranges-wish",
     "quiet-ligers-fetch",
+    "shy-kids-grow",
     "silent-dragons-exist",
-    "silent-goats-dance"
+    "silent-goats-dance",
+    "slow-readers-create"
   ]
 }

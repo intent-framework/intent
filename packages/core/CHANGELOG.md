@@ -1,5 +1,16 @@
 # @intent-framework/core
 
+## 0.1.0-alpha.5
+
+### Minor Changes
+
+- 95cb82f: Add public `FlowDiagnosticMeta` type and optional `flow` metadata to `GraphDiagnostic` for future flow-scoped diagnostics.
+- b76a1e0: Add `flow-step-not-surfaced` diagnostic to `inspectScreen` for flow steps missing from surfaces.
+- 57b8bda: Add `orphaned-flow` diagnostic to `inspectScreen` for flows with no surfaced steps.
+
+  `inspectScreen` now reports `severity: "warning"` diagnostics with code `orphaned-flow`
+  when a flow has one or more steps but none of its steps appear in any surface.
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes

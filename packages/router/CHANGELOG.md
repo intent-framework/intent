@@ -1,5 +1,14 @@
 # @intent-framework/router
 
+## 0.1.0-alpha.5
+
+### Patch Changes
+
+- Updated dependencies [95cb82f]
+- Updated dependencies [b76a1e0]
+- Updated dependencies [57b8bda]
+  - @intent-framework/core@0.1.0-alpha.5
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes
