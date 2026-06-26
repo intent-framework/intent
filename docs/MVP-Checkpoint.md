@@ -142,9 +142,10 @@ Do not jump into these without a very specific narrow PR:
 ## Documented
 
 - ✅ `inspectScreen()` diagnostic guide (`docs/Inspect-Screen.md`) — covers graph contents, all five current diagnostics, semantic ID behavior, development workflow, and current boundaries.
+- ✅ Resource semantics guide (`docs/Resources.md`) — covers resource lifecycle, runtime scoping, ResourceRef vs ResourceNode, invalidation, loader context, and current boundaries.
 
 ## Recommended next moves
 
 1. ~~Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.~~ (Covered by the diagnostic guide documenting the `demo-panels.ts` pattern.)
-2. Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.
+2. ~~Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.~~ (Covered by docs/Resources.md.)
 3. Add one or two graph diagnostics that catch real authoring mistakes before adding any new package.

@@ -48,6 +48,8 @@ Each action includes: `id`, `semanticId`, `label`, `primary`, `enabled`, `blocke
 
 Each resource includes: `id`, `semanticId`, `name`, `status`, `hasValue`, `stale`, `error`.
 
+For a detailed explanation of resource lifecycle, runtime scoping, and invalidation, see the [Resources Guide](Resources.md).
+
 Resources require passing runtime resource nodes:
 
 ```ts
