@@ -1,5 +1,5 @@
-import type { ScreenDefinition, ActNode, DefaultScreenServices } from "@intent-framework/core"
-import { createScreenRuntime } from "@intent-framework/core"
+import type { ScreenDefinition, ActNode, DefaultScreenServices, InspectedScreen } from "@intent-framework/core"
+import { createScreenRuntime, inspectScreen } from "@intent-framework/core"
 
 function getReasonId(actId: string): string {
   return `${actId}-reason`
@@ -30,6 +30,7 @@ export type DomRendererOptions<TServices extends object = DefaultScreenServices>
   target: HTMLElement
   services?: TServices
   showScreenName?: boolean
+  showSemanticIds?: boolean
 }
 
 export { renderRouter } from "./dom-router.js"
@@ -39,9 +40,9 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
   options: DomRendererOptions<TServices>
 ): () => void {
-  const { target, services, showScreenName } = options
+  const { target, services, showScreenName, showSemanticIds } = options
   target.innerHTML = ""
-  const root = buildDom(screenDef, showScreenName)
+  const root = buildDom(screenDef, showScreenName, showSemanticIds)
   target.appendChild(root)
 
   const runtime = createScreenRuntime<TServices>(screenDef, { services })
@@ -164,13 +165,28 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
 
 function buildDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
-  showScreenName?: boolean
+  showScreenName?: boolean,
+  showSemanticIds?: boolean
 ): HTMLElement {
+  let inspected: InspectedScreen | undefined
+  let askSemanticIds: Map<string, string> | undefined
+  let actSemanticIds: Map<string, string> | undefined
+
+  if (showSemanticIds) {
+    inspected = inspectScreen(screenDef)
+    askSemanticIds = new Map(inspected.asks.map(a => [a.id, a.semanticId]))
+    actSemanticIds = new Map(inspected.acts.map(a => [a.id, a.semanticId]))
+  }
+
   const surface = screenDef.surfaces[0]
   const main = document.createElement("main")
 
   if (surface) {
     main.id = surface.id
+  }
+
+  if (showSemanticIds && inspected) {
+    main.setAttribute("data-intent-screen", inspected.semanticId)
   }
 
   if (showScreenName) {
@@ -190,11 +206,23 @@ function buildDom<TServices extends object = DefaultScreenServices>(
     const label = document.createElement("label")
     label.textContent = ask.label
     label.htmlFor = ask.id
+    if (showSemanticIds && askSemanticIds) {
+      const sid = askSemanticIds.get(ask.id)
+      if (sid) {
+        label.setAttribute("data-intent-ask", sid)
+      }
+    }
     container.appendChild(label)
 
     const input = createInputForAsk(ask)
     input.id = ask.id
     input.name = ask.id
+    if (showSemanticIds && askSemanticIds) {
+      const sid = askSemanticIds.get(ask.id)
+      if (sid) {
+        input.setAttribute("data-intent-ask", sid)
+      }
+    }
 
     if (ask.required) {
       input.required = true
@@ -249,6 +277,12 @@ function buildDom<TServices extends object = DefaultScreenServices>(
     button.id = act.id
     button.type = "button"
     button.textContent = act.label
+    if (showSemanticIds && actSemanticIds) {
+      const sid = actSemanticIds.get(act.id)
+      if (sid) {
+        button.setAttribute("data-intent-action", sid)
+      }
+    }
 
     if (act.primary) {
       button.className = "primary"
