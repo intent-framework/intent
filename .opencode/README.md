@@ -104,6 +104,22 @@ env:
 `GITHUB_TOKEN` is passed so the action can authenticate as the workflow runner
 when `use_github_token: true`.
 
+### Git author identity
+
+The workflow configures `github-actions[bot]` as the git author for OpenCode
+commits via a `Configure git author` step after checkout:
+
+```yaml
+- name: Configure git author
+  run: |
+    git config --global user.name "github-actions[bot]"
+    git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+```
+
+`/oc` read-only tasks (e.g. review, inspect) work without commits, but write
+tasks (implement, edit, create PRs) need this git identity to be set, otherwise
+OpenCode cannot commit changes.
+
 ### Merge behavior
 
 The workflow does not merge automatically. It opens or updates PRs and reports
