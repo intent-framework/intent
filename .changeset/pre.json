@@ -9,5 +9,7 @@
     "@intent-framework/server": "0.1.0",
     "@intent-framework/testing": "0.1.0-alpha.0"
   },
-  "changesets": []
+  "changesets": [
+    "silent-goats-dance"
+  ]
 }
