@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.0",
   "description": "Typed route definitions and navigation for Intent",
   "license": "MIT",
   "repository": {

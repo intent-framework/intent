@@ -6,6 +6,9 @@
     "test": "pnpm -r test",
     "typecheck": "tsc -p tsconfig.typecheck.json",
     "lint": "tsc -p tsconfig.typecheck.json",
+    "changeset": "changeset",
+    "version:packages": "changeset version",
+    "release:alpha": "pnpm build && pnpm pack:check && changeset publish --tag alpha",
     "pack:check": "pnpm -r --filter @intent-framework/core --filter @intent-framework/dom --filter @intent-framework/router --filter @intent-framework/testing exec npm pack --dry-run",
     "dev:web-basic": "pnpm --dir examples/web-basic dev"
   },
@@ -13,6 +16,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "typescript": "^5.9.3"
   }
 }

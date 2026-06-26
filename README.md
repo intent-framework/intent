@@ -276,7 +276,7 @@ Current limitations include:
 * No backend persistence yet
 * No real resource cache policy yet
 * No DevTools package yet
-* No package publishing flow yet
+* No automated publish workflow yet (Changesets is configured, release workflow pending)
 * Demo side panels use manual DOM
 * Demo diagnostics panel uses `MutationObserver`
 * Demo data is in memory only
