@@ -6,7 +6,7 @@ on:
 concurrency: ${{ github.workflow }}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish-alpha:

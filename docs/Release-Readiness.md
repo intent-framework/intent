@@ -225,7 +225,7 @@ Key rules:
   - Version Packages PRs must not bump packages to stable versions.
   - Stable versions are only allowed after intentionally exiting prerelease mode via `pnpm changeset pre exit`.
   - The GitHub Actions PR creation setting (`GITHUB_TOKEN` permissions for creating and approving PRs) may need manual enabling after alpha versioning is fixed.
-  - While the repo is in Changesets alpha prerelease mode, `release:alpha` must run `changeset publish` without `--tag alpha`. The alpha dist-tag is derived from `.changeset/pre.json`.
+  - `release:alpha` must run `changeset publish --tag alpha` so the published packages use the `alpha` npm dist-tag instead of overwriting `latest`.
 
 ### Validation gates
 
