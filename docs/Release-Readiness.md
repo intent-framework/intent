@@ -4,7 +4,7 @@
 
 Intent is in early experimental development. No packages have been published to npm. No GitHub Releases have been created.
 
-The repository has five workspace packages under `packages/*`. The four publishable packages are at version `0.1.0-alpha.0`. The private server package remains at `0.1.0`. All use `workspace:*` dependency references. The codebase is functional and validated by CI. Changesets is installed and configured. The remaining blocker before a first alpha release is the release workflow and npm publish automation.
+The repository has five workspace packages under `packages/*`. The four publishable packages are at version `0.1.0-alpha.0`. The private server package remains at `0.1.0`. All use `workspace:*` dependency references. The codebase is functional and validated by CI. Changesets is installed and configured. Release workflows exist for automated version PRs and manual alpha publishing.
 
 Four packages are intended for first-alpha publishing. `packages/server` is a private workspace package for now.
 
@@ -179,23 +179,28 @@ The `files` field in every package is `["dist"]`. Based on `npm pack --dry-run` 
 
 No unnecessary files (source maps, config files, tests, node_modules) leak into the tarball. The `files` policy is correct.
 
-## Release workflow recommendation
+## Release workflows
 
-### Use Changesets
+### Version Packages PR workflow
 
-[Changesets](https://github.com/changesets/changesets) is recommended for:
+A Changesets-based [version-packages.yml](../.github/workflows/version-packages.yml) workflow runs on pushes to `main`:
 
-- Version bumping (independent versioning per package)
-- Changelog generation per package
-- Coordinated publishing across the workspace
+1. Checks out the repository
+2. Installs dependencies
+3. Runs `pnpm version:packages` via `changesets/action`
+4. Opens or updates a "Version Packages" PR when changeset files are present
 
-### Recommended GitHub Action
+This workflow does **not** publish to npm. It only manages the version PR.
 
-Add a Changeset-based GitHub Action (e.g., `changesets/action`) that:
+### Manual Publish Alpha workflow
 
-1. Runs on pushes to `main`
-2. Opens or updates a "Version Packages" PR when changeset files are present
-3. Publishes to npm when the version PR is merged
+A [publish-alpha.yml](../.github/workflows/publish-alpha.yml) workflow exists for publishing:
+
+- **Trigger**: manual only (`workflow_dispatch`)
+- **Environment**: requires the `npm` GitHub environment
+- **Pre-publish validation**: test, typecheck, build, lint, pack:check
+- **Publish command**: `pnpm release:alpha` (builds, runs pack check, then `changeset publish --tag alpha`)
+- **npm auth**: configured at runtime via `NODE_AUTH_TOKEN`; no committed `.npmrc` file
 
 ### Publish cadence
 
@@ -229,22 +234,25 @@ Do not manually create GitHub Releases.
 - [x] MIT confirmed as intended public license
 - [x] Confirm package metadata (`repository` field in all packages)
 - [x] Server is private — not a publishing blocker
-- [x] Package exports point to correct `dist/` paths
-- [x] Package `files: ["dist"]` is correct
-- [x] Declaration files (`dist/index.d.ts`) exist after build
+- [x] Confirm package exports (all point to correct `dist/` paths)
+- [x] Confirm package files (`files: ["dist"]`)
+- [x] Confirm declaration files (`dist/index.d.ts` exists)
 - [x] Clean-dist validation passes
-- [x] `pnpm pack:check` passes
 - [x] Changesets installed and configured
-- [x] First alpha package versions set to `0.1.0-alpha.0`
-- [ ] Add release workflow (GitHub Action for Changesets)
-- [ ] Publish first alpha (`pnpm changeset publish`)
+- [x] Release workflows added:
+  - Version Packages PR workflow (push-to-main)
+  - Manual Publish Alpha workflow (manual dispatch only)
+- [ ] NPM_TOKEN secret added to GitHub repository secrets
+- [ ] Publish first alpha via manual Publish Alpha workflow
 - [ ] Create GitHub Release (automatic via Changesets, or manual)
 
 ## Current blockers
 
-- repository fields are present
-- GitHub repository home is https://github.com/intent-framework/intent
-- remaining first-alpha blocker after this PR: Release workflow not yet added, including npm publish automation and required secrets.
+- repository fields: present
+- GitHub repository home: `intent-framework/intent`
+- Changesets: installed and configured
+- Release workflows: version-packages.yml (automated version PRs) and publish-alpha.yml (manual publish) are added
+- Remaining first-alpha blocker: add `NPM_TOKEN` secret, then manually run Publish Alpha
 
 ## Future server-package decisions
 
@@ -253,11 +261,29 @@ Do not manually create GitHub Releases.
 
 ## Do not do yet
 
-- Do not publish any package to npm.
-- Do not create a GitHub Release.
-- Do not add a release GitHub Action yet.
+- Do not publish any package to npm until the manual Publish Alpha workflow is triggered.
+- Do not create a GitHub Release (Changesets will create one automatically on publish, or it can be done manually).
 - Do not change runtime or public APIs.
 - Do not add new dependencies unless required for a specific task.
+
+## Required secret: NPM_TOKEN
+
+Before running the Publish Alpha workflow, a GitHub Actions secret must be added:
+
+| Secret | Purpose |
+|---|---|
+| `NPM_TOKEN` | npm access token with publish permission for `@intent-framework/*` packages |
+
+The token must:
+- Have **publish** permission for the `@intent-framework` npm organization
+- Be stored as a GitHub Actions secret (not in the repository)
+- Be configured in the `npm` GitHub environment used by the Publish Alpha workflow
+
+Do not commit the token value to the repository.
+
+### Future improvement: trusted publishing
+
+Migrate npm publishing to trusted publishing / OIDC once the initial package publishing flow is stable.
 
 ## Pack check command
 
