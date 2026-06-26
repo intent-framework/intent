@@ -226,4 +226,5 @@ Intent does not replace components for everything. It replaces components as the
    ```
 2. See the [web demo](../examples/web-basic) for a full team invite flow with routing, resources, and diagnostics.
 3. Read the [Specification](Specification.md) for the architecture.
-4. Check the [MVP Checkpoint](MVP-Checkpoint.md) for current boundaries.
+4. Read the [Inspect Screen and Diagnostics Guide](Inspect-Screen.md) for a detailed walkthrough of `inspectScreen()`, diagnostics, and semantic IDs.
+5. Check the [MVP Checkpoint](MVP-Checkpoint.md) for current boundaries.

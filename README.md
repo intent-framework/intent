@@ -295,6 +295,8 @@ Diagnostics currently catch graph-level issues such as:
 
 Diagnostics are not lint rules for HTML. They are semantic graph feedback.
 
+For a detailed walkthrough of diagnostics, semantic IDs, and development workflow, see the [Inspect Screen and Diagnostics Guide](docs/Inspect-Screen.md).
+
 ## Development
 
 Run clean validation locally:
