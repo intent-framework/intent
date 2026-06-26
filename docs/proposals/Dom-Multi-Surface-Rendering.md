@@ -1,12 +1,12 @@
 # DOM Multi-Surface Rendering
 
-**Status:** Design Proposal  
+**Status:** Implemented (PR #115)  
 **Date:** 2026-06-26  
 **Author:** Big Pickle  
 **Lane:** `renderer/dom`  
 **Depends on:** Nothing  
 **Affected package:** `@intent-framework/dom`  
-**Changeset:** None (proposal-only)
+**Changeset:** Patch for `@intent-framework/dom`
 
 ---
 

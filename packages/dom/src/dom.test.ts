@@ -1774,4 +1774,501 @@ describe("DOM renderer", () => {
       expect(button.disabled).toBe(false)
     })
   })
+
+  describe("multi-surface rendering", () => {
+    it("renders multiple surfaces as separate sections", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const MultiSurface = screen("MultiSurface", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit").primary().when(true).does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(MultiSurface, { target: root })
+
+      const sections = root.querySelectorAll("section")
+      expect(sections).toHaveLength(2)
+      expect(sections[0]!.id).toBe("surface_main")
+      expect(sections[0]!.getAttribute("aria-label")).toBe("main")
+      expect(sections[1]!.id).toBe("surface_sidebar")
+      expect(sections[1]!.getAttribute("aria-label")).toBe("sidebar")
+    })
+
+    it("single-surface DOM ids remain backward compatible", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Single = screen("SingleSurface", $ => {
+        const text = $.state.text("email")
+        const ask = $.ask("Email", text).required()
+        const act = $.act("Send").primary().when(true).does(async () => {})
+        $.surface("main").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Single, { target: root })
+
+      const input = root.querySelector("input")!
+      expect(input.id).toBe("ask_email")
+      const button = root.querySelector("button")!
+      expect(button.id).toBe("act_send")
+      const output = root.querySelector("output")!
+      expect(output.id).toBe("feedback-output")
+    })
+
+    it("multi-surface ask/action ids are suffixed", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const DuplicateIds = screen("DuplicateIds", $ => {
+        const text = $.state.text("email")
+        const ask = $.ask("Email", text).required()
+        const act = $.act("Send").primary().when(true).does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(DuplicateIds, { target: root })
+
+      const inputs = root.querySelectorAll("input")
+      expect(inputs).toHaveLength(2)
+      expect(inputs[0]!.id).toBe("ask_email--main")
+      expect(inputs[1]!.id).toBe("ask_email--sidebar")
+
+      const buttons = root.querySelectorAll("button")
+      expect(buttons).toHaveLength(2)
+      expect(buttons[0]!.id).toBe("act_send--main")
+      expect(buttons[1]!.id).toBe("act_send--sidebar")
+    })
+
+    it("each surface renders only its own items", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const PerSurfaceItems = screen("PerSurfaceItems", $ => {
+        const name = $.state.text("name")
+        const email = $.state.text("email")
+        const nameAsk = $.ask("Name", name).required()
+        const emailAsk = $.ask("Email", email).required()
+        const submit = $.act("Submit").primary().when(true).does(async () => {})
+        const cancel = $.act("Cancel").when(true).does(async () => {})
+        $.surface("main").contains(nameAsk, submit)
+        $.surface("sidebar").contains(emailAsk, cancel)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(PerSurfaceItems, { target: root })
+
+      const sections = root.querySelectorAll("section")
+      const mainSection = sections[0]!
+      const sidebarSection = sections[1]!
+
+      // Main section has name ask and submit button
+      expect(mainSection.querySelector("input")!.id).toBe("ask_name--main")
+      expect(mainSection.querySelector("button")!.id).toBe("act_submit--main")
+
+      // Sidebar section has email ask and cancel button
+      expect(sidebarSection.querySelector("input")!.id).toBe("ask_email--sidebar")
+      expect(sidebarSection.querySelector("button")!.id).toBe("act_cancel--sidebar")
+
+      // Main section does not have email ask
+      expect(mainSection.querySelector("#ask_email--main")).toBeNull()
+      // Sidebar section does not have name ask
+      expect(sidebarSection.querySelector("#ask_name--sidebar")).toBeNull()
+    })
+
+    it("duplicate text ask controls share state", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const SharedText = screen("SharedText", $ => {
+        const text = $.state.text("message")
+        const ask = $.ask("Message", text).required()
+        const act = $.act("Send").primary().when(ask.valid).does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SharedText, { target: root })
+
+      const inputMain = document.getElementById("ask_message--main") as HTMLInputElement
+      const inputSide = document.getElementById("ask_message--sidebar") as HTMLInputElement
+
+      // Type in main — side should update
+      inputMain.value = "hello from main"
+      inputMain.dispatchEvent(new Event("input", { bubbles: true }))
+      expect(inputSide.value).toBe("hello from main")
+
+      // Type in sidebar — main should update
+      inputSide.value = "hello from sidebar"
+      inputSide.dispatchEvent(new Event("input", { bubbles: true }))
+      expect(inputMain.value).toBe("hello from sidebar")
+    })
+
+    it("duplicate checkbox ask controls share state and checked value", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const SharedCheckbox = screen("SharedCheckbox", $ => {
+        const accepted = $.state.boolean("accepted")
+        const ask = $.ask("Accept", accepted)
+        const act = $.act("Submit").primary().when(true).does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SharedCheckbox, { target: root })
+
+      const cbMain = document.getElementById("ask_accept--main") as HTMLInputElement
+      const cbSide = document.getElementById("ask_accept--sidebar") as HTMLInputElement
+
+      expect(cbMain.checked).toBe(false)
+      expect(cbSide.checked).toBe(false)
+
+      // Check in main — side should update
+      cbMain.checked = true
+      cbMain.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(cbSide.checked).toBe(true)
+
+      // Uncheck in sidebar — main should update
+      cbSide.checked = false
+      cbSide.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(cbMain.checked).toBe(false)
+    })
+
+    it("duplicate select ask controls share state and selected value", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const SharedSelect = screen("SharedSelect", $ => {
+        const role = $.state.choice("role", {
+          initial: "member",
+          options: ["admin", "member", "viewer"] as const,
+        })
+        const roleAsk = $.ask("Role", role).asChoice()
+        const act = $.act("Save").primary().when(true).does(async () => {})
+        $.surface("main").contains(roleAsk, act)
+        $.surface("sidebar").contains(roleAsk)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SharedSelect, { target: root })
+
+      const selectMain = document.getElementById("ask_role--main") as HTMLSelectElement
+      const selectSide = document.getElementById("ask_role--sidebar") as HTMLSelectElement
+
+      expect(selectMain.value).toBe("member")
+      expect(selectSide.value).toBe("member")
+
+      // Change in main — side should update
+      selectMain.value = "admin"
+      selectMain.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(selectSide.value).toBe("admin")
+
+      // Change in sidebar — main should update
+      selectSide.value = "viewer"
+      selectSide.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(selectMain.value).toBe("viewer")
+    })
+
+    it("duplicate action buttons execute the same action", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executionCount = 0
+
+      const SharedAction = screen("SharedAction", $ => {
+        const act = $.act("Do it")
+          .primary()
+          .when(true)
+          .does(async () => {
+            executionCount++
+          })
+        $.surface("main").contains(act)
+        $.surface("sidebar").contains(act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SharedAction, { target: root })
+
+      const btnMain = document.getElementById("act_do_it--main") as HTMLButtonElement
+      const btnSide = document.getElementById("act_do_it--sidebar") as HTMLButtonElement
+
+      btnMain.click()
+      await new Promise(r => setTimeout(r, 10))
+      expect(executionCount).toBe(1)
+
+      btnSide.click()
+      await new Promise(r => setTimeout(r, 10))
+      expect(executionCount).toBe(2)
+    })
+
+    it("enabled/disabled state updates across duplicate action buttons", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const SharedEnabled = screen("SharedEnabled", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid, "Name is required.")
+          .does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SharedEnabled, { target: root })
+
+      const btnMain = document.getElementById("act_submit--main") as HTMLButtonElement
+      const btnSide = document.getElementById("act_submit--sidebar") as HTMLButtonElement
+
+      // Both disabled initially
+      expect(btnMain.disabled).toBe(true)
+      expect(btnSide.disabled).toBe(true)
+
+      // Fill in text — both should enable
+      const state = SharedEnabled.asks[0]!.state as unknown as { set: (v: string) => void }
+      state.set("Alice")
+
+      expect(btnMain.disabled).toBe(false)
+      expect(btnSide.disabled).toBe(false)
+
+      // Clear text — both should disable again
+      state.set("")
+
+      expect(btnMain.disabled).toBe(true)
+      expect(btnSide.disabled).toBe(true)
+    })
+
+    it("blocked reasons are scoped per surface copy", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const ScopedReasons = screen("ScopedReasons", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid, "Name is required.")
+          .does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(ScopedReasons, { target: root })
+
+      const btnMain = document.getElementById("act_submit--main") as HTMLButtonElement
+      const btnSide = document.getElementById("act_submit--sidebar") as HTMLButtonElement
+
+      const reasonMain = document.getElementById("act_submit-reason--main")!
+      const reasonSide = document.getElementById("act_submit-reason--sidebar")!
+
+      expect(reasonMain).not.toBeNull()
+      expect(reasonSide).not.toBeNull()
+      expect(reasonMain.textContent).toBe("Name is required.")
+      expect(reasonSide.textContent).toBe("Name is required.")
+
+      expect(btnMain.getAttribute("aria-describedby")).toBe("act_submit-reason--main")
+      expect(btnSide.getAttribute("aria-describedby")).toBe("act_submit-reason--sidebar")
+    })
+
+    it("aria-describedby points to the correct per-surface reason/hint ids", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const ScopedAria = screen("ScopedAria", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid, "Name is required.")
+          .does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(ScopedAria, { target: root })
+
+      const btnMain = document.getElementById("act_submit--main") as HTMLButtonElement
+      const btnSide = document.getElementById("act_submit--sidebar") as HTMLButtonElement
+
+      expect(btnMain.getAttribute("aria-describedby")).toBe("act_submit-reason--main")
+      expect(btnSide.getAttribute("aria-describedby")).toBe("act_submit-reason--sidebar")
+    })
+
+    it("per-surface feedback output exists and is aria-live", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const SurfaceFeedback = screen("SurfaceFeedback", $ => {
+        const act = $.act("Do it")
+          .primary()
+          .when(true)
+          .does(async () => {})
+          .feedback({
+            pending: "Doing...",
+            success: "Done.",
+          })
+        $.surface("main").contains(act)
+        $.surface("sidebar").contains(act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SurfaceFeedback, { target: root })
+
+      const outputMain = document.getElementById("feedback-output--main")!
+      const outputSide = document.getElementById("feedback-output--sidebar")!
+
+      expect(outputMain).not.toBeNull()
+      expect(outputSide).not.toBeNull()
+      expect(outputMain.getAttribute("aria-live")).toBe("polite")
+      expect(outputSide.getAttribute("aria-live")).toBe("polite")
+    })
+
+    it("enter key default action works per surface for text-like controls", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executed = false
+
+      const EnterSurface = screen("EnterSurface", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {
+            executed = true
+          })
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(EnterSurface, { target: root })
+
+      const inputMain = document.getElementById("ask_name--main") as HTMLInputElement
+      inputMain.value = "Alice"
+      inputMain.dispatchEvent(new Event("input", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      inputMain.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(true)
+
+      // Reset and try sidebar
+      executed = false
+      const inputSide = document.getElementById("ask_name--sidebar") as HTMLInputElement
+      inputSide.value = "Bob"
+      inputSide.dispatchEvent(new Event("input", { bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+
+      inputSide.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(true)
+    })
+
+    it("enter key does not execute from checkbox/select", async () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      let executed = false
+
+      const EnterExclude = screen("EnterExclude", $ => {
+        const accepted = $.state.boolean("accepted")
+        const askBool = $.ask("Accept", accepted)
+        const role = $.state.choice("role", {
+          initial: "member",
+          options: ["admin", "member"] as const,
+        })
+        const askChoice = $.ask("Role", role).asChoice()
+        const act = $.act("Submit")
+          .primary()
+          .when(true)
+          .does(async () => {
+            executed = true
+          })
+        $.surface("main").contains(askBool, askChoice, act)
+        $.surface("sidebar").contains(askBool, askChoice, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(EnterExclude, { target: root })
+
+      // Press Enter on checkbox — should not execute
+      const cbMain = document.getElementById("ask_accept--main") as HTMLInputElement
+      cbMain.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(false)
+
+      // Press Enter on select — should not execute
+      const selectMain = document.getElementById("ask_role--main") as HTMLSelectElement
+      selectMain.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      await new Promise(r => setTimeout(r, 10))
+      expect(executed).toBe(false)
+    })
+
+    it("data-intent-* semantic ids remain identical across duplicate surface copies", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const SemanticIds = screen("SemanticIds", $ => {
+        const text = $.state.text("email")
+        const ask = $.ask("Email", text).required()
+        const act = $.act("Send").primary().when(ask.valid).does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(SemanticIds, { target: root, showSemanticIds: true })
+
+      // Labels in both surfaces should have same data-intent-ask
+      const labels = root.querySelectorAll("label[data-intent-ask]")
+      expect(labels).toHaveLength(2)
+      expect(labels[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+      expect(labels[1]!.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      // Inputs in both surfaces should have same data-intent-ask
+      const inputs = root.querySelectorAll("input[data-intent-ask]")
+      expect(inputs).toHaveLength(2)
+      expect(inputs[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+      expect(inputs[1]!.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      // Buttons in both surfaces should have same data-intent-action
+      const buttons = root.querySelectorAll("button[data-intent-action]")
+      expect(buttons).toHaveLength(2)
+      expect(buttons[0]!.getAttribute("data-intent-action")).toBe("action:send")
+      expect(buttons[1]!.getAttribute("data-intent-action")).toBe("action:send")
+    })
+
+    it("cleanup unsubscribes all multi-surface listeners", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const CleanupMulti = screen("CleanupMulti", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        const act = $.act("Submit")
+          .primary()
+          .when(ask.valid)
+          .does(async () => {})
+        $.surface("main").contains(ask, act)
+        $.surface("sidebar").contains(ask, act)
+      })
+
+      const root = document.getElementById("root")!
+      const cleanup = renderDom(CleanupMulti, { target: root })
+
+      const btnMain = document.getElementById("act_submit--main") as HTMLButtonElement
+      const btnSide = document.getElementById("act_submit--sidebar") as HTMLButtonElement
+      expect(btnMain.disabled).toBe(true)
+      expect(btnSide.disabled).toBe(true)
+
+      cleanup()
+
+      // After cleanup, state changes should not update buttons
+      const state = CleanupMulti.asks[0]!.state as unknown as { set: (v: string) => void }
+      state.set("test")
+
+      expect(btnMain.disabled).toBe(true)
+      expect(btnSide.disabled).toBe(true)
+    })
+  })
 })
