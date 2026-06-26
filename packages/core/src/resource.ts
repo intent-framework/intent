@@ -25,15 +25,22 @@ export type ResourceNode<TValue, TServices extends object = DefaultScreenService
   reload: (context?: ResourceLoadContext<TServices>) => Promise<void>
   invalidate: () => void
   subscribe: (fn: () => void) => () => void
+  dispose: () => void
 }
 
 export type AnyResourceNode = ResourceNode<unknown, any>
+
+export type ResourceCacheOptions = {
+  staleTime?: number
+  deduplicate?: boolean
+}
 
 export type ResourceConfig<TValue = unknown, TServices extends object = DefaultScreenServices> = {
   id: string
   name: string
   autoLoad: boolean
   loader: ResourceLoader<TValue, TServices>
+  cache?: ResourceCacheOptions
   ref?: ResourceRef<TValue, TServices>
 }
 
@@ -51,6 +58,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
   name: string,
   loader: ResourceLoader<TValue, TServices>,
   autoLoad = true,
+  cache?: ResourceCacheOptions,
 ): ResourceNode<TValue, TServices> {
   const statusSignal: Signal<number> = signal(0)
   const staleSignal: Signal<number> = signal(0)
@@ -61,8 +69,13 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
   let currentStale = false
   let lastContext: ResourceLoadContext<TServices> | undefined = undefined
 
+  let _staleTimer: ReturnType<typeof setTimeout> | null = null
+  let _inFlightPromise: Promise<void> | null = null
+
   const notify = () => statusSignal.set(statusSignal.get() + 1)
   const staleNotify = () => staleSignal.set(staleSignal.get() + 1)
+
+  const shouldDeduplicate = cache ? cache.deduplicate !== false : false
 
   let _ready: Condition | undefined
   let _pending: Condition | undefined
@@ -109,7 +122,30 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     return _stale
   }
 
-  async function executeLoad(context?: ResourceLoadContext<TServices>): Promise<void> {
+  function _clearStaleTimer(): void {
+    if (_staleTimer != null) {
+      clearTimeout(_staleTimer)
+      _staleTimer = null
+    }
+  }
+
+  function _startStaleTimer(): void {
+    _clearStaleTimer()
+    if (cache?.staleTime != null && isFinite(cache.staleTime)) {
+      _staleTimer = setTimeout(() => {
+        if (!currentStale) {
+          currentStale = true
+          staleNotify()
+        }
+      }, cache.staleTime)
+    }
+  }
+
+  function executeLoad(context?: ResourceLoadContext<TServices>): Promise<void> {
+    if (shouldDeduplicate && _inFlightPromise) {
+      return _inFlightPromise
+    }
+
     currentStale = false
     staleNotify()
     currentStatus = "pending"
@@ -122,24 +158,32 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     }
     const loadContext = context ?? lastContext ?? ({} as ResourceLoadContext<TServices>)
 
-    try {
-      const result = await Promise.resolve(
-        (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(
-          loadContext
+    const promise = (async (): Promise<void> => {
+      try {
+        const result = await Promise.resolve(
+          (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(
+            loadContext
+          )
         )
-      )
-      currentValue = result
-      currentStatus = "ready"
-      currentStale = false
-      notify()
-      staleNotify()
-    } catch (e: unknown) {
-      currentError = e
-      currentStatus = "failed"
-      currentStale = false
-      notify()
-      staleNotify()
-    }
+        currentValue = result
+        currentStatus = "ready"
+        currentStale = false
+        notify()
+        staleNotify()
+        _startStaleTimer()
+      } catch (e: unknown) {
+        currentError = e
+        currentStatus = "failed"
+        currentStale = false
+        notify()
+        staleNotify()
+      } finally {
+        _inFlightPromise = null
+      }
+    })()
+
+    _inFlightPromise = promise
+    return promise
   }
 
   function invalidate(): void {
@@ -147,6 +191,11 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
       currentStale = true
       staleNotify()
     }
+  }
+
+  function dispose(): void {
+    _clearStaleTimer()
+    _inFlightPromise = null
   }
 
   const node: ResourceNode<TValue, TServices> = {
@@ -180,6 +229,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     subscribe(fn: () => void) {
       return statusSignal.subscribe(fn)
     },
+    dispose,
   }
 
   return node

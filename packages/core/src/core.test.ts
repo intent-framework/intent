@@ -3214,3 +3214,188 @@ describe("resource loader context", () => {
     })
   })
 })
+
+describe("resource cache semantics", () => {
+  describe("staleTime", () => {
+    it("resource without cache keeps current manual-stale behavior", () => {
+      const resource = createResourceNode("team", "team", async () => "data")
+      expect(resource.stale.current).toBe(false)
+      resource.invalidate()
+      expect(resource.stale.current).toBe(true)
+      // No stale timer should have been started
+    })
+
+    it("marks resource stale after staleTime elapses", async () => {
+      const resource = createResourceNode("team", "team", async () => "data", true, { staleTime: 10 })
+      expect(resource.stale.current).toBe(false)
+      await resource.load()
+      expect(resource.stale.current).toBe(false)
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(resource.stale.current).toBe(true)
+    })
+
+    it("leaves status ready and value available when stale", async () => {
+      const resource = createResourceNode("team", "team", async () => "hello", true, { staleTime: 10 })
+      await resource.load()
+      expect(resource.status).toBe("ready")
+      expect(resource.value).toBe("hello")
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(resource.stale.current).toBe(true)
+      expect(resource.status).toBe("ready")
+      expect(resource.value).toBe("hello")
+    })
+
+    it("notifies stale subscribers when staleTime fires", async () => {
+      const resource = createResourceNode("team", "team", async () => "data", true, { staleTime: 10 })
+      await resource.load()
+      const values: boolean[] = []
+      const unsub = resource.stale.subscribe(() => {
+        values.push(resource.stale.current)
+      })
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(values).toContain(true)
+      unsub()
+    })
+
+    it("reload clears stale and restarts stale timer", async () => {
+      const resource = createResourceNode("team", "team", async () => "data", true, { staleTime: 10 })
+      await resource.load()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(resource.stale.current).toBe(true)
+      await resource.reload()
+      expect(resource.stale.current).toBe(false)
+      // Should not be stale right after reload
+      await new Promise(resolve => setTimeout(resolve, 5))
+      expect(resource.stale.current).toBe(false)
+    })
+
+    it("invalidate marks stale immediately even before staleTime", async () => {
+      const resource = createResourceNode("team", "team", async () => "data", true, { staleTime: 10_000 })
+      await resource.load()
+      expect(resource.stale.current).toBe(false)
+      resource.invalidate()
+      expect(resource.stale.current).toBe(true)
+    })
+
+    it("failed load does not start stale timer", async () => {
+      const resource = createResourceNode("team", "team", async () => { throw new Error("fail") }, true, { staleTime: 10 })
+      await resource.load()
+      expect(resource.status).toBe("failed")
+      await new Promise(resolve => setTimeout(resolve, 20))
+      // failed resources should not become stale
+      expect(resource.stale.current).toBe(false)
+    })
+
+    it("dispose clears stale timer and prevents later notifications", async () => {
+      let notified = false
+      const resource = createResourceNode("team", "team", async () => "data", true, { staleTime: 10 })
+      await resource.load()
+      const unsub = resource.stale.subscribe(() => { notified = true })
+      resource.dispose()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      expect(notified).toBe(false)
+      unsub()
+    })
+  })
+
+  describe("deduplicate", () => {
+    it("deduplicate true shares concurrent load promises", async () => {
+      let resolveLoad!: (value: string) => void
+      const loadPromise = new Promise<string>(resolve => { resolveLoad = resolve })
+      let callCount = 0
+
+      const resource = createResourceNode("team", "team", async () => {
+        callCount++
+        return loadPromise
+      }, true, { deduplicate: true })
+
+      const load1 = resource.load()
+      const load2 = resource.load()
+      const load3 = resource.load()
+
+      resolveLoad("result")
+      await Promise.all([load1, load2, load3])
+
+      expect(callCount).toBe(1)
+    })
+
+    it("deduplicate true invokes loader only once for concurrent load/reload calls", async () => {
+      let resolveLoad!: (value: string) => void
+      const loadPromise = new Promise<string>(resolve => { resolveLoad = resolve })
+      let callCount = 0
+
+      const resource = createResourceNode("team", "team", async () => {
+        callCount++
+        return loadPromise
+      }, true, { deduplicate: true })
+
+      // Concurrent load + reload should share the same in-flight promise
+      const p1 = resource.load()
+      const p2 = resource.reload()
+      resolveLoad("result")
+      await Promise.all([p1, p2])
+
+      expect(callCount).toBe(1)
+    })
+
+    it("deduplicate false preserves independent concurrent loader calls", async () => {
+      let callCount = 0
+      let resolveLoad!: (value: string) => void
+      const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+
+      const resource = createResourceNode("team", "team", async () => {
+        callCount++
+        return deferred
+      }, true, { deduplicate: false })
+
+      const load1 = resource.load()
+      const load2 = resource.load()
+
+      resolveLoad("data")
+      await Promise.all([load1, load2])
+
+      expect(callCount).toBe(2)
+    })
+
+    it("failed deduplicated load marks failed status and clears in-flight promise", async () => {
+      let callCount = 0
+
+      const resource = createResourceNode("team", "team", async () => {
+        callCount++
+        throw new Error("fail")
+      }, true, { deduplicate: true })
+
+      const load1 = resource.load()
+      const load2 = resource.load()
+
+      await load1
+      await load2
+
+      expect(callCount).toBe(1)
+      expect(resource.status).toBe("failed")
+      expect(resource.error).toBeInstanceOf(Error)
+      expect((resource.error as Error).message).toBe("fail")
+    })
+
+    it("a later load after a deduped failure can retry normally", async () => {
+      let callCount = 0
+
+      const resource = createResourceNode("team", "team", async () => {
+        callCount++
+        if (callCount === 1) throw new Error("fail")
+        return "success"
+      }, true, { deduplicate: true })
+
+      // First load fails
+      await resource.load()
+      expect(resource.status).toBe("failed")
+      expect(callCount).toBe(1)
+
+      // Second load retries and succeeds (in-flight promise was cleared)
+      await resource.load()
+      expect(resource.status).toBe("ready")
+      expect(resource.value).toBe("success")
+      expect(callCount).toBe(2)
+    })
+  })
+})

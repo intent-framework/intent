@@ -251,14 +251,65 @@ On failure, `error` contains the error message and `status` is `"failed"`.
 
 See the [Inspect Screen and Diagnostics Guide](Inspect-Screen.md) for more detail.
 
+## Cache options (Phase 1)
+
+Resources support optional `cache` configuration:
+
+```ts
+const team = $.resource("team", {
+  load: async () => loadTeam(),
+  cache: {
+    staleTime: 5_000,    // ms (optional, default: Infinity — no time-based stale)
+    deduplicate: true,   // boolean (optional, default: true when cache is set)
+  },
+})
+```
+
+### staleTime
+
+`cache.staleTime` is an optional number in milliseconds. After a successful `load()` or `reload()`, a timer starts. When it fires, the resource transitions to stale automatically:
+
+- `resource.stale` becomes `true`
+- `resource.status` remains `"ready"`
+- `resource.value` remains available
+- Subscribers to the `stale` condition are notified
+
+Behavior:
+
+- **Timer resets** on every successful `load()` or `reload()`.
+- **`invalidate()`** always marks stale immediately, regardless of `staleTime`.
+- **Failed loads** do not start a stale timer.
+- **`dispose()`** clears the stale timer and prevents late notifications.
+
+### deduplicate
+
+`cache.deduplicate` is an optional boolean. When `true`, concurrent `load()` and `reload()` calls while a load is already pending share the same in-flight promise:
+
+- Only one loader invocation runs.
+- All callers resolve or fail with the same result.
+- The in-flight promise is cleared when the load completes (success or failure).
+
+When `false`, each call runs independently (preserving existing behavior).
+
+When `cache` is not set at all, deduplication is disabled to preserve backward compatibility. When `cache` is set, `deduplicate` defaults to `true`.
+
+### Future cache options
+
+The following cache options remain as future work and are **not yet supported**:
+
+- **`cache.key`** — cache key function for parameterized resources
+- **`cacheTime`** — retention period for stale values before eviction
+- **`swr`** — stale-while-revalidate background refreshing
+- **Cross-navigation cache store** — persistent cache across screen navigations
+
 ## Current boundaries
 
 Resources are intentionally limited:
 
 - **No global cache.** Each runtime owns its resource nodes. There is no shared cache between runtimes.
 - **No cache keys.** Resource identity is by name within a screen. There is no key-based deduplication or caching.
-- **No staleTime.** Invalidation is manual or action-driven. There is no TTL-based staleness.
-- **No automatic background refetching.** Stale resources stay stale until explicitly reloaded.
+- **No `cacheTime`.** There is no time-based retention of stale values beyond `staleTime` transitions.
+- **No stale-while-revalidate (SWR).** Stale resources stay stale until explicitly reloaded.
 - **No Suspense integration.** Resources do not integrate with React Suspense or any other framework's loading boundaries.
 - **No server framework integration yet.** Resources live on screen definitions and runtimes. Server-side resource hydration is not implemented.
 - **No full concurrent multi-mount resource ref semantics.** A `ResourceRef` connects to one runtime at a time. The last runtime to start owns the ref.

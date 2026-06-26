@@ -1,10 +1,13 @@
 # Resource Cache and Stale Semantics — Design Proposal
 
-**Status:** Proposal  
+**Status:** Implemented (Phase 1: staleTime + deduplicate)  
 **Date:** 2026-06-26  
 **Author:** Big Pickle  
 **Affected package:** `@intent-framework/core`  
 **Related docs:** `docs/Resources.md`, `docs/Specification.md`
+
+> **Phase 1 implementation** (PR #119): `cache.staleTime` and `cache.deduplicate` are implemented in `@intent-framework/core@0.1.0-alpha.8`.  
+> Remaining features (cache.key, cacheTime, swr, cross-navigation cache) remain as proposal/future work.
 
 ---
 
@@ -572,3 +575,25 @@ No changeset is needed for this proposal — it is design-only.
 - `packages/core/src/resource.ts` — Current `ResourceNode`, `ResourceConfig`,
   `createResourceNode` implementation.
 - `docs/MVP-Checkpoint.md` — "Resource cache policy" listed as unproven.
+
+---
+
+## Implementation Status
+
+### Phase 1 (implemented in `@intent-framework/core@0.1.0-alpha.8`)
+
+- `cache.staleTime` — time-based automatic staleness
+- `cache.deduplicate` — in-flight load deduplication
+- Resources without `cache` options behave exactly as before
+
+### Future (not yet implemented)
+
+- `cache.key` — cache key function for parameterized resources
+- `cacheTime` — retention period for stale values before eviction
+- `swr` — stale-while-revalidate background refetching
+- Cross-navigation cache store (InMemoryResourceCache)
+- Dependency-tracked keys
+- Streaming resources
+- SSR hydration
+- Optimistic updates
+- Server resources
