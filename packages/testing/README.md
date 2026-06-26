@@ -66,6 +66,7 @@ Testing provides a runtime harness for Intent screens. It depends on `@intent-fr
 
 ## Learn more
 
+- [Testing Harness Guide](../../docs/Testing-Harness.md) — full API reference, resource testing, services injection
 - [Root README](../../README.md) — project overview and testing philosophy
 - [Quickstart](../../docs/Quickstart.md) — step-by-step guide with testing
 - [Canonical runnable example](../../examples/canonical-invite) — matches the Quickstart one-to-one
