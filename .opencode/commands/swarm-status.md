@@ -16,7 +16,7 @@ For each active PR related to swarm work, inspect and report:
 - PR number and title
 - Worker status (open, draft, ready for review)
 - CI status (passing, failing, in progress)
-- Files changed and their file families
+- Files changed and their file families (verify via `git diff` against base, not only the PR description)
 - Likely conflicts with other open PRs (same file family)
 - Blockers (failing CI, merge conflicts, pending review)
 
@@ -32,10 +32,11 @@ Finally, provide a **recommended merge order** based on:
 1. No overlapping file families (conflicting PRs must not merge simultaneously)
 2. Docs/tooling first (lowest risk)
 3. Runtime/API last (requires user review)
-4. Merge one PR at a time
+4. Merge one PR at a time, then re-check CI on main before proceeding
 
 ## Safety
 
 - Read-only. Do not edit, approve, merge, publish, or post any comments.
 - If a PR is risky (runtime/API/release), flag it and note that explicit user approval is required.
+- Stale PR bodies are not blockers; verify actual files via `git diff` instead.
 - Do not suggest expanding scope or creating new issues.
