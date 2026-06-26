@@ -76,13 +76,21 @@ function slugify(text: string): string {
     .replace(/[^a-z0-9-]/g, "")
 }
 
-function semanticNodeId(kind: string, id: string): string {
+function createSemanticIdFactory(kind: string) {
   const prefix = NODE_KINDS[kind] ?? kind
-  const internalPrefix = `${kind}_`
-  const slug = id.startsWith(internalPrefix)
-    ? id.slice(internalPrefix.length).replace(/_/g, "-")
-    : id
-  return `${prefix}:${slug}`
+  const used = new Map<string, number>()
+  let unnamed = 0
+
+  return (source: string): string => {
+    const slug = slugify(source)
+    const base = slug.length > 0 ? slug : String(++unnamed)
+    const count = used.get(base) ?? 0
+    used.set(base, count + 1)
+
+    return count === 0
+      ? `${prefix}:${base}`
+      : `${prefix}:${base}-${count + 1}`
+  }
 }
 
 function computeDiagnostics<TServices extends object = DefaultScreenServices>(
@@ -159,12 +167,18 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
 ): InspectedScreen {
   const diagnostics = computeDiagnostics(screenDef)
 
+  const askIds = createSemanticIdFactory("ask")
+  const actIds = createSemanticIdFactory("act")
+  const flowIds = createSemanticIdFactory("flow")
+  const surfaceIds = createSemanticIdFactory("surface")
+  const resourceIds = createSemanticIdFactory("resource")
+
   const idToSemantic = new Map<string, string>()
   for (const a of screenDef.asks) {
-    idToSemantic.set(a.id, semanticNodeId("ask", a.id))
+    idToSemantic.set(a.id, askIds(a.label))
   }
   for (const a of screenDef.acts) {
-    idToSemantic.set(a.id, semanticNodeId("act", a.id))
+    idToSemantic.set(a.id, actIds(a.label))
   }
 
   const augmentedDiagnostics: GraphDiagnostic[] = diagnostics.map(d => ({
@@ -177,7 +191,7 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     semanticId: `screen:${slugify(screenDef.name)}`,
     asks: screenDef.asks.map(a => ({
       id: a.id,
-      semanticId: semanticNodeId("ask", a.id),
+      semanticId: idToSemantic.get(a.id)!,
       label: a.label,
       kind: a.kind,
       required: a.required,
@@ -187,7 +201,7 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     })),
     acts: screenDef.acts.map(a => ({
       id: a.id,
-      semanticId: semanticNodeId("act", a.id),
+      semanticId: idToSemantic.get(a.id)!,
       label: a.label,
       primary: a.primary,
       enabled: a.enabled.current,
@@ -198,19 +212,19 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     })),
     flows: screenDef.flows.map(f => ({
       id: f.id,
-      semanticId: semanticNodeId("flow", f.id),
+      semanticId: flowIds(f.name),
       name: f.name,
       stepCount: f.steps.length,
     })),
     surfaces: screenDef.surfaces.map(s => ({
       id: s.id,
-      semanticId: semanticNodeId("surface", s.id),
+      semanticId: surfaceIds(s.name),
       name: s.name,
       itemCount: s.items.length,
     })),
     resources: (runtimeResources ?? []).map(r => ({
       id: r.id,
-      semanticId: semanticNodeId("resource", r.id),
+      semanticId: resourceIds(r.name),
       name: r.name,
       status: r.status,
       hasValue: r.value !== undefined,
