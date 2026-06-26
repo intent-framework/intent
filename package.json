@@ -11,7 +11,8 @@
     "release:alpha": "pnpm build && pnpm pack:check && changeset publish",
     "pack:check": "pnpm -r --filter @intent-framework/core --filter @intent-framework/dom --filter @intent-framework/router --filter @intent-framework/testing exec npm pack --dry-run",
     "dev:web-basic": "pnpm --dir examples/web-basic dev",
-    "dev:canonical": "pnpm --dir examples/canonical-invite dev"
+    "dev:canonical": "pnpm --dir examples/canonical-invite dev",
+    "dev:choice-form": "pnpm --dir examples/choice-form dev"
   },
   "engines": {
     "node": ">=18"
