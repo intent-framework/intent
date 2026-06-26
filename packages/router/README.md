@@ -5,11 +5,11 @@ Typed route definitions and navigation for Intent.
 ## Install
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.1 @intent-framework/router@0.1.0-alpha.1
+pnpm add @intent-framework/core @intent-framework/router
 ```
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.1 @intent-framework/router@0.1.0-alpha.1
+npm install @intent-framework/core @intent-framework/router
 ```
 
 ## What it provides
@@ -56,4 +56,4 @@ Router provides typed route definitions and navigation for Intent screens. Use `
 
 ## Status
 
-Experimental alpha. Version `0.1.0-alpha.1`. APIs may change. Not recommended for production use.
+Experimental alpha. APIs may change. Not recommended for production use.
