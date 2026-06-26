@@ -2,15 +2,17 @@
 
 ## Status
 
-Intent is in early experimental development. No packages have been published to npm. No GitHub Releases have been created.
+Intent's first public alpha has been published.
 
-The repository has five workspace packages under `packages/*`. The four publishable packages are at version `0.1.0-alpha.0`. The private server package remains at `0.1.0`. All use `workspace:*` dependency references. The codebase is functional and validated by CI. Changesets is installed and configured. Release workflows exist for automated version PRs and manual alpha publishing.
+GitHub Release: [v0.1.0-alpha.0](https://github.com/intent-framework/intent/releases/tag/v0.1.0-alpha.0)
 
-Four packages are intended for first-alpha publishing. `packages/server` is a private workspace package for now.
+Four packages are published to npm under the `@intent-framework/*` scope. The server package `@intent-framework/server` remains private and unpublished.
 
-## Intended publishable packages
+Changesets is installed and configured. Release workflows exist for automated version PRs and manual alpha publishing.
 
-The first alpha will publish four packages:
+## Published packages
+
+The following packages are published to npm:
 
 | Package | npm name | Purpose |
 |---|---|---|
@@ -243,48 +245,36 @@ Do not manually create GitHub Releases.
 - [x] Release workflows added:
   - Version Packages PR workflow (push-to-main)
   - Manual Publish Alpha workflow (manual dispatch only)
-- [ ] NPM_TOKEN secret added to GitHub repository secrets
-- [ ] Publish first alpha via manual Publish Alpha workflow
-- [ ] Optionally create a GitHub Release manually after npm publish
+- [x] NPM_TOKEN secret added to GitHub repository secrets
+- [x] Publish first alpha via manual Publish Alpha workflow
+- [x] GitHub Release v0.1.0-alpha.0 created
 
-## Current blockers
+## Post-release verification
 
-- repository fields: present
-- GitHub repository home: `intent-framework/intent`
-- Changesets: installed and configured
-- Release workflows: version-packages.yml (automated version PRs) and publish-alpha.yml (manual publish) are added
-- Remaining first-alpha blocker: add `NPM_TOKEN` secret, then manually run Publish Alpha
+Published packages:
 
-## Future server-package decisions
+- `@intent-framework/core@0.1.0-alpha.0`
+- `@intent-framework/dom@0.1.0-alpha.0`
+- `@intent-framework/router@0.1.0-alpha.0`
+- `@intent-framework/testing@0.1.0-alpha.0`
 
-- Server maturity is no longer a first-alpha publishing blocker because server is private
-- When the server API matures, the package can be made public and published as a separate decision
+Verified:
 
-## Do not do yet
+- npm install smoke test passed
+- `alpha` dist-tag points to `0.1.0-alpha.0`
+- `latest` dist-tag currently points to `0.1.0-alpha.0` because this is the only published version
 
-- Do not publish any package to npm until the manual Publish Alpha workflow is triggered.
-- Do not create a GitHub Release yet. The current manual Publish Alpha workflow publishes npm packages only. GitHub Releases are not automated yet.
-- Do not change runtime or public APIs.
-- Do not add new dependencies unless required for a specific task.
+When stable releases exist, `latest` should point to stable releases and `alpha` should point to prereleases.
 
-## Required secret: NPM_TOKEN
+## Server package
 
-Before running the Publish Alpha workflow, a GitHub Actions secret must be added:
+`@intent-framework/server` remains a private workspace package until the server API matures. When the server API matures, the package can be made public and published as a separate decision.
 
-| Secret | Purpose |
-|---|---|
-| `NPM_TOKEN` | npm access token with publish permission for `@intent-framework/*` packages |
+## NPM_TOKEN
 
-The token must:
-- Have **publish** permission for the `@intent-framework` npm organization
-- Be stored as a GitHub Actions secret (not in the repository)
-- Be configured in the `npm` GitHub environment used by the Publish Alpha workflow
+`NPM_TOKEN` is required for manual publishing. Prefer environment-scoped GitHub secret under the `npm` environment. Use least privilege.
 
-Do not commit the token value to the repository.
-
-### Future improvement: trusted publishing
-
-Migrate npm publishing to trusted publishing / OIDC once the initial package publishing flow is stable.
+Future improvement: migrate npm publishing to trusted publishing / OIDC once the initial package publishing flow is stable.
 
 ## Pack check command
 

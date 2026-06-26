@@ -34,6 +34,36 @@ The current repository proves the core shape:
 
 It is not production-ready yet. The goal right now is to keep the foundation small, inspectable, and hard to fake.
 
+## Install
+
+Intent is available as experimental alpha packages on npm:
+
+```sh
+pnpm add @intent-framework/core@alpha @intent-framework/dom@alpha @intent-framework/router@alpha @intent-framework/testing@alpha
+```
+
+```sh
+npm install @intent-framework/core@alpha @intent-framework/dom@alpha @intent-framework/router@alpha @intent-framework/testing@alpha
+```
+
+```txt
+First public alpha: v0.1.0-alpha.0
+GitHub Release: https://github.com/intent-framework/intent/releases/tag/v0.1.0-alpha.0
+```
+
+Published packages:
+
+| Package | npm |
+|---------|-----|
+| `@intent-framework/core` | Platformless semantic graph and runtime |
+| `@intent-framework/dom` | DOM materializer for screens and router |
+| `@intent-framework/router` | Typed route definitions and navigation |
+| `@intent-framework/testing` | Semantic test harness |
+
+`@intent-framework/server` remains private and unpublished.
+
+This is experimental alpha software. APIs are subject to change. Not recommended for production use.
+
 ## Why Intent exists
 
 Modern app code often scatters product meaning across UI components, route files, data hooks, form handlers, test selectors, and backend endpoints.
