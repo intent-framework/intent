@@ -1598,4 +1598,180 @@ describe("DOM renderer", () => {
       expect(headingsAfter[0]!.textContent).toBe("MyScreen")
     })
   })
+
+  describe("control rendering for boolean and choice asks", () => {
+    it("boolean-backed ask renders as checkbox input", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("BoolCheckbox", $ => {
+        const accepted = $.state.boolean("acceptedTerms")
+        const termsAsk = $.ask("Accept terms", accepted)
+        $.surface("main").contains(termsAsk)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const checkbox = root.querySelector("input[type=checkbox]")
+      expect(checkbox).not.toBeNull()
+      expect(checkbox!.id).toBe("ask_accept_terms")
+      expect((checkbox as HTMLInputElement).checked).toBe(false)
+    })
+
+    it("checkbox change updates boolean state", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("BoolCheckboxUpdate", $ => {
+        const accepted = $.state.boolean("acceptedTerms")
+        const termsAsk = $.ask("Accept terms", accepted)
+        $.surface("main").contains(termsAsk)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const checkbox = root.querySelector("input[type=checkbox]") as HTMLInputElement
+      expect(checkbox.checked).toBe(false)
+
+      checkbox.checked = true
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }))
+
+      const state = Screen.asks[0]!.state as unknown as { value: boolean }
+      expect(state.value).toBe(true)
+
+      checkbox.checked = false
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(state.value).toBe(false)
+    })
+
+    it("choice ask renders as select element with options", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("ChoiceSelect", $ => {
+        const role = $.state.choice("role", {
+          initial: "member",
+          options: ["admin", "member", "viewer"] as const,
+        })
+        const roleAsk = $.ask("Role", role).asChoice()
+        $.surface("main").contains(roleAsk)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const select = root.querySelector("select")
+      expect(select).not.toBeNull()
+      expect(select!.id).toBe("ask_role")
+
+      const options = select!.querySelectorAll("option")
+      expect(options).toHaveLength(3)
+      expect(options[0]!.value).toBe("admin")
+      expect(options[1]!.value).toBe("member")
+      expect(options[2]!.value).toBe("viewer")
+      expect(select!.value).toBe("member")
+    })
+
+    it("select change updates choice state", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("ChoiceSelectUpdate", $ => {
+        const role = $.state.choice("role", {
+          initial: "member",
+          options: ["admin", "member", "viewer"] as const,
+        })
+        const roleAsk = $.ask("Role", role).asChoice()
+        $.surface("main").contains(roleAsk)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const select = root.querySelector("select") as HTMLSelectElement
+      select.value = "admin"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+
+      const state = Screen.asks[0]!.state as unknown as { value: string }
+      expect(state.value).toBe("admin")
+
+      select.value = "viewer"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(state.value).toBe("viewer")
+    })
+
+    it("contact/secret/text inputs retain existing behavior", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("ExistingBehavior", $ => {
+        const email = $.state.text("email")
+        const password = $.state.text("password")
+        const name = $.state.text("name")
+        const emailAsk = $.ask("Email", email).asContact("email").required()
+        const passwordAsk = $.ask("Password", password).asSecret().required()
+        const nameAsk = $.ask("Name", name).required()
+        $.surface("main").contains(emailAsk, passwordAsk, nameAsk)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const inputs = root.querySelectorAll("input")
+      expect(inputs).toHaveLength(3)
+      expect(inputs[0]!.getAttribute("type")).toBe("email")
+      expect(inputs[1]!.getAttribute("type")).toBe("password")
+      expect(inputs[2]!.getAttribute("type")).toBe("text")
+    })
+
+    it("blocked reason has intent-blocked-reason class and role alert", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("BlockedReasonAccessible", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).required()
+        const login = $.act("Log in").primary().when(emailAsk.valid, "Enter your email.")
+        $.surface("main").contains(emailAsk, login)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const reasonEl = document.querySelector(".intent-blocked-reason")
+      expect(reasonEl).not.toBeNull()
+      expect(reasonEl!.getAttribute("role")).toBe("alert")
+      expect(reasonEl!.textContent).toBe("Enter your email.")
+    })
+
+    it("button enables after filling text fields and checking checkbox", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("ButtonEnablesCheckbox", $ => {
+        const name = $.state.text("name")
+        const accepted = $.state.boolean("acceptedTerms")
+        const nameAsk = $.ask("Name", name).required()
+        const termsAsk = $.ask("Accept terms", accepted)
+          .validate(v => v === true ? true : "Accept the terms to continue")
+        const submit = $.act("Submit").primary()
+          .when(nameAsk.valid, "Enter your name")
+          .when(termsAsk.valid, "Accept the terms to continue")
+        $.surface("main").contains(nameAsk, termsAsk, submit)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const button = root.querySelector("button") as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+
+      // Fill in text field — still blocked because checkbox not checked
+      const nameInput = root.querySelector("input[type=text]") as HTMLInputElement
+      nameInput.value = "Ada"
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }))
+      expect(button.disabled).toBe(true)
+
+      // Check the checkbox — now enabled
+      const checkbox = root.querySelector("input[type=checkbox]") as HTMLInputElement
+      checkbox.checked = true
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }))
+      expect(button.disabled).toBe(false)
+    })
+  })
 })
