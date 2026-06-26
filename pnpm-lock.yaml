@@ -93,10 +93,10 @@ importers:
   packages/dom:
     dependencies:
       '@intent-framework/core':
-        specifier: workspace:^0.1.0-alpha.5
+        specifier: workspace:^0.1.0-alpha.6
         version: link:../core
       '@intent-framework/router':
-        specifier: workspace:^0.1.0-alpha.5
+        specifier: workspace:^0.1.0-alpha.6
         version: link:../router
     devDependencies:
       jsdom:
@@ -115,7 +115,7 @@ importers:
   packages/router:
     dependencies:
       '@intent-framework/core':
-        specifier: workspace:^0.1.0-alpha.5
+        specifier: workspace:^0.1.0-alpha.6
         version: link:../core
     devDependencies:
       tsdown:
@@ -147,7 +147,7 @@ importers:
   packages/testing:
     dependencies:
       '@intent-framework/core':
-        specifier: workspace:^0.1.0-alpha.5
+        specifier: workspace:^0.1.0-alpha.6
         version: link:../core
     devDependencies:
       tsdown:
