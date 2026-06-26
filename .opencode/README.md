@@ -46,3 +46,57 @@ All commands use the `opencode/big-pickle` model.
 
 All custom tools are read-only except `validation`, which runs local build/check commands.
 No tool deletes, resets, force-pushes, publishes, or reads secrets.
+
+## GitHub workflow
+
+OpenCode can also be triggered from GitHub issues and pull requests via the
+`.github/workflows/opencode.yml` workflow.
+
+### How to trigger
+
+Comment on any issue, PR, or specific code line with:
+
+```
+/oc <your instruction>
+/opencode <your instruction>
+```
+
+The workflow triggers on `issue_comment` and `pull_request_review_comment` events
+when the comment body contains `/oc` or `/opencode`.
+
+### Examples
+
+| Context | Comment |
+|---------|---------|
+| Issue | `/oc fix this issue` |
+| PR thread | `/oc update this PR with the requested change` |
+| Inline review comment | `/oc apply this suggestion` |
+| Issue | `/oc implement the change described here` |
+| PR | `/oc review this PR` |
+
+### Workflow location
+
+`.github/workflows/opencode.yml`
+
+### Model
+
+`opencode/big-pickle`
+
+### Setup
+
+The workflow uses the built-in `GITHUB_TOKEN` (no GitHub App installation
+required). The token is granted these permissions in the workflow:
+
+- `id-token: write`
+- `contents: write`
+- `pull-requests: write`
+- `issues: write`
+
+No additional secrets are required unless the model provider needs an API key.
+For `opencode/big-pickle`, the OpenCode GitHub Action handles authentication
+internally.
+
+### Merge behavior
+
+The workflow does not merge automatically. It opens or updates PRs and reports
+results. Merge decisions follow the existing `.opencode` merge rules (see above).
