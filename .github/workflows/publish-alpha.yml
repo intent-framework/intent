@@ -66,3 +66,45 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Set alpha dist-tags
+        run: |
+          for dir in packages/core packages/dom packages/router packages/testing; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            npm dist-tag add "$name@$version" alpha
+            echo "Set $name alpha → $version"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push git tags
+        run: git push --tags
+
+      - name: Verify alpha dist-tags
+        run: |
+          for dir in packages/core packages/dom packages/router packages/testing; do
+            name=$(node -p "require('./$dir/package.json').name")
+            expected=$(node -p "require('./$dir/package.json').version")
+            actual=$(npm view "$name" dist-tags.alpha)
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::alpha dist-tag for $name is $actual, expected $expected"
+              exit 1
+            fi
+            echo "✅ $name alpha dist-tag: $actual"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify git tags on remote
+        run: |
+          for dir in packages/core packages/dom packages/router packages/testing; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            tag="$name@$version"
+            if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" 2>&1; then
+              echo "::error::git tag $tag not found on remote"
+              exit 1
+            fi
+            echo "✅ git tag $tag found on remote"
+          done

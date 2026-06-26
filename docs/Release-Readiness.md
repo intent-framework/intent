@@ -203,6 +203,15 @@ A [publish-alpha.yml](../.github/workflows/publish-alpha.yml) workflow exists fo
 - **npm auth**: configured at runtime via `NODE_AUTH_TOKEN`; no committed `.npmrc` file
 - Both workflows explicitly pin pnpm 10 via `pnpm/action-setup@v6` with `version: 10`
 
+**Post-publish steps** (run after `changeset publish`):
+
+1. **Set alpha dist-tags** — Reads package name and version from each `packages/*/package.json` (core, dom, router, testing) and runs `npm dist-tag add` with the `alpha` tag. This is required because `changeset publish` in prerelease mode publishes uncategorized prereleases to `latest` (not `alpha`) for packages that have never had a regular release.
+2. **Push git tags** — Runs `git push --tags`. Changeset creates local git tags during publish (format: `@intent-framework/pkg@version`) but does not reliably push them to remote.
+3. **Verify alpha dist-tags** — Checks every public package's `alpha` dist-tag matches its `package.json` version. Fails the workflow on mismatch.
+4. **Verify git tags on remote** — Checks every package tag exists on `origin` via `git ls-remote --exit-code`. Fails the workflow if any tag is missing.
+
+All post-publish steps use the `NPM_TOKEN` / `NODE_AUTH_TOKEN` from the `npm` environment. The server package `@intent-framework/server` is excluded from all steps.
+
 ### Publish cadence
 
 - Currently publishing **alpha releases** (`0.1.0-alpha.0` through `0.1.0-alpha.2` so far)
@@ -223,8 +232,10 @@ Key rules:
   - Version Packages PRs must not bump packages to stable versions.
   - Stable versions are only allowed after intentionally exiting prerelease mode via `pnpm changeset pre exit`.
   - The GitHub Actions PR creation setting (`GITHUB_TOKEN` permissions for creating and approving PRs) may need manual enabling after alpha versioning is fixed.
-  - While in prerelease mode, the `alpha` npm dist-tag is controlled by `.changeset/pre.json` (the `"tag": "alpha"` field), not by the `release:alpha` command line.
   - `release:alpha` must NOT pass `--tag alpha` to `changeset publish` because changeset rejects explicit `--tag` in prerelease mode.
+  - The `alpha` npm dist-tag is NOT set by `changeset publish`. Changeset publishes uncategorized prereleases to `latest` when a package has never had a regular release. The `alpha` dist-tag is set by an explicit post-publish step in the `publish-alpha.yml` workflow.
+  - Git tags created by `changeset publish` are pushed to remote by an explicit `git push --tags` step in the workflow.
+  - Both dist-tag and git tag operations are verified by the workflow and will fail the run if they are missing or stale.
 
 ### Validation gates
 
@@ -268,16 +279,17 @@ Do not manually create GitHub Releases.
 
 Published packages (latest alpha):
 
-- `@intent-framework/core@0.1.0-alpha.1`
-- `@intent-framework/dom@0.1.0-alpha.2`
-- `@intent-framework/router@0.1.0-alpha.1`
-- `@intent-framework/testing@0.1.0-alpha.1`
+- `@intent-framework/core@0.1.0-alpha.2`
+- `@intent-framework/dom@0.1.0-alpha.3`
+- `@intent-framework/router@0.1.0-alpha.2`
+- `@intent-framework/testing@0.1.0-alpha.2`
 
 Verified:
 
 - npm install smoke test passed for alpha.0, alpha.1, alpha.2
-- `alpha` dist-tag points to the latest published alpha version
-- `latest` dist-tag points to the latest alpha because no stable releases exist yet
+- `alpha` dist-tag points to the latest published alpha version (set by workflow post-publish step)
+- `latest` dist-tag points to the latest alpha (changeset behavior — publishes to `latest` when no regular release exists)
+- Git tags (`@intent-framework/pkg@version`) are present on remote (pushed by workflow post-publish step)
 
 When stable releases exist, `latest` should point to stable releases and `alpha` should point to prereleases.
 
