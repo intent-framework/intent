@@ -201,7 +201,7 @@ A [publish-alpha.yml](../.github/workflows/publish-alpha.yml) workflow exists fo
 - **Trigger**: manual only (`workflow_dispatch`)
 - **Environment**: requires the `npm` GitHub environment
 - **Pre-publish validation**: test, typecheck, build, lint, pack:check
-- **Publish command**: `pnpm release:alpha` (builds, runs pack check, then `changeset publish --tag alpha`)
+- **Publish command**: `pnpm release:alpha` (builds, runs pack check, then `changeset publish`)
 - **npm auth**: configured at runtime via `NODE_AUTH_TOKEN`; no committed `.npmrc` file
 - Both workflows explicitly pin pnpm 10 via `pnpm/action-setup@v6` with `version: 10`
 
@@ -225,6 +225,7 @@ Key rules:
   - Version Packages PRs must not bump packages to stable versions.
   - Stable versions are only allowed after intentionally exiting prerelease mode via `pnpm changeset pre exit`.
   - The GitHub Actions PR creation setting (`GITHUB_TOKEN` permissions for creating and approving PRs) may need manual enabling after alpha versioning is fixed.
+  - While the repo is in Changesets alpha prerelease mode, `release:alpha` must run `changeset publish` without `--tag alpha`. The alpha dist-tag is derived from `.changeset/pre.json`.
 
 ### Validation gates
 
