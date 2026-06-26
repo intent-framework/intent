@@ -9,6 +9,14 @@ function getEnterHintId(askId: string): string {
   return `${askId}-enter-hint`
 }
 
+function slugify(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+}
+
 function sanitizeLabel(label: string): string {
   return label.replace(/\.+$/, "")
 }
@@ -30,6 +38,7 @@ export type DomRendererOptions<TServices extends object = DefaultScreenServices>
   target: HTMLElement
   services?: TServices
   showScreenName?: boolean
+  showSemanticIds?: boolean
 }
 
 export { renderRouter } from "./dom-router.js"
@@ -39,9 +48,9 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
   options: DomRendererOptions<TServices>
 ): () => void {
-  const { target, services, showScreenName } = options
+  const { target, services, showScreenName, showSemanticIds } = options
   target.innerHTML = ""
-  const root = buildDom(screenDef, showScreenName)
+  const root = buildDom(screenDef, showScreenName, showSemanticIds)
   target.appendChild(root)
 
   const runtime = createScreenRuntime<TServices>(screenDef, { services })
@@ -164,13 +173,18 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
 
 function buildDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
-  showScreenName?: boolean
+  showScreenName?: boolean,
+  showSemanticIds?: boolean
 ): HTMLElement {
   const surface = screenDef.surfaces[0]
   const main = document.createElement("main")
 
   if (surface) {
     main.id = surface.id
+  }
+
+  if (showSemanticIds) {
+    main.setAttribute("data-intent-screen", `screen:${slugify(screenDef.name)}`)
   }
 
   if (showScreenName) {
@@ -190,11 +204,17 @@ function buildDom<TServices extends object = DefaultScreenServices>(
     const label = document.createElement("label")
     label.textContent = ask.label
     label.htmlFor = ask.id
+    if (showSemanticIds) {
+      label.setAttribute("data-intent-ask", `ask:${slugify(ask.label)}`)
+    }
     container.appendChild(label)
 
     const input = createInputForAsk(ask)
     input.id = ask.id
     input.name = ask.id
+    if (showSemanticIds) {
+      input.setAttribute("data-intent-ask", `ask:${slugify(ask.label)}`)
+    }
 
     if (ask.required) {
       input.required = true
@@ -249,6 +269,9 @@ function buildDom<TServices extends object = DefaultScreenServices>(
     button.id = act.id
     button.type = "button"
     button.textContent = act.label
+    if (showSemanticIds) {
+      button.setAttribute("data-intent-action", `action:${slugify(act.label)}`)
+    }
 
     if (act.primary) {
       button.className = "primary"

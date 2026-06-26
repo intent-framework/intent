@@ -20,6 +20,7 @@ npm install @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alp
 - Reactive action enablement and blocked reasons
 - Enter key triggers the default action when unambiguous
 - Opt-in screen-name heading via `showScreenName`
+- Opt-in semantic data attributes via `showSemanticIds`
 
 ## Minimal example
 

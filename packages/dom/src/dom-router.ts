@@ -18,6 +18,7 @@ export type RenderRouterOptions<TServices extends object = DefaultScreenServices
   notFound?: ScreenDefinition<TServices> | ((pathname: string) => ScreenDefinition<TServices>)
   services?: Omit<TServices, "navigate" | "route">
   showScreenName?: boolean
+  showSemanticIds?: boolean
 }
 
 export function renderRouter<
@@ -27,7 +28,7 @@ export function renderRouter<
   router: Router<Routes, TServices>,
   options: RenderRouterOptions<TServices>,
 ): RouterDomHandle<Routes> {
-  const { showScreenName } = options
+  const { showScreenName, showSemanticIds } = options
   const win = options.window ?? window
   let currentCleanup: (() => void) | undefined
 
@@ -64,6 +65,7 @@ export function renderRouter<
         target: options.target,
         services: mergedServices,
         showScreenName,
+        showSemanticIds,
       })
       return
     }
@@ -76,6 +78,7 @@ export function renderRouter<
         target: options.target,
         services: mergedServices,
         showScreenName,
+        showSemanticIds,
       })
     } else {
       options.target.textContent = "Not found"

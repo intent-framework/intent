@@ -1488,4 +1488,126 @@ describe("DOM renderer", () => {
       expect(headingsAfter[0]!.textContent).toBe("MyScreen")
     })
   })
+
+  describe("showSemanticIds", () => {
+    it("does not add data-intent-* attributes by default", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMemberTest", $ => {
+        const email = $.state.text("email")
+        const ask = $.ask("Email", email).required()
+        const invite = $.act("Invite member").primary().when(ask.valid)
+        $.surface("main").contains(ask, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const main = root.querySelector("main")!
+      expect(main.hasAttribute("data-intent-screen")).toBe(false)
+
+      const label = root.querySelector("label")!
+      expect(label.hasAttribute("data-intent-ask")).toBe(false)
+
+      const input = root.querySelector("input")!
+      expect(input.hasAttribute("data-intent-ask")).toBe(false)
+
+      const button = root.querySelector("button")!
+      expect(button.hasAttribute("data-intent-action")).toBe(false)
+    })
+
+    it("does not add data-intent-* attributes when showSemanticIds is false", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMemberTest2", $ => {
+        const email = $.state.text("email")
+        const ask = $.ask("Email", email).required()
+        const invite = $.act("Invite member").primary().when(ask.valid)
+        $.surface("main").contains(ask, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: false })
+
+      expect(root.querySelector("main")!.hasAttribute("data-intent-screen")).toBe(false)
+      expect(root.querySelector("label")!.hasAttribute("data-intent-ask")).toBe(false)
+      expect(root.querySelector("input")!.hasAttribute("data-intent-ask")).toBe(false)
+      expect(root.querySelector("button")!.hasAttribute("data-intent-action")).toBe(false)
+    })
+
+    it("adds data-intent-* attributes when showSemanticIds is true", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMember", $ => {
+        const email = $.state.text("email")
+        const ask = $.ask("Email", email).required()
+        const invite = $.act("Invite member").primary().when(ask.valid)
+        $.surface("main").contains(ask, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const main = root.querySelector("main")!
+      expect(main.getAttribute("data-intent-screen")).toBe("screen:invite-member")
+
+      const label = root.querySelector("label")!
+      expect(label.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      const input = root.querySelector("input")!
+      expect(input.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      const button = root.querySelector("button")!
+      expect(button.getAttribute("data-intent-action")).toBe("action:invite-member")
+    })
+
+    it("works with showScreenName enabled simultaneously", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Team Details", $ => {
+        const email = $.state.text("email")
+        const ask = $.ask("Email", email).required()
+        const invite = $.act("Invite").primary().when(ask.valid)
+        $.surface("main").contains(ask, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showScreenName: true, showSemanticIds: true })
+
+      const heading = root.querySelector("h1")!
+      expect(heading).not.toBeNull()
+      expect(heading.textContent).toBe("Team Details")
+
+      const main = root.querySelector("main")!
+      expect(main.getAttribute("data-intent-screen")).toBe("screen:team-details")
+
+      const button = root.querySelector("button")!
+      expect(button.getAttribute("data-intent-action")).toBe("action:invite")
+    })
+
+    it("preserves accessibility when showSemanticIds is enabled", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("LoginAccessibility", $ => {
+        const email = $.state.text("email")
+        const ask = $.ask("Email", email).required()
+        const login = $.act("Log in").primary().when(ask.valid, "Email required.")
+        $.surface("main").contains(ask, login)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const label = root.querySelector("label")!
+      expect(label.getAttribute("for")).toBe("ask_email")
+
+      const input = root.querySelector("input")!
+      expect(input.required).toBe(true)
+
+      const button = root.querySelector("button")!
+      expect(button.disabled).toBe(true)
+      expect(button.getAttribute("aria-describedby")).toBe("act_log_in-reason")
+      expect(document.getElementById("act_log_in-reason")?.textContent).toBe("Email required.")
+    })
+  })
 })
