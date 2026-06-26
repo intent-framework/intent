@@ -7,7 +7,7 @@
     "typecheck": "tsc -p tsconfig.typecheck.json",
     "lint": "tsc -p tsconfig.typecheck.json",
     "changeset": "changeset",
-    "version:packages": "changeset version",
+    "version:packages": "changeset version && pnpm install --no-frozen-lockfile",
     "release:alpha": "pnpm build && pnpm pack:check && changeset publish",
     "pack:check": "pnpm -r --filter @intent-framework/core --filter @intent-framework/dom --filter @intent-framework/router --filter @intent-framework/testing exec npm pack --dry-run",
     "dev:web-basic": "pnpm --dir examples/web-basic dev",
