@@ -96,12 +96,24 @@ jobs:
           do
             name=$(echo "$spec" | cut -d' ' -f1)
             expected=$(echo "$spec" | cut -d' ' -f2)
-            actual=$(npm view "$name" dist-tags.alpha)
+            attempt=0
+            max_attempts=25
+            while [ $attempt -lt $max_attempts ]; do
+              attempt=$((attempt + 1))
+              actual=$(npm view "$name" dist-tags.alpha --prefer-online 2>/dev/null || npm view "$name" dist-tags.alpha)
+              if [ "$actual" = "$expected" ]; then
+                echo "✅ $name alpha dist-tag: $actual (attempt $attempt)"
+                break
+              fi
+              echo "Attempt $attempt: $name — expected $expected, got $actual"
+              if [ $attempt -lt $max_attempts ]; then
+                sleep $((RANDOM % 6 + 10))
+              fi
+            done
             if [ "$actual" != "$expected" ]; then
-              echo "::error::alpha dist-tag for $name is $actual, expected $expected"
+              echo "::error::alpha dist-tag for $name is $actual, expected $expected (after $max_attempts attempts)"
               exit 1
             fi
-            echo "✅ $name alpha dist-tag: $actual"
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
