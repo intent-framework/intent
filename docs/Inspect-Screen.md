@@ -183,6 +183,40 @@ $.flow("signup").startsWith(email)  // name is surfaced but not in any flow
 // Diagnostic: surfaced-node-not-in-any-flow for "Name"
 ```
 
+### `flow-step-not-surfaced`
+
+- **Severity**: `warning`
+- **What it means**: A flow step references an ask or action node that is not included in any surface. The interaction path is defined but one of its steps would render nothing visible, making the flow incomplete.
+- **Triggers when**: A flow's `.startsWith()` or `.then()` references a node that is not in any `.surface().contains()`.
+- **Why per-flow and not deduplicated**: Unlike `ask-not-in-surface` / `action-not-in-surface` (which fire once per unsurfaced node), this diagnostic fires once per (flow, step) pair. If the same unsurfaced node appears in multiple flows, each one is reported so the author knows which flows are broken.
+- **Fix**: Add the missing node to a surface, or remove it from the flow step.
+
+Example:
+
+```ts
+const email = $.ask("Email", emailState)
+$.surface("main").contains()        // email not surfaced
+$.flow("signup").startsWith(email)  // flow-step-not-surfaced for "Email" in flow "signup"
+```
+
+### `orphaned-flow`
+
+- **Severity**: `warning`
+- **What it means**: A flow exists with one or more steps, but none of its steps reference a node that appears in any surface. The flow defines an interaction path that is entirely disconnected from the rendered UI.
+- **Triggers when**: A flow has at least one step, and every step references an ask or action that is not in any surface.
+- **Does not trigger for**: Empty flows (zero-step flows are not diagnosed, as they may be placeholders for future steps).
+- **Relationship to `flow-step-not-surfaced`**: `orphaned-flow` is a flow-level signal — it fires once per affected flow. The individual unsurfaced steps also each fire `flow-step-not-surfaced`. A flow with all-unsurfaced steps will produce both diagnostics.
+- **Fix**: Surface at least one node referenced by a flow step, or add the flow's steps to a surface.
+
+Example:
+
+```ts
+const email = $.ask("Email", emailState)
+const name = $.ask("Name", nameState)
+$.surface("main").contains()              // no nodes surfaced
+$.flow("signup").startsWith(email).then(name)  // orphaned-flow for "signup"
+```
+
 ### Diagnostic output format
 
 Each diagnostic is a `GraphDiagnostic` object:
@@ -193,7 +227,8 @@ Each diagnostic is a `GraphDiagnostic` object:
   code: "secret-ask-not-private",
   message: "Secret ask should also be marked private.",
   nodeId: "ask_password",
-  semanticNodeId: "ask:password"
+  semanticNodeId: "ask:password",
+  flow?: FlowDiagnosticMeta
 }
 ```
 
@@ -202,6 +237,30 @@ Each diagnostic is a `GraphDiagnostic` object:
 - `message`: human-readable explanation.
 - `nodeId` (optional): the internal node ID of the affected node.
 - `semanticNodeId` (optional): the semantic ID of the affected node, when applicable.
+- `flow` (optional): a `FlowDiagnosticMeta` object present on flow-scoped diagnostics (`flow-step-not-surfaced`, `orphaned-flow`).
+
+### FlowDiagnosticMeta type
+
+```ts
+type FlowDiagnosticMeta = {
+  flowNodeId: string
+  flowSemanticNodeId?: string
+}
+```
+
+`FlowDiagnosticMeta` identifies the containing flow for a diagnostic:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `flowNodeId` | `string` | Internal node ID of the flow |
+| `flowSemanticNodeId` | `string` (optional) | Semantic ID of the flow, populated by `inspectScreen()` |
+
+Present on diagnostics where the issue is scoped to a specific flow:
+
+| Diagnostic | `nodeId` / `semanticNodeId` | `flow` / `flow.flowNodeId` |
+|------------|----------------------------|---------------------------|
+| `flow-step-not-surfaced` | The unsurfaced ask or action step | The containing flow |
+| `orphaned-flow` | Undefined (no single node is at fault) | The orphaned flow |
 
 ## Development workflow
 
