@@ -1,12 +1,12 @@
 # @intent-framework/router
 
-## 0.1.0-alpha.3
+## 0.1.0-alpha.4
 
 ### Patch Changes
 
 - 8150b8d: Fix npm package README: remove stale version pins from install commands and status sections.
 - Updated dependencies [8150b8d]
-  - @intent-framework/core@0.1.0-alpha.3
+  - @intent-framework/core@0.1.0-alpha.4
 
 ## 0.1.0-alpha.2
 

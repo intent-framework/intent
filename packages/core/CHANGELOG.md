@@ -1,6 +1,6 @@
 # @intent-framework/core
 
-## 0.1.0-alpha.3
+## 0.1.0-alpha.4
 
 ### Patch Changes
 
