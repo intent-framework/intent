@@ -39,17 +39,17 @@ It is not production-ready yet. The goal right now is to keep the foundation sma
 Intent is available as experimental alpha packages on npm:
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alpha.1 @intent-framework/router@0.1.0-alpha.1 @intent-framework/testing@0.1.0-alpha.1
+pnpm add @intent-framework/core@0.1.0-alpha.7 @intent-framework/dom@0.1.0-alpha.7 @intent-framework/router@0.1.0-alpha.7 @intent-framework/testing@0.1.0-alpha.7
 ```
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alpha.1 @intent-framework/router@0.1.0-alpha.1 @intent-framework/testing@0.1.0-alpha.1
+npm install @intent-framework/core@0.1.0-alpha.7 @intent-framework/dom@0.1.0-alpha.7 @intent-framework/router@0.1.0-alpha.7 @intent-framework/testing@0.1.0-alpha.7
 ```
 
 The quickstart pins the current alpha version so examples match the published APIs.
 
 ```txt
-Current alpha: v0.1.0-alpha.1
+Current alpha: v0.1.0-alpha.7
 First public alpha: v0.1.0-alpha.0
 GitHub Releases: https://github.com/intent-framework/intent/releases
 ```
@@ -246,9 +246,23 @@ For a guided walkthrough, see [Demo Guide](docs/Demo.md).
 
 For a deep dive into resource semantics — load, reload, invalidation, staleness, and runtime scoping — see the [Resources Guide](docs/Resources.md).
 
+## Examples
+
+The repository includes five runnable examples, each demonstrating a different set of Intent capabilities:
+
+| Example | What it demonstrates |
+|---------|---------------------|
+| [`canonical-invite`](examples/canonical-invite) | Minimal screen: text ask, primary action, validation, blocked reasons, feedback, `inspectScreen()`. Matches the Quickstart one-to-one. |
+| [`choice-form`](examples/choice-form) | All state kinds (text, choice, boolean) and ask kinds (`asChoice()`, `asSecret()`, `hint()`), multiple surfaces per screen, flow diagnostics, full test coverage. |
+| [`resource-lifecycle`](examples/resource-lifecycle) | Full resource lifecycle: autoLoad, manual load, reload, invalidation, stale detection, failed state, action-driven invalidation with `.invalidates()`. |
+| [`secret-vault`](examples/secret-vault) | Multi-step flows (3+ steps), `asSecret()` + `private()`, `BooleanState` toggles, multi-screen router app, flow diagnostics. |
+| [`web-basic`](examples/web-basic) | Multi-screen team invite demo with router, resources, diagnostics panel, feedback, and keyboard default action. |
+
+Each example includes tests. Run with `pnpm dev:<name>` (e.g. `pnpm dev:choice-form`) and test with `pnpm test` from the example directory.
+
 ## What the demo demonstrates
 
-The demo is intentionally small. It is a dagger, not a cathedral.
+The `web-basic` demo is intentionally small. It is a dagger, not a cathedral.
 
 It demonstrates:
 
@@ -294,6 +308,9 @@ Diagnostics currently catch graph-level issues such as:
 * Primary actions blocked without a human-readable reason
 * Asks not included in a surface
 * Actions not included in a surface
+* Surfaces including nodes that no flow references
+* Flow steps referencing nodes not in any surface
+* Flows whose steps are entirely disconnected from surfaces
 
 Diagnostics are not lint rules for HTML. They are semantic graph feedback.
 
@@ -355,6 +372,11 @@ Core rules:
 * Prefer semantic primitives over framework glue.
 
 ## Roadmap
+
+Completed:
+
+* ✦ Three focused examples: `choice-form`, `resource-lifecycle`, `secret-vault` — covering all state kinds, choice/secret asks, multi-surface screens, resource lifecycle (autoLoad, reload, invalidation, failed state), complex flows, secret+private, and flow diagnostics
+* ✦ DOM multi-surface rendering — each surface renders as a semantic `<section>` with surface-suffixed DOM ids, shared state, duplicate controls, and per-surface blocked reasons and feedback
 
 Near-term work:
 
