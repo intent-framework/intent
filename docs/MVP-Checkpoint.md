@@ -28,6 +28,7 @@ It now has:
 ## What is proven
 
 - An npm-first quickstart guides new developers through install, definition, rendering, testing, and graph inspection.
+- A canonical runnable example (`examples/canonical-invite`) matches the quickstart one-to-one.
 - Screens can be authored semantically.
 - DOM can materialize the graph without being the source of truth.
 - Actions can be independently executable.
@@ -133,9 +134,12 @@ Do not jump into these without a very specific narrow PR:
 - Full DevTools package
 - Backend framework
 
+## Proven
+
+- ✅ Canonical example app (`examples/canonical-invite`) — new developers can clone and run after the quickstart. See [Canonical Invite Example](../examples/canonical-invite).
+
 ## Recommended next moves
 
-1. Add a canonical example app that new developers can clone and run after the quickstart.
-2. Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.
-3. Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.
-4. Add one or two graph diagnostics that catch real authoring mistakes before adding any new package.
+1. Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.
+2. Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.
+3. Add one or two graph diagnostics that catch real authoring mistakes before adding any new package.

@@ -34,7 +34,7 @@ export const InviteMember = screen("InviteMember", $ => {
 
   const emailAsk = $.ask("Email", email)
     .required("Email is required")
-    .validate(value => value.includes("@"), "Enter a valid email")
+    .validate(value => value.includes("@") ? true : "Enter a valid email")
 
   const invite = $.act("Invite member")
     .primary()
@@ -218,4 +218,12 @@ Intent does not replace components for everything. It replaces components as the
 
 ---
 
-**Next steps:** See the [web demo](../examples/web-basic) for a full team invite flow with routing, resources, and diagnostics. Read the [Specification](Specification.md) for the architecture. Check the [MVP Checkpoint](MVP-Checkpoint.md) for current boundaries.
+**Next steps:**
+
+1. Run the [canonical example](../examples/canonical-invite) — it matches this Quickstart one-to-one:
+   ```sh
+   pnpm dev:canonical
+   ```
+2. See the [web demo](../examples/web-basic) for a full team invite flow with routing, resources, and diagnostics.
+3. Read the [Specification](Specification.md) for the architecture.
+4. Check the [MVP Checkpoint](MVP-Checkpoint.md) for current boundaries.
