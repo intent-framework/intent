@@ -1,5 +1,13 @@
 # @intent-framework/dom
 
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- ce52d3e: DOM rendering now uses proper controls for boolean and choice asks: boolean-backed asks render as checkboxes, choice asks render as select elements. Blocked reason elements now include an `intent-blocked-reason` class and `role="alert"` for accessible error feedback. Enter key default action is disabled for non-text inputs (checkbox, select).
+  - @intent-framework/core@0.1.0-alpha.6
+  - @intent-framework/router@0.1.0-alpha.6
+
 ## 0.1.0-alpha.5
 
 ### Patch Changes

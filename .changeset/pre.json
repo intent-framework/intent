@@ -8,7 +8,8 @@
     "@intent-framework/router": "0.1.0-alpha.0",
     "@intent-framework/server": "0.1.0",
     "@intent-framework/testing": "0.1.0-alpha.0",
-    "canonical-invite": "0.0.0"
+    "canonical-invite": "0.0.0",
+    "choice-form": "0.0.0"
   },
   "changesets": [
     "five-ducks-sleep",
@@ -18,6 +19,7 @@
     "shy-kids-grow",
     "silent-dragons-exist",
     "silent-goats-dance",
-    "slow-readers-create"
+    "slow-readers-create",
+    "sweet-bananas-fix"
   ]
 }
