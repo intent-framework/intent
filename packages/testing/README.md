@@ -5,11 +5,11 @@ Semantic test harness for Intent screens.
 ## Install
 
 ```sh
-pnpm add -D @intent-framework/testing@0.1.0-alpha.1
+pnpm add -D @intent-framework/testing
 ```
 
 ```sh
-npm install --save-dev @intent-framework/testing@0.1.0-alpha.1
+npm install --save-dev @intent-framework/testing
 ```
 
 ## What it provides
@@ -72,4 +72,4 @@ Testing provides a runtime harness for Intent screens. It depends on `@intent-fr
 
 ## Status
 
-Experimental alpha. Version `0.1.0-alpha.1`. APIs may change. Not recommended for production use.
+Experimental alpha. APIs may change. Not recommended for production use.

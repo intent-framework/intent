@@ -5,11 +5,11 @@ DOM materializer for Intent screens and router.
 ## Install
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alpha.1
+pnpm add @intent-framework/core @intent-framework/dom
 ```
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.1 @intent-framework/dom@0.1.0-alpha.1
+npm install @intent-framework/core @intent-framework/dom
 ```
 
 ## What it provides
@@ -62,4 +62,4 @@ DOM is a renderer for Intent screens. It depends on `@intent-framework/core` and
 
 ## Status
 
-Experimental alpha. Version `0.1.0-alpha.1`. APIs may change. Not recommended for production use.
+Experimental alpha. APIs may change. Not recommended for production use.

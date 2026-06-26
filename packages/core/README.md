@@ -5,11 +5,11 @@ Platformless semantic graph and runtime for Intent applications.
 ## Install
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.1
+pnpm add @intent-framework/core
 ```
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.1
+npm install @intent-framework/core
 ```
 
 ## What it provides
@@ -64,4 +64,4 @@ Core defines the product graph. It has no DOM, React, Node, or framework depende
 
 ## Status
 
-Experimental alpha. Version `0.1.0-alpha.1`. APIs may change. Not recommended for production use.
+Experimental alpha. APIs may change. Not recommended for production use.
