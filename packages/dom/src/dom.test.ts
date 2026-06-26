@@ -1384,6 +1384,116 @@ describe("DOM renderer", () => {
     })
   })
 
+  describe("showSemanticIds data attributes", () => {
+    it("does not add data-intent-* attributes by default", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMember", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).required()
+        const invite = $.act("Invite member")
+          .primary()
+          .when(emailAsk.valid)
+          .does(async () => {})
+        $.surface("main").contains(emailAsk, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      expect(root.querySelector("[data-intent-screen]")).toBeNull()
+      expect(root.querySelector("[data-intent-ask]")).toBeNull()
+      expect(root.querySelector("[data-intent-action]")).toBeNull()
+    })
+
+    it("adds data-intent attributes with correct semantic IDs when enabled", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMember", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).required()
+        const invite = $.act("Invite member")
+          .primary()
+          .when(emailAsk.valid)
+          .does(async () => {})
+        $.surface("main").contains(emailAsk, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const main = root.querySelector("main")!
+      expect(main.getAttribute("data-intent-screen")).toBe("screen:invite-member")
+
+      const label = root.querySelector("label")!
+      expect(label.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      const input = root.querySelector("input")!
+      expect(input.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      const button = root.querySelector("button")!
+      expect(button.getAttribute("data-intent-action")).toBe("action:invite-member")
+    })
+
+    it("adds data-intent attributes for multiple asks and actions", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("MultiIntentScreen", $ => {
+        const email = $.state.text("email")
+        const password = $.state.text("password")
+        const emailAsk = $.ask("Email", email).required()
+        const passwordAsk = $.ask("Password", password).required()
+        const login = $.act("Log in").primary().when(emailAsk.valid).when(passwordAsk.valid)
+        const reset = $.act("Reset").when(true).does(async () => {})
+        $.surface("main").contains(emailAsk, passwordAsk, login, reset)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const labels = root.querySelectorAll("label")
+      expect(labels[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+      expect(labels[1]!.getAttribute("data-intent-ask")).toBe("ask:password")
+
+      const inputs = root.querySelectorAll("input")
+      expect(inputs[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+      expect(inputs[1]!.getAttribute("data-intent-ask")).toBe("ask:password")
+
+      const buttons = root.querySelectorAll("button")
+      expect(buttons[0]!.getAttribute("data-intent-action")).toBe("action:log-in")
+      expect(buttons[1]!.getAttribute("data-intent-action")).toBe("action:reset")
+    })
+
+    it("default DOM output unchanged when showSemanticIds is omitted", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("DefaultCheck", $ => {
+        const text = $.state.text("name")
+        const ask = $.ask("Name", text).required()
+        $.act("Save").primary().when(ask.valid).does(async () => {})
+        $.surface("main").contains(ask)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      expect(root.querySelector("[data-intent-screen]")).toBeNull()
+      expect(root.querySelector("[data-intent-ask]")).toBeNull()
+      expect(root.querySelector("[data-intent-action]")).toBeNull()
+
+      const main = root.querySelector("main")
+      expect(main).not.toBeNull()
+      const form = root.querySelector("form")
+      expect(form).not.toBeNull()
+      const label = root.querySelector("label")
+      expect(label?.textContent).toBe("Name")
+      const input = root.querySelector("input")
+      expect(input).not.toBeNull()
+      const button = root.querySelector("button")
+      expect(button?.textContent).toBe("Save")
+    })
+  })
+
   describe("showScreenName heading", () => {
     it("does not render a screen name heading by default", () => {
       document.body.innerHTML = '<div id="root"></div>'
