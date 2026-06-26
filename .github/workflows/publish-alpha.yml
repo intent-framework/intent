@@ -79,7 +79,29 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push git tags
-        run: git push --tags
+        run: |
+          for dir in packages/core packages/dom packages/router packages/testing; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            tag="$name@$version"
+            remote_sha=$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')
+            if [ -n "$remote_sha" ]; then
+              local_sha=$(git rev-list -n 1 "$tag" 2>/dev/null || echo "")
+              if [ "$remote_sha" = "$local_sha" ]; then
+                echo "⏭️  git tag $tag already exists at $remote_sha on remote, skipping"
+              else
+                echo "::error::git tag $tag exists on remote at $remote_sha but local is $local_sha"
+                exit 1
+              fi
+            else
+              if ! git rev-parse "$tag" >/dev/null 2>&1; then
+                git tag "$tag"
+                echo "Created local tag $tag"
+              fi
+              git push origin "$tag"
+              echo "✅ git tag $tag pushed"
+            fi
+          done
 
       - name: Verify alpha dist-tags
         run: |
@@ -114,9 +136,22 @@ jobs:
             name=$(node -p "require('./$dir/package.json').name")
             version=$(node -p "require('./$dir/package.json').version")
             tag="$name@$version"
-            if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" 2>&1; then
-              echo "::error::git tag $tag not found on remote"
+            attempt=0
+            max_attempts=25
+            while [ $attempt -lt $max_attempts ]; do
+              attempt=$((attempt + 1))
+              if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+                remote_sha=$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')
+                echo "✅ $tag found on remote at $remote_sha (attempt $attempt)"
+                break
+              fi
+              echo "Attempt $attempt: $tag not yet found on remote"
+              if [ $attempt -lt $max_attempts ]; then
+                sleep $((RANDOM % 6 + 10))
+              fi
+            done
+            if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              echo "::error::git tag $tag not found on remote (after $max_attempts attempts)"
               exit 1
             fi
-            echo "✅ git tag $tag found on remote"
           done
