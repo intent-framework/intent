@@ -120,6 +120,18 @@ commits via a `Configure git author` step after checkout:
 tasks (implement, edit, create PRs) need this git identity to be set, otherwise
 OpenCode cannot commit changes.
 
+### Checkout credentials for push
+
+The workflow intentionally persists checkout credentials so OpenCode write tasks
+can push branches. The `persist-credentials` option is left at its default
+(`true`).
+
+### Troubleshooting
+
+| Symptom | Likely cause |
+|---------|-------------|
+| `/oc` can commit but push fails with `could not read Username for 'https://github.com'` | Checkout credentials are not persisted. Ensure `persist-credentials` is not `false` in the `actions/checkout` step. |
+
 ### Merge behavior
 
 The workflow does not merge automatically. It opens or updates PRs and reports
