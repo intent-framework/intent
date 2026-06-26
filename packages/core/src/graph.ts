@@ -158,6 +158,37 @@ function computeDiagnostics<TServices extends object = DefaultScreenServices>(
     }
   }
 
+  if (screenDef.flows.length > 0) {
+    const flowNodeIds = new Set<string>()
+    for (const flow of screenDef.flows) {
+      for (const step of flow.steps) {
+        flowNodeIds.add(step.node.id)
+      }
+    }
+
+    for (const ask of screenDef.asks) {
+      if (surfacedNodeIds.has(ask.id) && !flowNodeIds.has(ask.id)) {
+        diagnostics.push({
+          severity: "info",
+          code: "surfaced-node-not-in-any-flow",
+          message: `"${ask.label}" is surfaced but not referenced in any flow.`,
+          nodeId: ask.id,
+        })
+      }
+    }
+
+    for (const act of screenDef.acts) {
+      if (surfacedNodeIds.has(act.id) && !flowNodeIds.has(act.id)) {
+        diagnostics.push({
+          severity: "info",
+          code: "surfaced-node-not-in-any-flow",
+          message: `"${act.label}" is surfaced but not referenced in any flow.`,
+          nodeId: act.id,
+        })
+      }
+    }
+  }
+
   return diagnostics
 }
 

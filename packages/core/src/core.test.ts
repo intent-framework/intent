@@ -734,6 +734,103 @@ describe("graph diagnostics", () => {
     const inspected = inspectScreen(screenDef)
     expect(inspected.diagnostics).toEqual([])
   })
+
+  describe("reachability diagnostics", () => {
+    it("emits surfaced-node-not-in-any-flow for surfaced ask not in any flow", () => {
+      const screenDef = screen("AskNotInFlow", $ => {
+        const email = $.state.text("email")
+        const name = $.state.text("name")
+        const emailAsk = $.ask("Email", email).private()
+        const nameAsk = $.ask("Name", name).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, nameAsk, login)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.severity).toBe("info")
+      expect(diags[0]?.nodeId).toBe("ask_name")
+    })
+
+    it("emits surfaced-node-not-in-any-flow for surfaced action not in any flow", () => {
+      const screenDef = screen("ActNotInFlow", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        const signup = $.act("Sign up")
+        $.surface("main").contains(emailAsk, login, signup)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.severity).toBe("info")
+      expect(diags[0]?.nodeId).toBe("act_sign_up")
+    })
+
+    it("does not emit diagnostic when surfaced node is referenced by a flow", () => {
+      const screenDef = screen("NodeInFlow", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("does not emit diagnostic when there are zero flows", () => {
+      const screenDef = screen("NoFlows", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("coexists with existing structural diagnostics without breaking deterministic ordering", () => {
+      const screenDef = screen("Mixed", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email)
+        const login = $.act("Log in").primary()
+        const signup = $.act("Sign up").primary()
+        $.surface("main").contains(emailAsk, login, signup)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const first = inspectScreen(screenDef)
+      const second = inspectScreen(screenDef)
+      expect(first.diagnostics.map(d => d.code)).toEqual(second.diagnostics.map(d => d.code))
+      const codes = first.diagnostics.map(d => d.code)
+      expect(codes).toContain("multiple-primary-actions")
+      expect(codes).toContain("surfaced-node-not-in-any-flow")
+      // signup is surfaced but not in any flow
+      const reachDiags = first.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(reachDiags).toHaveLength(1)
+      expect(reachDiags[0]?.nodeId).toBe("act_sign_up")
+    })
+
+    it("includes semanticNodeId when inspectScreen enriches diagnostics", () => {
+      const screenDef = screen("SemanticReach", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        const hidden = $.act("Hidden")
+        $.surface("main").contains(emailAsk, login, hidden)
+        $.flow("login").startsWith(emailAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "surfaced-node-not-in-any-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.semanticNodeId).toBeDefined()
+      expect(diags[0]?.semanticNodeId).toBe("action:hidden")
+    })
+  })
 })
 
 describe("resource", () => {

@@ -163,6 +163,26 @@ $.act("Hidden")                // triggers diagnostic
 $.surface("main").contains()   // action not included
 ```
 
+### `surfaced-node-not-in-any-flow`
+
+- **Severity**: `info`
+- **What it means**: An ask or action is included in a surface but is not referenced by any flow step. The node is visible but there is no defined interaction path leading to it.
+- **Triggers when**: At least one flow exists on the screen, and a surfaced ask or action is not referenced in any flow's `.startsWith()` / `.then()` chain.
+- **Why only when flows exist**: Flows are optional. A screen with zero flows relies on implicit DOM ordering and is not expected to reference every surfaced node in a flow.
+- **Fix**: Add the node to a flow step, or remove the node from the surface if it should not be rendered.
+
+Example:
+
+```ts
+const email = $.ask("Email", emailState)
+const name = $.ask("Name", nameState)
+
+$.surface("main").contains(email, name)
+
+$.flow("signup").startsWith(email)  // name is surfaced but not in any flow
+// Diagnostic: surfaced-node-not-in-any-flow for "Name"
+```
+
 ### Diagnostic output format
 
 Each diagnostic is a `GraphDiagnostic` object:
