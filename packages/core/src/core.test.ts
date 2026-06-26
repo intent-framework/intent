@@ -980,6 +980,158 @@ describe("graph diagnostics", () => {
       expect(reachDiags[0]?.nodeId).toBe("act_sign_up")
     })
   })
+
+  describe("orphaned-flow diagnostic", () => {
+    it("does not emit orphaned-flow when there are no flows", () => {
+      const screenDef = screen("NoFlowsForOrphan", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("does not emit orphaned-flow for empty flow", () => {
+      const screenDef = screen("EmptyFlow", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+        $.flow("empty")
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("emits orphaned-flow when all flow steps are unsurfaced", () => {
+      const screenDef = screen("AllStepsUnsurfaced", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(login)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.severity).toBe("warning")
+      expect(diags[0]?.code).toBe("orphaned-flow")
+      expect(diags[0]?.message).toBe('"login" has no surfaced steps.')
+    })
+
+    it("does not emit orphaned-flow when at least one flow step is surfaced", () => {
+      const screenDef = screen("OneStepSurfaced", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(emailAsk, login)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk).then(login)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(0)
+    })
+
+    it("multiple flows report only orphaned flows", () => {
+      const screenDef = screen("MultipleFlowsOrphan", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        const signup = $.act("Sign up")
+        $.surface("main").contains(emailAsk, login)
+        $.flow("a").startsWith(emailAsk).then(login)
+        $.flow("b").startsWith(pwdAsk).then(signup)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.message).toBe('"b" has no surfaced steps.')
+    })
+
+    it("diagnostic includes nested flow.flowNodeId and flow.flowSemanticNodeId", () => {
+      const screenDef = screen("OrphanedFlowMeta", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(login)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.flow?.flowNodeId).toBe("flow_login")
+      expect(diags[0]?.flow?.flowSemanticNodeId).toBe("flow:login")
+    })
+
+    it("diagnostic leaves nodeId and semanticNodeId undefined", () => {
+      const screenDef = screen("OrphanedNoNodeId", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        $.surface("main").contains(login)
+        $.flow("login").startsWith(emailAsk).then(pwdAsk)
+      })
+      const inspected = inspectScreen(screenDef)
+      const diags = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(diags).toHaveLength(1)
+      expect(diags[0]?.nodeId).toBeUndefined()
+      expect(diags[0]?.semanticNodeId).toBeUndefined()
+    })
+
+    it("deterministic ordering across repeated inspectScreen calls", () => {
+      const screenDef = screen("OrphanedDeterministic", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        const signup = $.act("Sign up")
+        $.surface("main").contains(login)
+        $.flow("a").startsWith(emailAsk).then(login)
+        $.flow("b").startsWith(pwdAsk).then(signup)
+      })
+      const first = inspectScreen(screenDef)
+      const second = inspectScreen(screenDef)
+      expect(first.diagnostics.map(d => d.code)).toEqual(second.diagnostics.map(d => d.code))
+    })
+
+    it("coexists with flow-step-not-surfaced without changing its behavior", () => {
+      const screenDef = screen("CoexistOrphan", $ => {
+        const email = $.state.text("email")
+        const pwd = $.state.text("password")
+        const emailAsk = $.ask("Email", email).private()
+        const pwdAsk = $.ask("Password", pwd).private()
+        const login = $.act("Log in")
+        const signup = $.act("Sign up")
+        $.surface("main").contains(login)
+        $.flow("a").startsWith(emailAsk).then(login)
+        $.flow("b").startsWith(pwdAsk).then(signup)
+      })
+      const inspected = inspectScreen(screenDef)
+      const orphaned = inspected.diagnostics.filter(d => d.code === "orphaned-flow")
+      expect(orphaned).toHaveLength(1)
+      expect(orphaned[0]?.message).toBe('"b" has no surfaced steps.')
+      const flowStepNotSurfaced = inspected.diagnostics.filter(d => d.code === "flow-step-not-surfaced")
+      expect(flowStepNotSurfaced).toHaveLength(3)
+      expect(flowStepNotSurfaced[0]?.nodeId).toBe("ask_email")
+      expect(flowStepNotSurfaced[1]?.nodeId).toBe("ask_password")
+      expect(flowStepNotSurfaced[2]?.nodeId).toBe("act_sign_up")
+    })
+  })
 })
 
 describe("resource", () => {

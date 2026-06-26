@@ -189,6 +189,23 @@ function computeDiagnostics<TServices extends object = DefaultScreenServices>(
       }
     }
 
+    // orphaned-flow: flow has steps but none are surfaced
+    for (const flow of screenDef.flows) {
+      if (flow.steps.length > 0) {
+        const hasSurfacedStep = flow.steps.some(step => surfacedNodeIds.has(step.node.id))
+        if (!hasSurfacedStep) {
+          diagnostics.push({
+            severity: "warning",
+            code: "orphaned-flow",
+            message: `"${flow.name}" has no surfaced steps.`,
+            flow: {
+              flowNodeId: flow.id,
+            },
+          })
+        }
+      }
+    }
+
     for (const ask of screenDef.asks) {
       if (surfacedNodeIds.has(ask.id) && !flowNodeIds.has(ask.id)) {
         diagnostics.push({
