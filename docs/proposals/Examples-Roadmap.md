@@ -1,6 +1,6 @@
 # Examples Roadmap — Design Proposal
 
-**Status:** Proposal  
+**Status:** Implementing — Example 1 (`choice-form`) done in #108  
 **Date:** 2026-06-26  
 **Author:** Big Pickle  
 **Affected packages:** `@intent-framework/core`, `@intent-framework/dom`, `@intent-framework/router`, `@intent-framework/testing`  
