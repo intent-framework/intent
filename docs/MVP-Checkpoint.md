@@ -50,7 +50,7 @@ It now has:
 - Complex nested routing/layouts.
 - Form arrays or complex forms.
 - Styling/theming story.
-- Package publishing flow.
+- Production package publishing flow (first alpha published, need to validate end-to-end).
 
 ## Implemented packages
 
@@ -104,7 +104,7 @@ See also the README [Current limitations](../README.md#current-limitations).
 - No backend persistence yet.
 - No real resource cache policy yet.
 - No DevTools package yet.
-- No package publishing flow yet.
+- Package publishing flow is set up (Changesets + manual publish workflow). First alpha published.
 - Demo side panels use manual DOM.
 - Demo diagnostics panel uses `MutationObserver`.
 - Demo data is in memory only.
