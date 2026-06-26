@@ -2,11 +2,9 @@
 
 ## Status
 
-Intent's first public alpha has been published.
+Three public alpha releases have been published: `0.1.0-alpha.0`, `0.1.0-alpha.1`, and `0.1.0-alpha.2`.
 
-GitHub Release: [v0.1.0-alpha.0](https://github.com/intent-framework/intent/releases/tag/v0.1.0-alpha.0)
-
-Four packages are published to npm under the `@intent-framework/*` scope. The server package `@intent-framework/server` remains private and unpublished.
+Five packages are under the `@intent-framework/*` scope, four of which are published to npm. The server package `@intent-framework/server` remains private and unpublished.
 
 Changesets is installed and configured. Release workflows exist for automated version PRs and manual alpha publishing.
 
@@ -31,7 +29,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.1` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -49,7 +47,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.2` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -65,7 +63,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.1` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -81,7 +79,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0` | Acceptable for alpha |
+| Current version | `0.1.0-alpha.1` | Acceptable for alpha |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -97,7 +95,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 
 | Field | Value | Status |
 |---|---|---|
-| Current version | `0.1.0` | Acceptable for alpha |
+| Current version | `0.1.0` | Acceptable for alpha (private) |
 | `main` | `./dist/index.js` | Exists after build |
 | `module` | `./dist/index.js` | Exists after build |
 | `types` | `./dist/index.d.ts` | Exists after build |
@@ -108,7 +106,7 @@ Packages under `examples/` (e.g., `web-basic`) are private and must not be publi
 | `repository` | Present | Points to `intent-framework/intent` (`packages/server`) |
 | `dependencies` | `@intent-framework/core` | Uses `workspace:*` |
 | Build tool | `tsdown` | Bundles ESM + `.d.ts` |
-| Publish? | No, private for first alpha | `"private": true` set; `publishConfig` removed |
+| Publish? | No, stays private | `"private": true` set; `publishConfig` removed |
 | Note | Early stage | Server package has global registries and basic action/resource/policy types. Not yet production-ready. |
 
 ## Package naming
@@ -121,7 +119,7 @@ The `intent-framework` npm organization has been created. The scope is:
 - `@intent-framework/dom`
 - `@intent-framework/router`
 - `@intent-framework/testing`
-- `@intent-framework/server` (private workspace package for first alpha)
+- `@intent-framework/server` (private workspace package, not published)
 
 ## Build outputs
 
@@ -207,7 +205,7 @@ A [publish-alpha.yml](../.github/workflows/publish-alpha.yml) workflow exists fo
 
 ### Publish cadence
 
-- Start with an **alpha release** (`0.1.0-alpha.0`)
+- Currently publishing **alpha releases** (`0.1.0-alpha.0` through `0.1.0-alpha.2` so far)
 - Use `Changesets` pre-release mode for alpha/beta
 - Graduate to stable after API surface is settled and real-world usage begins
 
@@ -247,7 +245,7 @@ After a successful npm publish:
 
 Do not manually create GitHub Releases.
 
-## First alpha release checklist
+## Alpha release checklist
 
 - [x] npm scope is `@intent-framework/*` — `intent-framework` org created, packages renamed
 - [x] MIT confirmed as intended public license
@@ -262,23 +260,23 @@ Do not manually create GitHub Releases.
   - Version Packages PR workflow (push-to-main)
   - Manual Publish Alpha workflow (manual dispatch only)
 - [x] NPM_TOKEN secret added to GitHub repository secrets
-- [x] Publish first alpha via manual Publish Alpha workflow
-- [x] GitHub Release v0.1.0-alpha.0 created
+- [x] First alpha published (v0.1.0-alpha.0)
+- [x] Subsequent alpha releases published (v0.1.0-alpha.1, v0.1.0-alpha.2)
 
 ## Post-release verification
 
-Published packages:
+Published packages (latest alpha):
 
-- `@intent-framework/core@0.1.0-alpha.0`
-- `@intent-framework/dom@0.1.0-alpha.0`
-- `@intent-framework/router@0.1.0-alpha.0`
-- `@intent-framework/testing@0.1.0-alpha.0`
+- `@intent-framework/core@0.1.0-alpha.1`
+- `@intent-framework/dom@0.1.0-alpha.2`
+- `@intent-framework/router@0.1.0-alpha.1`
+- `@intent-framework/testing@0.1.0-alpha.1`
 
 Verified:
 
-- npm install smoke test passed
-- `alpha` dist-tag points to `0.1.0-alpha.0`
-- `latest` dist-tag currently points to `0.1.0-alpha.0` because this is the only published version
+- npm install smoke test passed for alpha.0, alpha.1, alpha.2
+- `alpha` dist-tag points to the latest published alpha version
+- `latest` dist-tag points to the latest alpha because no stable releases exist yet
 
 When stable releases exist, `latest` should point to stable releases and `alpha` should point to prereleases.
 
