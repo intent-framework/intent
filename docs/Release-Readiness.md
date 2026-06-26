@@ -4,7 +4,7 @@
 
 Intent is in early experimental development. No packages have been published to npm. No GitHub Releases have been created.
 
-The repository has five workspace packages under `packages/*`, all at version `0.1.0`, all using `workspace:*` dependency references. The codebase is functional and validated by CI, but several metadata and workflow steps are missing before a first alpha release.
+The repository has five workspace packages under `packages/*`. The four publishable packages are at version `0.1.0-alpha.0`. The private server package remains at `0.1.0`. All use `workspace:*` dependency references. The codebase is functional and validated by CI. Changesets is installed and configured. The remaining blocker before a first alpha release is the release workflow and npm publish automation.
 
 Four packages are intended for first-alpha publishing. `packages/server` is a private workspace package for now.
 
@@ -226,15 +226,16 @@ Do not manually create GitHub Releases.
 ## First alpha release checklist
 
 - [x] npm scope is `@intent-framework/*` — `intent-framework` org created, packages renamed
-- [ ] Reconfirm MIT is the intended public license before publishing
+- [x] MIT confirmed as intended public license
 - [x] Confirm package metadata (`repository` field in all packages)
 - [x] Server is private — not a publishing blocker
-- [ ] Confirm package exports (all point to correct `dist/` paths — already correct)
-- [ ] Confirm package files (`files: ["dist"]` — already correct)
-- [ ] Confirm declaration files (`dist/index.d.ts` exists — already correct)
-- [ ] Run clean-dist validation (`rm -rf packages/*/dist examples/*/dist && pnpm test && pnpm typecheck && pnpm build && pnpm lint`)
-- [ ] Run `pnpm pack:check`
-- [ ] Add Changesets (`pnpm add -Dw @changesets/cli && pnpm changeset init`)
+- [x] Package exports point to correct `dist/` paths
+- [x] Package `files: ["dist"]` is correct
+- [x] Declaration files (`dist/index.d.ts`) exist after build
+- [x] Clean-dist validation passes
+- [x] `pnpm pack:check` passes
+- [x] Changesets installed and configured
+- [x] First alpha package versions set to `0.1.0-alpha.0`
 - [ ] Add release workflow (GitHub Action for Changesets)
 - [ ] Publish first alpha (`pnpm changeset publish`)
 - [ ] Create GitHub Release (automatic via Changesets, or manual)
@@ -243,7 +244,7 @@ Do not manually create GitHub Releases.
 
 - repository fields are present
 - GitHub repository home is https://github.com/intent-framework/intent
-- remaining first-alpha blockers: release workflow not yet added, alpha prerelease versioning not configured, and human confirmation that MIT is the intended public license
+- remaining first-alpha blocker after this PR: Release workflow not yet added, including npm publish automation and required secrets.
 
 ## Future server-package decisions
 
@@ -254,9 +255,8 @@ Do not manually create GitHub Releases.
 
 - Do not publish any package to npm.
 - Do not create a GitHub Release.
-- Do not add Changesets yet — wait until the audit blockers are resolved.
 - Do not add a release GitHub Action yet.
-- Do not change versions or public APIs.
+- Do not change runtime or public APIs.
 - Do not add new dependencies unless required for a specific task.
 
 ## Pack check command
