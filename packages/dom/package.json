@@ -32,8 +32,8 @@
     "lint": "tsc -b"
   },
   "dependencies": {
-    "@intent-framework/core": "workspace:*",
-    "@intent-framework/router": "workspace:*"
+    "@intent-framework/core": "workspace:^0.1.0-alpha.4",
+    "@intent-framework/router": "workspace:^0.1.0-alpha.4"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",
