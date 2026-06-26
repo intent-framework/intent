@@ -29,6 +29,11 @@ A lane is a stream of work with non-overlapping file scope. Lanes are defined by
 | `docs` | `docs/**`, `README.md`, `AGENTS.md` | Documentation |
 | `tooling` | `.github/**`, `.opencode/**`, `package.json`, `pnpm-workspace.yaml`, `tsconfig*.json` | CI, commands, config |
 
+### Lane Design Guidelines
+
+- **Prefer exact allowed file paths for parallel lanes.** Broad families like `docs/**` create scope overlap. When multiple docs tasks exist, scope each lane to an exact sub-path (e.g. `docs/agent/` vs `docs/guide/`).
+- **Broad families should be serialized.** If a lane uses a broad family like `docs/**`, it should be the only lane in that family running in a given cycle. Run broad lanes one at a time.
+
 ## Allowed / Forbidden Files
 
 ### Allowed
@@ -41,6 +46,7 @@ A lane is a stream of work with non-overlapping file scope. Lanes are defined by
 - A docs lane must not edit `packages/*/src/**`
 - A core lane must not edit `examples/**` or `.github/**` unless the task explicitly requires it
 - No lane may change package versions unless it is a release lane
+- Unexpected changesets in docs-only lanes are scope violations unless the task explicitly allows them
 
 ## Merge Policies
 
@@ -60,6 +66,12 @@ This applies to any PR that modifies `packages/*/src/**` beyond trivial comments
 ### Merge one PR at a time
 
 Even when auto-merge is allowed, merge sequentially. Wait for one PR to merge and observe CI on main before merging the next. This avoids cascading failures and tangled rollbacks.
+
+### Operational Notes
+
+- **Maintainer workflow approval may be required.** On first interaction with a repository, GitHub Actions may pause until a maintainer approves the run. This is not a failure state.
+- **Verify actual changed files, not PR descriptions.** PR descriptions can become stale or inaccurate. Before merging, confirm file scope via `git diff` against the base branch.
+- **Stale PR bodies are not blockers.** If the PR body is outdated but the actual changed files and CI are correct, proceed with the merge. The PR body is documentation, not source of truth.
 
 ## Conflict Rules
 
