@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Intent — Resource Lifecycle Example</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+      h1:first-of-type { font-size: 1.25rem; }
+      h2 { font-size: 1rem; margin-top: 2rem; }
+      label { display: block; font-weight: 600; margin-top: 1rem; margin-bottom: 0.25rem; }
+      input { width: 100%; box-sizing: border-box; padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+      button { margin-right: 0.5rem; margin-bottom: 0.5rem; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border: 1px solid #aaa; border-radius: 4px; background: #fff; }
+      button.primary { font-weight: 700; background: #1a73e8; color: #fff; border-color: #1a73e8; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      pre { background: #f5f5f5; padding: 0.75rem; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; }
+      .proves { background: #e8f0fe; padding: 0.75rem; border-radius: 4px; margin-top: 1.5rem; }
+      .proves ul { margin: 0.25rem 0; padding-left: 1.25rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Intent: Resource Lifecycle</h1>
+    <p>Demonstrates autoLoad, manual load, reload, invalidation, stale state, failed state, and action-driven invalidation.</p>
+    <div id="root"></div>
+    <h2>Resource Status</h2>
+    <pre id="resource-status">Loading...</pre>
+    <h2>Semantic Graph (<code>inspectScreen()</code>)</h2>
+    <pre id="inspect">Loading...</pre>
+    <div class="proves">
+      <strong>What this proves:</strong>
+      <ul>
+        <li><code>autoLoad: true</code> resource reaches <code>ready</code> on runtime start.</li>
+        <li><code>autoLoad: false</code> resource starts <code>idle</code>.</li>
+        <li><code>resource.reload()</code> transitions through <code>pending</code> to <code>ready</code>.</li>
+        <li><code>resource.invalidate()</code> marks stale without reloading.</li>
+        <li><code>reload()</code> clears stale.</li>
+        <li><code>resource.load()</code> manually triggers a deferred load.</li>
+        <li><code>action.invalidates(resource)</code> marks the resource stale after successful action.</li>
+        <li>A failed loader produces <code>failed</code> status and error.</li>
+        <li>A failed action does not invalidate its targeted resources.</li>
+        <li>Route context is available to resource loaders.</li>
+      </ul>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
