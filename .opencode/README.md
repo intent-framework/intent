@@ -15,6 +15,8 @@ All commands use the `opencode/big-pickle` model.
 |---------|-------------|
 | `/work <task>` | General implementation workflow. Creates a branch, implements, validates, PRs, observes CI, merges when green. |
 | `/docs <task>` | Documentation-only changes. No runtime/API changes, no version bumps, exact current APIs only. |
+| `/dispatch <plan>` | Turn a user-provided swarm plan into GitHub issues and `/oc` worker comments. Does not implement work. |
+| `/swarm-status` | Read-only report on active swarm issues, PRs, worker status, CI, conflicts, and merge order. |
 | `/review-pr <number>` | Read-only PR review. Checks correctness, scope, API fit, docs, changesets, packaging. Does not merge. |
 | `/observe-pr <number>` | Watch PR CI, merge when green. Skips risky changes without explicit approval. |
 | `/fix-ci <number>` | Diagnose and fix a failing CI run on a PR. Pushes minimal fix, re-observes CI, merges when safe. |
