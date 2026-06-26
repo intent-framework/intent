@@ -4,12 +4,18 @@ import type { AnyResourceNode } from "./resource.js"
 
 export type DiagnosticSeverity = "info" | "warning" | "error"
 
+export type FlowDiagnosticMeta = {
+  flowNodeId: string
+  flowSemanticNodeId?: string
+}
+
 export type GraphDiagnostic = {
   severity: DiagnosticSeverity
   code: string
   message: string
   nodeId?: string
   semanticNodeId?: string
+  flow?: FlowDiagnosticMeta
 }
 
 export type InspectedScreen = {
