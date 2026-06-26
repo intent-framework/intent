@@ -244,7 +244,7 @@ Do not manually create GitHub Releases.
   - Manual Publish Alpha workflow (manual dispatch only)
 - [ ] NPM_TOKEN secret added to GitHub repository secrets
 - [ ] Publish first alpha via manual Publish Alpha workflow
-- [ ] Create GitHub Release (automatic via Changesets, or manual)
+- [ ] Optionally create a GitHub Release manually after npm publish
 
 ## Current blockers
 
@@ -262,7 +262,7 @@ Do not manually create GitHub Releases.
 ## Do not do yet
 
 - Do not publish any package to npm until the manual Publish Alpha workflow is triggered.
-- Do not create a GitHub Release (Changesets will create one automatically on publish, or it can be done manually).
+- Do not create a GitHub Release yet. The current manual Publish Alpha workflow publishes npm packages only. GitHub Releases are not automated yet.
 - Do not change runtime or public APIs.
 - Do not add new dependencies unless required for a specific task.
 
