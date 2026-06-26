@@ -201,6 +201,7 @@ A [publish-alpha.yml](../.github/workflows/publish-alpha.yml) workflow exists fo
 - **Pre-publish validation**: test, typecheck, build, lint, pack:check
 - **Publish command**: `pnpm release:alpha` (builds, runs pack check, then `changeset publish --tag alpha`)
 - **npm auth**: configured at runtime via `NODE_AUTH_TOKEN`; no committed `.npmrc` file
+- Both workflows explicitly pin pnpm 10 via `pnpm/action-setup@v6` with `version: 10`
 
 ### Publish cadence
 
