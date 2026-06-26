@@ -13,6 +13,28 @@ function sanitizeLabel(label: string): string {
   return label.replace(/\.+$/, "")
 }
 
+function semanticSlugify(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+}
+
+function createSemanticIdFactory(prefix: string): (source: string) => string {
+  const used = new Map<string, number>()
+  let unnamed = 0
+  return (source: string): string => {
+    const slug = semanticSlugify(source)
+    const base = slug.length > 0 ? slug : String(++unnamed)
+    const count = used.get(base) ?? 0
+    used.set(base, count + 1)
+    return count === 0
+      ? `${prefix}:${base}`
+      : `${prefix}:${base}-${count + 1}`
+  }
+}
+
 function findDefaultAction<TServices extends object = DefaultScreenServices>(
   acts: ActNode<TServices>[]
 ): ActNode<TServices> | undefined {
@@ -30,6 +52,7 @@ export type DomRendererOptions<TServices extends object = DefaultScreenServices>
   target: HTMLElement
   services?: TServices
   showScreenName?: boolean
+  showSemanticIds?: boolean
 }
 
 export { renderRouter } from "./dom-router.js"
@@ -39,9 +62,9 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
   options: DomRendererOptions<TServices>
 ): () => void {
-  const { target, services, showScreenName } = options
+  const { target, services, showScreenName, showSemanticIds } = options
   target.innerHTML = ""
-  const root = buildDom(screenDef, showScreenName)
+  const root = buildDom(screenDef, showScreenName, showSemanticIds)
   target.appendChild(root)
 
   const runtime = createScreenRuntime<TServices>(screenDef, { services })
@@ -164,13 +187,21 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
 
 function buildDom<TServices extends object = DefaultScreenServices>(
   screenDef: ScreenDefinition<TServices>,
-  showScreenName?: boolean
+  showScreenName?: boolean,
+  showSemanticIds?: boolean
 ): HTMLElement {
   const surface = screenDef.surfaces[0]
   const main = document.createElement("main")
 
   if (surface) {
     main.id = surface.id
+  }
+
+  if (showSemanticIds) {
+    main.setAttribute("data-intent-screen", `screen:${semanticSlugify(screenDef.name)}`)
+    if (surface) {
+      main.setAttribute("data-intent-surface", `surface:${semanticSlugify(surface.name)}`)
+    }
   }
 
   if (showScreenName) {
@@ -183,18 +214,31 @@ function buildDom<TServices extends object = DefaultScreenServices>(
   form.setAttribute("method", "POST")
   form.setAttribute("novalidate", "")
 
+  const askSemanticIds = showSemanticIds ? createSemanticIdFactory("ask") : null
+
   for (const ask of screenDef.asks) {
     const container = document.createElement("div")
     container.className = "ask-group"
 
+    const askSemanticId = askSemanticIds ? askSemanticIds(ask.label) : null
+
     const label = document.createElement("label")
     label.textContent = ask.label
     label.htmlFor = ask.id
+
+    if (askSemanticId) {
+      label.setAttribute("data-intent-ask", askSemanticId)
+    }
+
     container.appendChild(label)
 
     const input = createInputForAsk(ask)
     input.id = ask.id
     input.name = ask.id
+
+    if (askSemanticId) {
+      input.setAttribute("data-intent-ask", askSemanticId)
+    }
 
     if (ask.required) {
       input.required = true
@@ -244,11 +288,18 @@ function buildDom<TServices extends object = DefaultScreenServices>(
     form.appendChild(container)
   }
 
+  const actSemanticIds = showSemanticIds ? createSemanticIdFactory("action") : null
+
   for (const act of screenDef.acts) {
     const button = document.createElement("button")
     button.id = act.id
     button.type = "button"
     button.textContent = act.label
+
+    if (actSemanticIds) {
+      const semanticId = actSemanticIds(act.label)
+      button.setAttribute("data-intent-action", semanticId)
+    }
 
     if (act.primary) {
       button.className = "primary"

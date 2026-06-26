@@ -1488,4 +1488,148 @@ describe("DOM renderer", () => {
       expect(headingsAfter[0]!.textContent).toBe("MyScreen")
     })
   })
+
+  describe("showSemanticIds data attributes", () => {
+    it("does not add semantic data attributes by default", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMember", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).required()
+        const invite = $.act("Invite member").primary().when(true).does(async () => {})
+        $.surface("main").contains(emailAsk, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root })
+
+      const main = root.querySelector("main")!
+      expect(main.hasAttribute("data-intent-screen")).toBe(false)
+
+      const label = root.querySelector("label")!
+      expect(label.hasAttribute("data-intent-ask")).toBe(false)
+
+      const input = root.querySelector("input")!
+      expect(input.hasAttribute("data-intent-ask")).toBe(false)
+
+      const button = root.querySelector("button")!
+      expect(button.hasAttribute("data-intent-action")).toBe(false)
+    })
+
+    it("adds semantic data attributes when showSemanticIds is enabled", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("InviteMember", $ => {
+        const email = $.state.text("email")
+        const emailAsk = $.ask("Email", email).required()
+        const invite = $.act("Invite member").primary().when(true).does(async () => {})
+        $.surface("main").contains(emailAsk, invite)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const main = root.querySelector("main")!
+      expect(main.getAttribute("data-intent-screen")).toBe("screen:invite-member")
+      expect(main.getAttribute("data-intent-surface")).toBe("surface:main")
+
+      const labels = root.querySelectorAll("label")
+      expect(labels[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      const inputs = root.querySelectorAll("input")
+      expect(inputs[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+
+      const buttons = root.querySelectorAll("button")
+      expect(buttons[0]!.getAttribute("data-intent-action")).toBe("action:invite-member")
+    })
+
+    it("assigns the same semantic ID to both label and input for the same ask", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Test", $ => {
+        const name = $.state.text("name")
+        const ask = $.ask("Name", name).required()
+        $.act("Save").primary().when(true).does(async () => {})
+        $.surface("main").contains(ask)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const labelId = root.querySelector("label")!.getAttribute("data-intent-ask")
+      const inputId = root.querySelector("input")!.getAttribute("data-intent-ask")
+      expect(labelId).toBe("ask:name")
+      expect(inputId).toBe("ask:name")
+    })
+
+    it("generates unique IDs for duplicate ask labels", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Test", $ => {
+        const a = $.state.text("a")
+        const b = $.state.text("b")
+        const askA = $.ask("Email", a).required()
+        const askB = $.ask("Email", b).required()
+        $.act("Save").primary().when(true).does(async () => {})
+        $.surface("main").contains(askA, askB)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const labels = root.querySelectorAll("label")
+      expect(labels[0]!.getAttribute("data-intent-ask")).toBe("ask:email")
+      expect(labels[1]!.getAttribute("data-intent-ask")).toBe("ask:email-2")
+    })
+
+    it("generates unique IDs for duplicate action labels", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Test", $ => {
+        const a = $.act("Save").primary().when(true).does(async () => {})
+        const b = $.act("Save").when(true).does(async () => {})
+        $.surface("main").contains(a, b)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const buttons = root.querySelectorAll("button")
+      expect(buttons[0]!.getAttribute("data-intent-action")).toBe("action:save")
+      expect(buttons[1]!.getAttribute("data-intent-action")).toBe("action:save-2")
+    })
+
+    it("does not break existing accessibility or behavior", () => {
+      document.body.innerHTML = '<div id="root"></div>'
+
+      const Screen = screen("Login", $ => {
+        const email = $.state.text("email")
+        const password = $.state.text("password")
+        const emailAsk = $.ask("Email", email).required()
+        const passwordAsk = $.ask("Password", password).required()
+        const login = $.act("Log in").primary().when(emailAsk.valid).when(passwordAsk.valid)
+        $.surface("main").contains(emailAsk, passwordAsk, login)
+      })
+
+      const root = document.getElementById("root")!
+      renderDom(Screen, { target: root, showSemanticIds: true })
+
+      const labels = root.querySelectorAll("label")
+      expect(labels).toHaveLength(2)
+      expect(labels[0]!.textContent).toBe("Email")
+      expect(labels[1]!.textContent).toBe("Password")
+
+      const button = root.querySelector("button") as HTMLButtonElement
+      expect(button.textContent).toBe("Log in")
+      expect(button.getAttribute("type")).toBe("button")
+      expect(button.disabled).toBe(true)
+
+      const output = root.querySelector("output")!
+      expect(output.getAttribute("aria-live")).toBe("polite")
+
+      // Semantic IDs should still be present alongside normal attributes
+      expect(button.hasAttribute("data-intent-action")).toBe(true)
+      expect(button.getAttribute("data-intent-action")).toBe("action:log-in")
+    })
+  })
 })

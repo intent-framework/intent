@@ -91,12 +91,13 @@ This produces:
 - Typing a valid email enables the button reactively.
 - Pressing Enter triggers the default action when unambiguous.
 
-The DOM renderer also accepts services and an option to show the screen name as an `<h1>`:
+The DOM renderer also accepts services and options:
 
 ```ts
 renderDom(InviteMember, {
   target: root,
-  showScreenName: true,
+  showScreenName: true,     // renders <h1> with screen name
+  showSemanticIds: true,    // adds data-intent-* attributes
 })
 ```
 

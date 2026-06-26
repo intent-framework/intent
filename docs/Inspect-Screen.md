@@ -245,6 +245,6 @@ The current graph inspection has deliberate limitations:
 - **No full reachability analysis.** Diagnostics check surface membership but do not trace whether all nodes are reachable through flows or surfaces.
 - **No route-wide graph inspection.** `inspectScreen()` inspects one screen at a time. There is no cross-screen or route-level graph snapshot yet.
 - **No DevTools package yet.** There is no dedicated browser extension or DevTools panel. The web-basic demo uses a `MutationObserver`-driven DOM side panel.
-- **DOM renderer does not expose all semantic IDs as data attributes.** The DOM renderer uses its own `id` conventions for accessibility. Semantic IDs are not yet emitted as `data-semantic-id` attributes.
+- **DOM renderer can expose semantic IDs as data attributes.** The DOM renderer uses its own `id` conventions for accessibility. Pass `showSemanticIds: true` to `renderDom()` to emit `data-intent-screen`, `data-intent-surface`, `data-intent-ask`, and `data-intent-action` attributes on rendered elements.
 - **Resource graph inspection exists.** `inspectScreen()` accepts runtime resource nodes and reports status, staleness, and errors. However, cache and staleness semantics are still early — there is no automatic reload, polling, or TTL-based invalidation.
 - **No visual diff or time-travel debugging.** Graph snapshots are static. There is no history of state changes over time.
