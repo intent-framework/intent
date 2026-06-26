@@ -89,3 +89,11 @@ export function getSurfaces(): Map<string, SurfaceNode> {
 export function getResources(): Map<string, AnyResourceNode> {
   return resourceMap
 }
+
+export function nextSuffix(baseId: string, exists: (id: string) => boolean): string {
+  let counter = 2
+  while (exists(`${baseId}-${counter}`)) {
+    counter++
+  }
+  return `${baseId}-${counter}`
+}

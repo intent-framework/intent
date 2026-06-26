@@ -1,4 +1,4 @@
-import { registerFlowNode } from "./registry.js"
+import { registerFlowNode, getFlows, nextSuffix } from "./registry.js"
 import type { AnyAskNode } from "./ask.js"
 import type { ActNode } from "./act.js"
 import { AskBuilder } from "./ask.js"
@@ -16,7 +16,11 @@ export class FlowBuilder {
   private node: FlowNode
 
   constructor(name: string) {
-    const id = `flow_${name}`
+    const baseId = `flow_${name}`
+    const existing = getFlows()
+    const id = existing.has(baseId)
+      ? nextSuffix(baseId, (id) => existing.has(id))
+      : baseId
     this.node = {
       id,
       name,

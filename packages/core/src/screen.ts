@@ -9,7 +9,7 @@ import { AskBuilder } from "./ask.js"
 import { ActBuilder } from "./act.js"
 import { FlowBuilder } from "./flow.js"
 import { SurfaceBuilder } from "./surface.js"
-import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, resetResourceRegistry, getAsks, getActs, getFlows, getSurfaces } from "./registry.js"
+import { resetAskRegistry, resetActRegistry, resetFlowRegistry, resetSurfaceRegistry, resetResourceRegistry, getAsks, getActs, getFlows, getSurfaces, nextSuffix } from "./registry.js"
 
 export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
   state: {
@@ -62,7 +62,10 @@ export function screen<TServices extends object = DefaultScreenServices>(
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
     resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean }) => {
-      const id = `resource_${n}`
+      const baseId = `resource_${n}`
+      const id = configs.some(c => c.id === baseId)
+        ? nextSuffix(baseId, (id) => configs.some(c => c.id === id))
+        : baseId
       const ref = new ResourceRef<T, TServices>(id, n, config.load, config.autoLoad ?? true)
       configs.push({ id, name: n, autoLoad: config.autoLoad ?? true, loader: config.load, ref })
       return ref

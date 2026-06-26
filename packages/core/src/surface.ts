@@ -1,4 +1,4 @@
-import { registerSurfaceNode } from "./registry.js"
+import { registerSurfaceNode, getSurfaces, nextSuffix } from "./registry.js"
 import type { AnyAskNode } from "./ask.js"
 import type { ActNode } from "./act.js"
 import { AskBuilder } from "./ask.js"
@@ -14,7 +14,11 @@ export class SurfaceBuilder {
   private node: SurfaceNode
 
   constructor(name: string) {
-    const id = `surface_${name}`
+    const baseId = `surface_${name}`
+    const existing = getSurfaces()
+    const id = existing.has(baseId)
+      ? nextSuffix(baseId, (id) => existing.has(id))
+      : baseId
     this.node = {
       id,
       name,

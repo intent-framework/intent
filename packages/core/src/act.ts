@@ -1,5 +1,5 @@
 import { signal, createCondition, type Signal, isCondition, type Condition } from "./signal.js"
-import { registerActNode } from "./registry.js"
+import { registerActNode, getActs, nextSuffix } from "./registry.js"
 
 export type NavigationService = (name: string, params?: Record<string, string>) => void
 
@@ -154,7 +154,11 @@ export class ActBuilder<TServices extends object = DefaultScreenServices> {
   private node: ActNode<TServices>
 
   constructor(label: string) {
-    const id = `act_${label.toLowerCase().replace(/\s+/g, "_")}`
+    const baseId = `act_${label.toLowerCase().replace(/\s+/g, "_")}`
+    const existing = getActs()
+    const id = existing.has(baseId)
+      ? nextSuffix(baseId, (id) => existing.has(id))
+      : baseId
     this.node = createActNode<TServices>(id, label, [], null, undefined, false)
     registerActNode(this.node)
   }
