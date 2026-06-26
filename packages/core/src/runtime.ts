@@ -54,7 +54,7 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
 
     const nodeMap = new Map<string, AnyResourceNode>()
     for (const config of this._screen.resourceConfigs) {
-      const node = createResourceNode(config.id, config.name, config.loader, false)
+      const node = createResourceNode(config.id, config.name, config.loader, false, config.cache)
       this._resourceNodes.push(node)
       nodeMap.set(config.id, node)
     }
@@ -91,6 +91,9 @@ export class ScreenRuntime<TServices extends object = DefaultScreenServices> {
       unsub()
     }
     this._unsubscribers = []
+    for (const node of this._resourceNodes) {
+      node.dispose()
+    }
     for (const config of this._screen.resourceConfigs) {
       if (config.ref && this._resourceNodeMap) {
         const node = this._resourceNodeMap.get(config.id)

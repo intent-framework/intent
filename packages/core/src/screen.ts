@@ -2,7 +2,7 @@ import type { AnyAskNode } from "./ask.js"
 import type { ActNode, DefaultScreenServices } from "./act.js"
 import type { FlowNode } from "./flow.js"
 import type { SurfaceNode } from "./surface.js"
-import type { ResourceConfig, ResourceLoadContext } from "./resource.js"
+import type { ResourceCacheOptions, ResourceConfig, ResourceLoadContext } from "./resource.js"
 import { ResourceRef } from "./resource.js"
 import { createTextState, createBooleanState, createChoiceState, type TextState, type BooleanState, type ChoiceState } from "./state.js"
 import { AskBuilder } from "./ask.js"
@@ -26,6 +26,7 @@ export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
     config: {
       load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>)
       autoLoad?: boolean
+      cache?: ResourceCacheOptions
     },
   ) => ResourceRef<T, TServices>
 }
@@ -61,13 +62,13 @@ export function screen<TServices extends object = DefaultScreenServices>(
     act: (label) => new ActBuilder<TServices>(label),
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
-    resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean }) => {
+    resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean; cache?: ResourceCacheOptions }) => {
       const baseId = `resource_${n}`
       const id = configs.some(c => c.id === baseId)
         ? nextSuffix(baseId, (id) => configs.some(c => c.id === id))
         : baseId
       const ref = new ResourceRef<T, TServices>(id, n, config.load, config.autoLoad ?? true)
-      configs.push({ id, name: n, autoLoad: config.autoLoad ?? true, loader: config.load, ref })
+      configs.push({ id, name: n, autoLoad: config.autoLoad ?? true, loader: config.load, cache: config.cache, ref })
       return ref
     },
   }
