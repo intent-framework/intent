@@ -13,7 +13,8 @@
     "dev:web-basic": "pnpm --dir examples/web-basic dev",
     "dev:canonical": "pnpm --dir examples/canonical-invite dev",
     "dev:choice-form": "pnpm --dir examples/choice-form dev",
-    "dev:resource-lifecycle": "pnpm --dir examples/resource-lifecycle dev"
+    "dev:resource-lifecycle": "pnpm --dir examples/resource-lifecycle dev",
+    "dev:secret-vault": "pnpm --dir examples/secret-vault dev"
   },
   "engines": {
     "node": ">=18"
