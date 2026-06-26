@@ -47,8 +47,8 @@ npm install @intent-framework/core@alpha @intent-framework/dom@alpha @intent-fra
 ```
 
 ```txt
-First public alpha: v0.1.0-alpha.0
-GitHub Release: https://github.com/intent-framework/intent/releases/tag/v0.1.0-alpha.0
+First public alpha: v0.1.0-alpha.1
+GitHub Release: https://github.com/intent-framework/intent/releases/tag/v0.1.0-alpha.1
 ```
 
 Published packages:
@@ -63,6 +63,10 @@ Published packages:
 `@intent-framework/server` remains private and unpublished.
 
 This is experimental alpha software. APIs are subject to change. Not recommended for production use.
+
+## Quickstart
+
+See [docs/Quickstart.md](docs/Quickstart.md) for a step-by-step guide — install, define a screen, render it, test it, and inspect the semantic graph.
 
 ## Why Intent exists
 

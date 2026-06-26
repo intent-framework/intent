@@ -2,7 +2,7 @@
 
 ## Date
 
-2026-06-25
+2026-06-26
 
 ## Current status
 
@@ -27,6 +27,7 @@ It now has:
 
 ## What is proven
 
+- An npm-first quickstart guides new developers through install, definition, rendering, testing, and graph inspection.
 - Screens can be authored semantically.
 - DOM can materialize the graph without being the source of truth.
 - Actions can be independently executable.
@@ -134,6 +135,7 @@ Do not jump into these without a very specific narrow PR:
 
 ## Recommended next moves
 
-1. Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.
-2. Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.
-3. Add one or two graph diagnostics that catch real authoring mistakes before adding any new package.
+1. Add a canonical example app that new developers can clone and run after the quickstart.
+2. Add a tiny diagnostics/dev-inspection page or command that prints `inspectScreen()` output for demo screens without `MutationObserver`.
+3. Improve resource semantics documentation: runtime-scoped resources, reload, stale, invalidation, context.
+4. Add one or two graph diagnostics that catch real authoring mistakes before adding any new package.
