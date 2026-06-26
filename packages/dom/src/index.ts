@@ -66,6 +66,8 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
           if (!reasonEl) {
             reasonEl = document.createElement("p")
             reasonEl.id = reasonId
+            reasonEl.className = "intent-blocked-reason"
+            reasonEl.setAttribute("role", "alert")
             form.appendChild(reasonEl)
           }
           reasonEl.textContent = act.blockedReasons[0]!
@@ -142,6 +144,8 @@ export function renderDom<TServices extends object = DefaultScreenServices>(
         if (event.key !== "Enter") return
         if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return
         if (input.tagName === "TEXTAREA") return
+        if (input.tagName === "SELECT") return
+        if ((input as HTMLInputElement).type === "checkbox") return
 
         const defaultAction = findDefaultAction(screenDef.acts)
         if (!defaultAction || !defaultAction.enabled.current) return
@@ -214,32 +218,54 @@ function buildDom<TServices extends object = DefaultScreenServices>(
     }
     container.appendChild(label)
 
-    const input = createInputForAsk(ask)
-    input.id = ask.id
-    input.name = ask.id
+    const control = createInputForAsk(ask)
+    control.id = ask.id
+    ;(control as HTMLInputElement).name = ask.id
     if (showSemanticIds && askSemanticIds) {
       const sid = askSemanticIds.get(ask.id)
       if (sid) {
-        input.setAttribute("data-intent-ask", sid)
+        control.setAttribute("data-intent-ask", sid)
       }
     }
 
     if (ask.required) {
-      input.required = true
+      (control as HTMLInputElement).required = true
     }
 
     if (ask.kind === "contact" && ask.contactKind) {
-      input.setAttribute("autocomplete", ask.contactKind)
+      control.setAttribute("autocomplete", ask.contactKind)
     }
 
-    input.addEventListener("input", () => {
-      const stateObj = ask.state as unknown as { value: string; set: (v: string) => void }
-      if (typeof stateObj.set === "function") {
-        stateObj.set(input.value)
+    if (typeof ask.state.value === "boolean") {
+      const stateObj = ask.state as unknown as { value: boolean; set: (v: boolean) => void }
+      ;(control as HTMLInputElement).checked = stateObj.value
+      control.addEventListener("change", () => {
+        stateObj.set((control as HTMLInputElement).checked)
+      })
+    } else if (ask.kind === "choice") {
+      const stateObj = ask.state as unknown as { value: string; set: (v: string) => void; options: readonly string[] }
+      const select = control as HTMLSelectElement
+      for (const opt of stateObj.options) {
+        const option = document.createElement("option")
+        option.value = opt
+        option.textContent = opt
+        select.appendChild(option)
       }
-    })
+      select.value = stateObj.value
+      select.addEventListener("change", () => {
+        stateObj.set(select.value)
+      })
+    } else {
+      const textInput = control as HTMLInputElement
+      textInput.addEventListener("input", () => {
+        const stateObj = ask.state as unknown as { value: string; set: (v: string) => void }
+        if (typeof stateObj.set === "function") {
+          stateObj.set(textInput.value)
+        }
+      })
+    }
 
-    container.appendChild(input)
+    container.appendChild(control)
 
     if (ask.hintText) {
       const hint = document.createElement("p")
@@ -260,11 +286,11 @@ function buildDom<TServices extends object = DefaultScreenServices>(
       container.appendChild(hint)
 
       if (defaultAction.enabled.current) {
-        const existing = input.getAttribute("aria-describedby")
+        const existing = control.getAttribute("aria-describedby")
         if (existing) {
-          input.setAttribute("aria-describedby", `${existing} ${hintId}`)
+          control.setAttribute("aria-describedby", `${existing} ${hintId}`)
         } else {
-          input.setAttribute("aria-describedby", hintId)
+          control.setAttribute("aria-describedby", hintId)
         }
       }
     }
@@ -295,6 +321,8 @@ function buildDom<TServices extends object = DefaultScreenServices>(
         button.setAttribute("aria-describedby", reasonId)
         const reasonEl = document.createElement("p")
         reasonEl.id = reasonId
+        reasonEl.className = "intent-blocked-reason"
+        reasonEl.setAttribute("role", "alert")
         reasonEl.textContent = act.blockedReasons[0]!
         form.appendChild(reasonEl)
       }
@@ -322,16 +350,26 @@ function updateFeedback<TServices extends object = DefaultScreenServices>(act: A
   }
 }
 
-function createInputForAsk(ask: { kind: string; contactKind?: string }): HTMLInputElement {
+function createInputForAsk(ask: { kind: string; contactKind?: string; state: { value: unknown } }): HTMLElement {
+  // Boolean-backed asks render as checkbox
+  if (typeof ask.state.value === "boolean") {
+    const input = document.createElement("input")
+    input.type = "checkbox"
+    return input
+  }
+
+  // Choice asks render as select
+  if (ask.kind === "choice") {
+    return document.createElement("select")
+  }
+
+  // Text / contact / secret → text-like inputs
   const input = document.createElement("input")
 
   if (ask.kind === "contact" && ask.contactKind === "email") {
     input.type = "email"
   } else if (ask.kind === "secret") {
     input.type = "password"
-  } else if (ask.kind === "choice") {
-    input.type = "text"
-    input.setAttribute("role", "combobox")
   } else {
     input.type = "text"
   }
