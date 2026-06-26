@@ -58,10 +58,10 @@ Published packages:
 
 | Package | npm |
 |---------|-----|
-| `@intent-framework/core` | Platformless semantic graph and runtime |
-| `@intent-framework/dom` | DOM materializer for screens and router |
-| `@intent-framework/router` | Typed route definitions and navigation |
-| `@intent-framework/testing` | Semantic test harness |
+| [`@intent-framework/core`](packages/core) | Platformless semantic graph and runtime |
+| [`@intent-framework/dom`](packages/dom) | DOM materializer for screens and router |
+| [`@intent-framework/router`](packages/router) | Typed route definitions and navigation |
+| [`@intent-framework/testing`](packages/testing) | Semantic test harness |
 
 `@intent-framework/server` remains private and unpublished.
 
@@ -196,10 +196,10 @@ This repository currently contains:
 
 | Package           | Purpose                                 |
 | ----------------- | --------------------------------------- |
-| `@intent-framework/core`    | Platformless semantic graph and runtime |
-| `@intent-framework/dom`     | DOM materializer for screens and router |
-| `@intent-framework/router`  | Typed route definitions and navigation  |
-| `@intent-framework/testing` | Semantic test harness                   |
+| [`@intent-framework/core`](packages/core)    | Platformless semantic graph and runtime |
+| [`@intent-framework/dom`](packages/dom)     | DOM materializer for screens and router |
+| [`@intent-framework/router`](packages/router)  | Typed route definitions and navigation  |
+| [`@intent-framework/testing`](packages/testing) | Semantic test harness                   |
 | `@intent-framework/server`  | Early server-side package               |
 
 The core package must remain platformless. It should not import DOM, React, router internals, server framework code, or native APIs.
