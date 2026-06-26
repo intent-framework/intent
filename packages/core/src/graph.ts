@@ -172,6 +172,23 @@ function computeDiagnostics<TServices extends object = DefaultScreenServices>(
       }
     }
 
+    // flow-step-not-surfaced: step referenced in a flow but not in any surface
+    for (const flow of screenDef.flows) {
+      for (const step of flow.steps) {
+        if (!surfacedNodeIds.has(step.node.id)) {
+          diagnostics.push({
+            severity: "warning",
+            code: "flow-step-not-surfaced",
+            message: `"${step.node.label}" is a flow step but not included in any surface.`,
+            nodeId: step.node.id,
+            flow: {
+              flowNodeId: flow.id,
+            },
+          })
+        }
+      }
+    }
+
     for (const ask of screenDef.asks) {
       if (surfacedNodeIds.has(ask.id) && !flowNodeIds.has(ask.id)) {
         diagnostics.push({
@@ -218,9 +235,17 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     idToSemantic.set(a.id, actIds(a.label))
   }
 
+  const idToFlowSemantic = new Map<string, string>()
+  for (const f of screenDef.flows) {
+    idToFlowSemantic.set(f.id, flowIds(f.name))
+  }
+
   const augmentedDiagnostics: GraphDiagnostic[] = diagnostics.map(d => ({
     ...d,
     semanticNodeId: d.nodeId ? idToSemantic.get(d.nodeId) : undefined,
+    flow: d.flow
+      ? { ...d.flow, flowSemanticNodeId: idToFlowSemantic.get(d.flow.flowNodeId) }
+      : undefined,
   }))
 
   return {
@@ -249,7 +274,7 @@ export function inspectScreen<TServices extends object = DefaultScreenServices>(
     })),
     flows: screenDef.flows.map(f => ({
       id: f.id,
-      semanticId: flowIds(f.name),
+      semanticId: idToFlowSemantic.get(f.id)!,
       name: f.name,
       stepCount: f.steps.length,
     })),
