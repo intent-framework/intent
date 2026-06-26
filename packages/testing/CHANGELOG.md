@@ -1,5 +1,12 @@
 # @intent-framework/testing
 
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Updated dependencies [d403398]
+  - @intent-framework/core@0.1.0-alpha.8
+
 ## 0.1.0-alpha.7
 
 ### Patch Changes

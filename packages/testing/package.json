@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.0-alpha.7",
+  "version": "0.1.0-alpha.8",
   "description": "Semantic test harness for Intent screens",
   "license": "MIT",
   "repository": {
@@ -32,7 +32,7 @@
     "lint": "tsc -b"
   },
   "dependencies": {
-    "@intent-framework/core": "workspace:^0.1.0-alpha.7"
+    "@intent-framework/core": "workspace:^0.1.0-alpha.8"
   },
   "devDependencies": {
     "tsdown": "^0.3.0",

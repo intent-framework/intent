@@ -1,5 +1,11 @@
 # @intent-framework/core
 
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- d403398: Implement resource cache semantics phase 1: `cache.staleTime` for time-based staleness and `cache.deduplicate` for in-flight load/reload deduplication. Resources without `cache` options behave exactly as before.
+
 ## 0.1.0-alpha.7
 
 ## 0.1.0-alpha.6
