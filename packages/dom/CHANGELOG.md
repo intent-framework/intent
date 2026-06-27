@@ -1,5 +1,13 @@
 # @intent-framework/dom
 
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- Updated dependencies [95b68b4]
+  - @intent-framework/core@0.1.0-alpha.10
+  - @intent-framework/router@0.1.0-alpha.10
+
 ## 0.1.0-alpha.9
 
 ### Patch Changes
