@@ -23,7 +23,7 @@ The current repository proves the core shape:
 - Typed router
 - Runtime-scoped resources
 - Resource reload and invalidation
-- Resource cache phase 1 (staleTime, deduplicate)
+- Resource cache phase 2 (staleTime, deduplicate, cache.key, ResourceKey)
 - Independent executable actions
 - Keyboard Enter default action
 - Accessible Enter hints
@@ -40,17 +40,17 @@ It is not production-ready yet. The goal right now is to keep the foundation sma
 Intent is available as experimental alpha packages on npm:
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.8 @intent-framework/dom@0.1.0-alpha.8 @intent-framework/router@0.1.0-alpha.8 @intent-framework/testing@0.1.0-alpha.8
+pnpm add @intent-framework/core@0.1.0-alpha.9 @intent-framework/dom@0.1.0-alpha.9 @intent-framework/router@0.1.0-alpha.9 @intent-framework/testing@0.1.0-alpha.9
 ```
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.8 @intent-framework/dom@0.1.0-alpha.8 @intent-framework/router@0.1.0-alpha.8 @intent-framework/testing@0.1.0-alpha.8
+npm install @intent-framework/core@0.1.0-alpha.9 @intent-framework/dom@0.1.0-alpha.9 @intent-framework/router@0.1.0-alpha.9 @intent-framework/testing@0.1.0-alpha.9
 ```
 
 The quickstart pins the current alpha version so examples match the published APIs.
 
 ```txt
-Current alpha: v0.1.0-alpha.8
+Current alpha: v0.1.0-alpha.9
 First public alpha: v0.1.0-alpha.0
 GitHub Releases: https://github.com/intent-framework/intent/releases
 ```
@@ -347,7 +347,7 @@ Current limitations include:
 * No native renderer yet
 * No SSR story yet
 * No backend persistence yet
-* Resource cache is phase 1 (staleTime, deduplicate); cache.key, cacheTime, swr, and cross-navigation cache are future
+* Resource cache is phase 2 (staleTime, deduplicate, cache.key); cacheTime, swr, and cross-navigation cache are future
 * No DevTools package yet
 * Automated version PR workflow and manual publish workflow are set up (Changesets configured)
 * Demo side panels use manual DOM

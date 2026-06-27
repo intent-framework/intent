@@ -7,16 +7,16 @@ This guide shows the fastest path from zero to a semantic screen using published
 ## 1. Install
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.8 @intent-framework/dom@0.1.0-alpha.8 @intent-framework/testing@0.1.0-alpha.8
+pnpm add @intent-framework/core@0.1.0-alpha.9 @intent-framework/dom@0.1.0-alpha.9 @intent-framework/testing@0.1.0-alpha.9
 ```
 
 Or with npm:
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.8 @intent-framework/dom@0.1.0-alpha.8 @intent-framework/testing@0.1.0-alpha.8
+npm install @intent-framework/core@0.1.0-alpha.9 @intent-framework/dom@0.1.0-alpha.9 @intent-framework/testing@0.1.0-alpha.9
 ```
 
-The quickstart pins `0.1.0-alpha.8` so the examples match the APIs shown below.
+The quickstart pins `0.1.0-alpha.9` so the examples match the APIs shown below.
 
 You also need `typescript` and `vitest` for type checking and tests.
 
