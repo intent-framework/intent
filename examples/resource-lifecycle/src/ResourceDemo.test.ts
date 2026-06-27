@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { testScreen } from "@intent-framework/testing"
 import { createScreenRuntime, inspectScreen } from "@intent-framework/core"
-import { ResourceDemo, teamLoadCount } from "./ResourceDemo.js"
+import { ResourceDemo, teamLoadCount, cachedTeamLoadCount, dedupeReportLoadCount } from "./ResourceDemo.js"
 
 const testServices = {
   route: { name: "demo", path: "/:id", params: { id: "team_1" } },
@@ -82,12 +82,46 @@ describe("ResourceDemo", () => {
     }, { services: testServices as any })
   })
 
+  it("cache.staleTime marks resource stale after timeout", async () => {
+    await testScreen(ResourceDemo, async app => {
+      const cached = app.resource("cachedTeam")
+      expect(cached.status()).toBe("ready")
+      expect(cached.stale()).toBe(false)
+      await new Promise(r => setTimeout(r, 100))
+      expect(cached.stale()).toBe(true)
+      expect(cached.status()).toBe("ready")
+    }, { services: testServices as any })
+  })
+
+  it("reload resets staleTime timer and clears stale", async () => {
+    await testScreen(ResourceDemo, async app => {
+      const cached = app.resource("cachedTeam")
+      await new Promise(r => setTimeout(r, 60))
+      expect(cached.stale()).toBe(true)
+      const before = cachedTeamLoadCount
+      await cached.reload()
+      expect(cachedTeamLoadCount).toBe(before + 1)
+      expect(cached.stale()).toBe(false)
+    }, { services: testServices as any })
+  })
+
+  it("cache.deduplicate shares in-flight promise", async () => {
+    await testScreen(ResourceDemo, async app => {
+      const report = app.resource("dedupeReport")
+      expect(report.status()).toBe("idle")
+      const before = dedupeReportLoadCount
+      await Promise.all([report.load(), report.load()])
+      expect(dedupeReportLoadCount).toBe(before + 1)
+      expect(report.status()).toBe("ready")
+    }, { services: testServices as any })
+  })
+
   it("inspectScreen reports resources with status/stale/error", async () => {
     const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
     await runtime.start()
     const graph = runtime.graph
     const resources = graph.resources
-    expect(resources).toHaveLength(3)
+    expect(resources).toHaveLength(5)
     const teamRes = resources.find(r => r.name === "team")!
     expect(teamRes.status).toBe("ready")
     expect(teamRes.hasValue).toBe(true)
