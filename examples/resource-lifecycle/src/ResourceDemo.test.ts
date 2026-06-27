@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { testScreen } from "@intent-framework/testing"
 import { createScreenRuntime, inspectScreen } from "@intent-framework/core"
-import { ResourceDemo, teamLoadCount, cachedTeamLoadCount, dedupeReportLoadCount } from "./ResourceDemo.js"
+import { ResourceDemo, teamLoadCount, cachedTeamLoadCount, dedupeReportLoadCount, keyedTeamLoadCount } from "./ResourceDemo.js"
 
 const testServices = {
   route: { name: "demo", path: "/:id", params: { id: "team_1" } },
@@ -116,12 +116,67 @@ describe("ResourceDemo", () => {
     }, { services: testServices as any })
   })
 
+  it("cache.key derives resource value from route context", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const keyed = runtime.resources.find(r => r.name === "keyedTeam")!
+    expect(keyed.status).toBe("ready")
+    expect((keyed.value as any)?.id).toBe("team_1")
+    expect((keyed.value as any)?.name).toBe("Team-team_1")
+    runtime.dispose()
+  })
+
+  it("cache.key: different keys are independent", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const keyed = runtime.resources.find(r => r.name === "keyedTeam")!
+    const before = keyedTeamLoadCount
+    // Load with a different key
+    await keyed.load({ route: { name: "demo", path: "/:id", params: { id: "team_b" } } })
+    expect(keyed.status).toBe("ready")
+    expect((keyed.value as any)?.id).toBe("team_b")
+    expect((keyed.value as any)?.name).toBe("Team-team_b")
+    expect(keyedTeamLoadCount).toBe(before + 1)
+    runtime.dispose()
+  })
+
+  it("cache.key: switching active key updates visible value/status", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const keyed = runtime.resources.find(r => r.name === "keyedTeam")!
+    // Initially keyed by route param "team_1"
+    expect((keyed.value as any)?.id).toBe("team_1")
+    // Switch to team_b
+    await keyed.load({ route: { name: "demo", path: "/:id", params: { id: "team_b" } } })
+    expect(keyed.status).toBe("ready")
+    expect((keyed.value as any)?.id).toBe("team_b")
+    // Switch back to team_1
+    await keyed.load({ route: { name: "demo", path: "/:id", params: { id: "team_1" } } })
+    expect(keyed.status).toBe("ready")
+    expect((keyed.value as any)?.id).toBe("team_1")
+    runtime.dispose()
+  })
+
+  it("cache.key: no-arg reload reuses last active key", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const keyed = runtime.resources.find(r => r.name === "keyedTeam")!
+    // Load team_b — changes active key
+    await keyed.load({ route: { name: "demo", path: "/:id", params: { id: "team_b" } } })
+    const afterFirst = keyedTeamLoadCount
+    // no-arg reload uses lastContext → reloads team_b
+    await keyed.reload()
+    expect(keyedTeamLoadCount).toBe(afterFirst + 1)
+    expect((keyed.value as any)?.id).toBe("team_b")
+    runtime.dispose()
+  })
+
   it("inspectScreen reports resources with status/stale/error", async () => {
     const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
     await runtime.start()
     const graph = runtime.graph
     const resources = graph.resources
-    expect(resources).toHaveLength(5)
+    expect(resources).toHaveLength(6)
     const teamRes = resources.find(r => r.name === "team")!
     expect(teamRes.status).toBe("ready")
     expect(teamRes.hasValue).toBe(true)

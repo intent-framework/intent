@@ -5,6 +5,7 @@ export let teamLoadCount = 0
 export let auditLogLoadCount = 0
 export let cachedTeamLoadCount = 0
 export let dedupeReportLoadCount = 0
+export let keyedTeamLoadCount = 0
 
 export type Team = {
   id: string
@@ -63,6 +64,19 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
     cache: { deduplicate: true },
   })
 
+  const keyedTeam = $.resource("keyedTeam", {
+    load: async ({ route }) => {
+      keyedTeamLoadCount++
+      return {
+        id: route.params.id,
+        name: `Team-${route.params.id}`,
+        members: 3,
+        version: keyedTeamLoadCount,
+      } satisfies Team
+    },
+    cache: { key: ({ route }) => route.params.id },
+  })
+
   const reloadTeam = $.act("Reload team")
     .does(async () => {
       await team.reload()
@@ -98,6 +112,19 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
       await dedupeReport.load()
     })
 
+  const loadKeyedTeamB = $.act("Load keyed team (team_b)")
+    .does(async ({ navigate }) => {
+      await keyedTeam.load({
+        route: { name: "demo", path: "/:id", params: { id: "team_b" } },
+        navigate,
+      })
+    })
+
+  const reloadKeyedTeam = $.act("Reload keyed team")
+    .does(async () => {
+      await keyedTeam.reload()
+    })
+
   $.surface("main").contains(
     reloadTeam,
     invalidateTeam,
@@ -106,5 +133,7 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
     loadAuditLog,
     reloadCachedTeam,
     loadDedupeReport,
+    loadKeyedTeamB,
+    reloadKeyedTeam,
   )
 })
