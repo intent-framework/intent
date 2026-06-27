@@ -251,19 +251,71 @@ On failure, `error` contains the error message and `status` is `"failed"`.
 
 See the [Inspect Screen and Diagnostics Guide](Inspect-Screen.md) for more detail.
 
-## Cache options (Phase 1)
+## Cache options (Phase 1 + Phase 2)
 
 Resources support optional `cache` configuration:
 
 ```ts
 const team = $.resource("team", {
-  load: async () => loadTeam(),
+  load: async ({ route }) => loadTeam(route.params.teamId),
   cache: {
-    staleTime: 5_000,    // ms (optional, default: Infinity — no time-based stale)
-    deduplicate: true,   // boolean (optional, default: true when cache is set)
+    key: ({ route }) => route.params.teamId,  // optional, derive cache key from context
+    staleTime: 5_000,                          // ms (optional, default: Infinity)
+    deduplicate: true,                         // boolean (optional, default: true when cache is set)
   },
 })
 ```
+
+### cache.key (Phase 2)
+
+`cache.key` is an optional function that derives a cache key from the resource's load context. When set, the resource holds multiple internal entries — one per unique key — each with its own:
+
+- value
+- error
+- status (idle/pending/ready/failed)
+- stale flag
+- staleTime timer
+- in-flight promise (for deduplication)
+
+The `ResourceRef` always reflects the **active key** entry — the key from the most recent `load()` or `reload()` call.
+
+```ts
+const team = $.resource("team", {
+  key: ({ route }) => route.params.teamId,
+  load: async ({ route }) => loadTeam(route.params.teamId),
+})
+
+// Navigating to /teams/abc loads with key "abc"
+await team.load({ route: { params: { teamId: "abc" } } })
+team.value // team data for "abc"
+
+// Navigating to /teams/xyz loads with key "xyz"
+await team.load({ route: { params: { teamId: "xyz" } } })
+team.value // team data for "xyz"
+
+// Back to /teams/abc — the cached entry is reused
+await team.load({ route: { params: { teamId: "abc" } } })
+team.value // team data for "abc" (reloaded)
+```
+
+Key semantics:
+
+- `ResourceKey` type: `string | number | boolean | null | undefined | ResourceKey[]`
+- Keys are normalized via `JSON.stringify` for stable map lookups.
+- Equivalent array content (e.g. `["a", "b"]`) maps to the same entry.
+- `no-arg reload()` uses the last context, therefore reloads the last active key.
+- `invalidate()` marks only the active entry stale.
+- `cache.deduplicate` deduplicates per active key.
+- `cache.staleTime` timers are per key.
+- Resources without `cache.key` behave exactly as before (single-entry behavior).
+
+Scope limitations (Phase 2):
+
+- **Single-runtime only.** Keyed entries live in one `ResourceNode` within one `ScreenRuntime`.
+- **No `cacheTime`.** Entries persist for the node's lifetime. No time-based eviction.
+- **No SWR.** Stale data must be explicitly reloaded.
+- **No cross-navigation cache.** Disposing the runtime clears all entries.
+- **No dependency-tracked keys.** Key is derived from context at load time; automatically reacting to context changes is future work.
 
 ### staleTime
 
@@ -279,7 +331,8 @@ Behavior:
 - **Timer resets** on every successful `load()` or `reload()`.
 - **`invalidate()`** always marks stale immediately, regardless of `staleTime`.
 - **Failed loads** do not start a stale timer.
-- **`dispose()`** clears the stale timer and prevents late notifications.
+- **`dispose()`** clears all stale timers and prevents late notifications.
+- **With `cache.key`**, each key has an independent stale timer.
 
 ### deduplicate
 
@@ -293,23 +346,25 @@ When `false`, each call runs independently (preserving existing behavior).
 
 When `cache` is not set at all, deduplication is disabled to preserve backward compatibility. When `cache` is set, `deduplicate` defaults to `true`.
 
+**With `cache.key`:** Deduplication is per-key. Concurrent `load()` calls with the same key share one promise. Different keys each invoke the loader independently.
+
 ### Future cache options
 
 The following cache options remain as future work and are **not yet supported**:
 
-- **`cache.key`** — cache key function for parameterized resources
 - **`cacheTime`** — retention period for stale values before eviction
 - **`swr`** — stale-while-revalidate background refreshing
 - **Cross-navigation cache store** — persistent cache across screen navigations
+- **Dependency-tracked keys** — automatic key derivation and reload when context changes without explicit load/reload
 
 ## Current boundaries
 
 Resources are intentionally limited:
 
 - **No global cache.** Each runtime owns its resource nodes. There is no shared cache between runtimes.
-- **No cache keys.** Resource identity is by name within a screen. There is no key-based deduplication or caching.
-- **No `cacheTime`.** There is no time-based retention of stale values beyond `staleTime` transitions.
+- **No `cacheTime`.** There is no time-based retention of stale values beyond `staleTime` transitions. Keyed entries persist for the node's lifetime.
 - **No stale-while-revalidate (SWR).** Stale resources stay stale until explicitly reloaded.
 - **No Suspense integration.** Resources do not integrate with React Suspense or any other framework's loading boundaries.
 - **No server framework integration yet.** Resources live on screen definitions and runtimes. Server-side resource hydration is not implemented.
 - **No full concurrent multi-mount resource ref semantics.** A `ResourceRef` connects to one runtime at a time. The last runtime to start owns the ref.
+- **No dependency-tracked keys.** The `cache.key` function runs at load/reload time only. Automatically reacting to context changes is future work.

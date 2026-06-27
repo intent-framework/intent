@@ -1,13 +1,13 @@
 # Resource Cache and Stale Semantics — Design Proposal
 
-**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 designed (cache.key)  
+**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 implemented (cache.key)  
 **Date:** 2026-06-27  
 **Author:** Big Pickle  
 **Affected package:** `@intent-framework/core`  
 **Related docs:** `docs/Resources.md`, `docs/Specification.md`
 
 > **Phase 1** (PR #119, `@intent-framework/core@0.1.0-alpha.8`): `cache.staleTime` and `cache.deduplicate`.  
-> **Phase 2 design** (this document): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
+> **Phase 2** (PR #TBD, `@intent-framework/core@0.1.0-alpha.9`): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
 > **Phase 3+**: `cacheTime`, SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
 
 ---
@@ -432,7 +432,7 @@ type ResourceCacheOptions = {
 - No new exports from the package
 - PR #119
 
-### Phase 2 — `cache.key` (recommended next slice)
+### Phase 2 — `cache.key` (implemented)
 
 **Scope:** `cache.key` only, scoped to one runtime and one `ResourceNode`.
 
@@ -861,7 +861,12 @@ No changeset is needed for this proposal — it is design-only.
 - `cache.deduplicate` — in-flight load deduplication
 - Resources without `cache` options behave exactly as before
 
-### Phase 2 (next implementation — `cache.key`)
+### Phase 2 (implemented in `@intent-framework/core@0.1.0-alpha.9`)
+
+- `cache.key` — per-key resource entries within a single ResourceNode
+- Per-key value, status, error, stale flag, staleTime timer, and in-flight promise
+- ResourceRef proxies the active key entry
+- Non-keyed resources preserve backward compatibility
 
 | Aspect | Decision |
 |--------|----------|

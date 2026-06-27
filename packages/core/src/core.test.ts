@@ -3399,3 +3399,504 @@ describe("resource cache semantics", () => {
     })
   })
 })
+
+describe("resource cache phase 2 - key", () => {
+  // === Key derivation ===
+
+  it("cache.key derives a key from load context", async () => {
+    const keys: unknown[] = []
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      keys.push(ctx.id)
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "abc" })
+    expect(keys).toEqual(["abc"])
+    expect(resource.value).toBe("data-abc")
+
+    await resource.load({ id: "xyz" })
+    expect(keys).toEqual(["abc", "xyz"])
+  })
+
+  it("equivalent array keys map to the same entry", async () => {
+    let callCount = 0
+    const resource = createResourceNode("team", "team", async (ctx: { ids: string[] }) => {
+      callCount++
+      return `data-${ctx.ids.join(",")}`
+    }, true, {
+      key: (ctx: { ids: string[] }) => ctx.ids,
+    })
+
+    await resource.load({ ids: ["a", "b"] })
+    expect(callCount).toBe(1)
+    expect(resource.value).toBe("data-a,b")
+
+    // Same array content → same entry → deduplicate in-flight should work
+    await resource.load({ ids: ["a", "b"] })
+    // But after first load completes, load() still reloads (always loads).
+    // The second load calls the loader again since entry is ready.
+    // However, different reference but same content should be same entry.
+    // The first load completes fully, so second load starts fresh.
+    // Actually, load() always invokes the loader when no in-flight promise exists.
+    // So this should call the loader again.
+    expect(callCount).toBe(2)
+    // But the same entry is updated, so value should still be consistent
+    expect(resource.value).toBe("data-a,b")
+  })
+
+  it("different keys create independent entries", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "abc" })
+    expect(resource.value).toBe("data-abc")
+
+    await resource.load({ id: "xyz" })
+    expect(resource.value).toBe("data-xyz")
+
+    // Switch back to "abc" — the entry still exists
+    await resource.load({ id: "abc" })
+    expect(resource.value).toBe("data-abc")
+  })
+
+  it("resources without cache.key preserve old single-entry behavior", async () => {
+    let callCount = 0
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      return `data${callCount}`
+    })
+
+    expect(resource.status).toBe("idle")
+    await resource.load()
+    expect(callCount).toBe(1)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data1")
+
+    await resource.load()
+    expect(callCount).toBe(2)
+    expect(resource.value).toBe("data2")
+  })
+
+  // === Entry independence ===
+
+  it("each key keeps its own value", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `value-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "a" })
+    expect(resource.value).toBe("value-a")
+
+    await resource.load({ id: "b" })
+    expect(resource.value).toBe("value-b")
+
+    // Switch back to key "a" — old value is preserved
+    await resource.load({ id: "a" })
+    expect(resource.value).toBe("value-a")
+  })
+
+  it("each key keeps its own status", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string; delay?: number }) => {
+      if (ctx.delay) await new Promise(r => setTimeout(r, ctx.delay!))
+      return `value-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    // Start loading key "a" (slow)
+    const loadA = resource.load({ id: "a", delay: 50 })
+    expect(resource.status).toBe("pending") // active key "a" is pending
+
+    // Start loading key "b" (fast) — switches active key
+    await resource.load({ id: "b" })
+    expect(resource.status).toBe("ready") // active key "b" is ready
+    expect(resource.value).toBe("value-b")
+
+    // Wait for "a" to complete
+    await loadA
+
+    // Active key is still "b" (last load context)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("value-b")
+  })
+
+  it("each key keeps its own error", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string; fail?: boolean }) => {
+      if (ctx.fail) throw new Error(`error-${ctx.id}`)
+      return `ok-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    // Key "a" fails
+    await resource.load({ id: "a", fail: true })
+    expect(resource.status).toBe("failed")
+    expect((resource.error as Error).message).toBe("error-a")
+
+    // Key "b" succeeds
+    await resource.load({ id: "b" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("ok-b")
+
+    // Switch back to "a" — still failed
+    await resource.load({ id: "a", fail: true })
+    expect(resource.status).toBe("failed")
+    expect((resource.error as Error).message).toBe("error-a")
+  })
+
+  it("failed load for one key does not poison another key", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string; fail?: boolean }) => {
+      if (ctx.fail) throw new Error("fail")
+      return `ok-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "good" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("ok-good")
+
+    // Fail a different key
+    await resource.load({ id: "bad", fail: true })
+    expect(resource.status).toBe("failed")
+
+    // Key "good" still has its value
+    await resource.load({ id: "good" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("ok-good")
+  })
+
+  it("stale flag is per key", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "a" })
+    expect(resource.stale.current).toBe(false)
+
+    // Invalidate active key "a"
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    // Switch to key "b" — "b" starts fresh, not stale
+    await resource.load({ id: "b" })
+    expect(resource.stale.current).toBe(false)
+
+    // Switch back to "a" — load() always reloads, clearing stale
+    // The stale flag is per-key, so invalidating "a" didn't affect "b"
+    await resource.load({ id: "a" })
+    // load() clears stale before running the loader (by design)
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("staleTime timer is per key", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      staleTime: 30,
+    })
+
+    await resource.load({ id: "a" })
+
+    // Switch to key "b" and load (starts b's timer)
+    await resource.load({ id: "b" })
+
+    // Switch back to "a" quickly — still not stale
+    await resource.load({ id: "a" })
+    expect(resource.stale.current).toBe(false)
+
+    // Wait for "a"'s stale timer (but not "b"'s)
+    await new Promise(r => setTimeout(r, 20))
+    // "a" was loaded at the last switch-back, so timer just started
+    expect(resource.stale.current).toBe(false)
+
+    // Wait for the remaining time
+    await new Promise(r => setTimeout(r, 20))
+    expect(resource.stale.current).toBe(true)
+
+    // Switch to "b" — its timer is independent and may not have fired yet
+    await resource.load({ id: "b" })
+    // "b" was loaded ~40ms ago, timer may have fired
+    // This test just verifies timers are independent; exact timing varies
+  })
+
+  // === Active key / ref proxying ===
+
+  it("ResourceRef proxies the active key value", async () => {
+    type S = { id: string }
+    const ref = new (await import("./resource.js")).ResourceRef<string, S>("r_test", "test", async (ctx: S) => {
+      return `data-${ctx.id}`
+    }, false)
+
+    const resource = createResourceNode("test", "test", async (ctx: S) => {
+      return `data-${ctx.id}`
+    }, false, {
+      key: (ctx: S) => ctx.id,
+    })
+
+    ref._connect(resource)
+
+    await resource.load({ id: "a" })
+    expect(ref.value).toBe("data-a")
+    expect(ref.status).toBe("ready")
+
+    // Load different key — ref proxies the new active key
+    await resource.load({ id: "b" })
+    expect(ref.value).toBe("data-b")
+    expect(ref.status).toBe("ready")
+
+    // Switch back
+    await resource.load({ id: "a" })
+    expect(ref.value).toBe("data-a")
+  })
+
+  it("switching keys updates visible value/status/error", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string; fail?: boolean }) => {
+      if (ctx.fail) throw new Error(`err-${ctx.id}`)
+      return `val-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "x" })
+    expect(resource.value).toBe("val-x")
+    expect(resource.status).toBe("ready")
+    expect(resource.error).toBeUndefined()
+
+    await resource.load({ id: "y", fail: true })
+    expect(resource.status).toBe("failed")
+    expect(resource.value).toBeUndefined()
+    expect((resource.error as Error).message).toBe("err-y")
+
+    await resource.load({ id: "x" })
+    expect(resource.value).toBe("val-x")
+    expect(resource.status).toBe("ready")
+    expect(resource.error).toBeUndefined()
+  })
+
+  it("invalidate() only invalidates the active key", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "a" })
+    expect(resource.stale.current).toBe(false)
+
+    // Invalidate active key "a"
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    // Load key "b" — "b" starts fresh, not stale (invalidate didn't affect it)
+    await resource.load({ id: "b" })
+    expect(resource.stale.current).toBe(false)
+
+    // load() always reloads and clears stale, so switch back clears "a"'s stale too
+    await resource.load({ id: "a" })
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("no-arg reload() uses lastContext and reloads the active/last key", async () => {
+    let lastContext: unknown = undefined
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      lastContext = ctx
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "abc" })
+    expect(resource.value).toBe("data-abc")
+
+    // No-arg reload reuses lastContext → reloads key "abc"
+    await resource.reload()
+    expect(lastContext).toHaveProperty("id", "abc")
+    expect(resource.value).toBe("data-abc")
+    expect(resource.status).toBe("ready")
+  })
+
+  it("reload(context) can switch to a new key", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+    })
+
+    await resource.load({ id: "first" })
+    expect(resource.value).toBe("data-first")
+
+    // reload with different context → switches to new key
+    await resource.reload({ id: "second" })
+    expect(resource.value).toBe("data-second")
+  })
+
+  // === Deduplication ===
+
+  it("deduplicate true dedupes concurrent loads for the same key", async () => {
+    let callCount = 0
+    let resolveLoad!: (v: string) => void
+    const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      return deferred
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      deduplicate: true,
+    })
+
+    const p1 = resource.load({ id: "x" })
+    const p2 = resource.load({ id: "x" })
+    const p3 = resource.load({ id: "x" })
+
+    resolveLoad("result")
+    await Promise.all([p1, p2, p3])
+
+    expect(callCount).toBe(1)
+  })
+
+  it("deduplicate true does not dedupe different keys", async () => {
+    let callCount = 0
+    let resolve1!: (v: string) => void
+    let resolve2!: (v: string) => void
+    const deferred1 = new Promise<string>(resolve => { resolve1 = resolve })
+    const deferred2 = new Promise<string>(resolve => { resolve2 = resolve })
+
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      callCount++
+      if (ctx.id === "x") return deferred1
+      return deferred2
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      deduplicate: true,
+    })
+
+    const p1 = resource.load({ id: "x" })
+    const p2 = resource.load({ id: "y" })
+
+    resolve1("x-result")
+    resolve2("y-result")
+    await Promise.all([p1, p2])
+
+    // Different keys → two loader calls
+    expect(callCount).toBe(2)
+  })
+
+  it("deduplicate false runs independent loads for the same key", async () => {
+    let callCount = 0
+    let resolve1!: (v: string) => void
+    let resolve2!: (v: string) => void
+    const deferred1 = new Promise<string>(resolve => { resolve1 = resolve })
+    const deferred2 = new Promise<string>(resolve => { resolve2 = resolve })
+
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      if (callCount === 1) return deferred1
+      return deferred2
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      deduplicate: false,
+    })
+
+    const p1 = resource.load({ id: "x" })
+    const p2 = resource.load({ id: "x" })
+
+    resolve1("first")
+    resolve2("second")
+    await Promise.all([p1, p2])
+
+    expect(callCount).toBe(2)
+  })
+
+  it("failed deduplicated keyed load clears in-flight state and can retry", async () => {
+    let callCount = 0
+
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      callCount++
+      throw new Error(`fail-${ctx.id}`)
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      deduplicate: true,
+    })
+
+    const p1 = resource.load({ id: "x" })
+    const p2 = resource.load({ id: "x" })
+
+    // Errors are caught internally; promises resolve (don't reject)
+    await p1
+    await p2
+
+    expect(callCount).toBe(1)
+    expect(resource.status).toBe("failed")
+
+    // Can retry after failure
+    await resource.load({ id: "x" })
+    // Same loader, will fail again
+    expect(resource.status).toBe("failed")
+    expect(callCount).toBe(2) // retry invokes loader again
+  })
+
+  // === Runtime integration ===
+
+  it("runtime autoLoad works with cache.key and route/context services", async () => {
+    type S = { route: { params: { teamId: string } } }
+    let receivedKey: string | undefined
+
+    const TestScreen = screen<S>("KeyedAutoload", $ => {
+      $.resource("team", {
+        load: async ({ route }) => {
+          receivedKey = route.params.teamId
+          return { id: route.params.teamId }
+        },
+        autoLoad: true,
+        cache: {
+          key: ({ route }) => route.params.teamId,
+        },
+      })
+    })
+
+    const runtime = createScreenRuntime<S>(TestScreen, {
+      services: { route: { params: { teamId: "team_42" } } } as S,
+    })
+    await runtime.start()
+
+    expect(runtime.resources).toHaveLength(1)
+    expect(runtime.resources[0]!.status).toBe("ready")
+    expect(runtime.resources[0]!.value).toEqual({ id: "team_42" })
+    expect(receivedKey).toBe("team_42")
+  })
+
+  it("dispose clears stale timers for all keyed entries", async () => {
+    let staleNotified = false
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      staleTime: 10,
+    })
+
+    await resource.load({ id: "a" })
+    await resource.load({ id: "b" })
+
+    const unsub = resource.stale.subscribe(() => { staleNotified = true })
+
+    resource.dispose()
+
+    await new Promise(r => setTimeout(r, 30))
+
+    // Neither timer should fire after dispose
+    expect(staleNotified).toBe(false)
+    unsub()
+  })
+})

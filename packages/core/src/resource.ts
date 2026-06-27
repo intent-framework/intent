@@ -3,6 +3,8 @@ import type { ActionExecutionContext, DefaultScreenServices } from "./act.js"
 
 export type ResourceStatus = "idle" | "pending" | "ready" | "failed"
 
+export type ResourceKey = string | number | boolean | null | undefined | ResourceKey[]
+
 export type ResourceLoadContext<TServices extends object = DefaultScreenServices> =
   ActionExecutionContext<TServices>
 
@@ -30,7 +32,8 @@ export type ResourceNode<TValue, TServices extends object = DefaultScreenService
 
 export type AnyResourceNode = ResourceNode<unknown, any>
 
-export type ResourceCacheOptions = {
+export type ResourceCacheOptions<TServices extends object = DefaultScreenServices> = {
+  key?: (context: ResourceLoadContext<TServices>) => ResourceKey
   staleTime?: number
   deduplicate?: boolean
 }
@@ -40,7 +43,7 @@ export type ResourceConfig<TValue = unknown, TServices extends object = DefaultS
   name: string
   autoLoad: boolean
   loader: ResourceLoader<TValue, TServices>
-  cache?: ResourceCacheOptions
+  cache?: ResourceCacheOptions<TServices>
   ref?: ResourceRef<TValue, TServices>
 }
 
@@ -58,19 +61,48 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
   name: string,
   loader: ResourceLoader<TValue, TServices>,
   autoLoad = true,
-  cache?: ResourceCacheOptions,
+  cache?: ResourceCacheOptions<TServices>,
 ): ResourceNode<TValue, TServices> {
   const statusSignal: Signal<number> = signal(0)
   const staleSignal: Signal<number> = signal(0)
 
+  const hasKey = typeof cache?.key === "function"
+  const DEFAULT_KEY = ""
+
+  type Entry = {
+    value: TValue | undefined
+    status: ResourceStatus
+    error: unknown
+    stale: boolean
+    staleTimer: ReturnType<typeof setTimeout> | null
+    inFlightPromise: Promise<void> | null
+  }
+
+  function createEntry(): Entry {
+    return {
+      value: undefined,
+      status: "idle",
+      error: undefined,
+      stale: false,
+      staleTimer: null,
+      inFlightPromise: null,
+    }
+  }
+
+  const entries = new Map<string, Entry>()
+  let _activeKey: string = DEFAULT_KEY
+
+  // For non-keyed resources, pre-create the default entry
+  if (!hasKey) {
+    entries.set(DEFAULT_KEY, createEntry())
+  }
+
+  // Sync-target variables read by public getters and conditions
   let currentStatus: ResourceStatus = "idle"
   let currentValue: TValue | undefined = undefined
   let currentError: unknown = undefined
   let currentStale = false
   let lastContext: ResourceLoadContext<TServices> | undefined = undefined
-
-  let _staleTimer: ReturnType<typeof setTimeout> | null = null
-  let _inFlightPromise: Promise<void> | null = null
 
   const notify = () => statusSignal.set(statusSignal.get() + 1)
   const staleNotify = () => staleSignal.set(staleSignal.get() + 1)
@@ -82,6 +114,65 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
   let _failed: Condition | undefined
   let _stale: Condition | undefined
 
+  // --- Entry helpers ---
+  function getActiveEntry(): Entry {
+    let entry = entries.get(_activeKey)
+    if (!entry) {
+      entry = createEntry()
+      entries.set(_activeKey, entry)
+    }
+    return entry
+  }
+
+  function syncFromEntry(entry: Entry): void {
+    currentStatus = entry.status
+    currentValue = entry.value
+    currentError = entry.error
+    if (currentStale !== entry.stale) {
+      currentStale = entry.stale
+      staleNotify()
+    }
+    notify()
+  }
+
+  function syncFromActiveEntry(): void {
+    syncFromEntry(getActiveEntry())
+  }
+
+  function normalizeKey(key: ResourceKey): string {
+    return JSON.stringify(key)
+  }
+
+  function resolveKey(ctx?: ResourceLoadContext<TServices>): string {
+    if (!hasKey) return DEFAULT_KEY
+    const context = ctx ?? lastContext ?? ({} as ResourceLoadContext<TServices>)
+    return normalizeKey(cache!.key!(context))
+  }
+
+  // --- Stale timer helpers ---
+  function _clearEntryStaleTimer(entry: Entry): void {
+    if (entry.staleTimer != null) {
+      clearTimeout(entry.staleTimer)
+      entry.staleTimer = null
+    }
+  }
+
+  function _startEntryStaleTimer(entry: Entry): void {
+    _clearEntryStaleTimer(entry)
+    if (cache?.staleTime != null && isFinite(cache.staleTime)) {
+      entry.staleTimer = setTimeout(() => {
+        if (!entry.stale) {
+          entry.stale = true
+          if (entry === getActiveEntry()) {
+            currentStale = true
+            staleNotify()
+          }
+        }
+      }, cache.staleTime)
+    }
+  }
+
+  // Condition getters (read from synced variables)
   function getReady(): Condition {
     if (!_ready) {
       _ready = createCondition(
@@ -122,113 +213,90 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     return _stale
   }
 
-  function _clearStaleTimer(): void {
-    if (_staleTimer != null) {
-      clearTimeout(_staleTimer)
-      _staleTimer = null
-    }
-  }
-
-  function _startStaleTimer(): void {
-    _clearStaleTimer()
-    if (cache?.staleTime != null && isFinite(cache.staleTime)) {
-      _staleTimer = setTimeout(() => {
-        if (!currentStale) {
-          currentStale = true
-          staleNotify()
-        }
-      }, cache.staleTime)
-    }
-  }
-
   function executeLoad(context?: ResourceLoadContext<TServices>): Promise<void> {
-    if (shouldDeduplicate && _inFlightPromise) {
-      return _inFlightPromise
+    const key = resolveKey(context)
+    _activeKey = key
+
+    let entry = entries.get(key)
+    if (!entry) {
+      entry = createEntry()
+      entries.set(key, entry)
     }
 
-    currentStale = false
-    staleNotify()
-    currentStatus = "pending"
-    currentValue = undefined
-    currentError = undefined
-    notify()
+    if (shouldDeduplicate && entry.inFlightPromise) {
+      return entry.inFlightPromise
+    }
 
     if (context !== undefined) {
       lastContext = context
     }
     const loadContext = context ?? lastContext ?? ({} as ResourceLoadContext<TServices>)
 
+    entry.stale = false
+    entry.status = "pending"
+    entry.value = undefined
+    entry.error = undefined
+    syncFromActiveEntry()
+
     const promise = (async (): Promise<void> => {
       try {
         const result = await Promise.resolve(
-          (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(
-            loadContext
-          )
+          (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(loadContext)
         )
-        currentValue = result
-        currentStatus = "ready"
-        currentStale = false
-        notify()
+        entry!.value = result
+        entry!.status = "ready"
+        entry!.stale = false
+        if (entry === getActiveEntry()) syncFromEntry(entry!)
         staleNotify()
-        _startStaleTimer()
+        _startEntryStaleTimer(entry!)
       } catch (e: unknown) {
-        currentError = e
-        currentStatus = "failed"
-        currentStale = false
-        notify()
+        entry!.error = e
+        entry!.status = "failed"
+        entry!.stale = false
+        if (entry === getActiveEntry()) syncFromEntry(entry!)
         staleNotify()
       } finally {
-        _inFlightPromise = null
+        entry!.inFlightPromise = null
       }
     })()
 
-    _inFlightPromise = promise
+    entry.inFlightPromise = promise
     return promise
   }
 
   function invalidate(): void {
-    if (!currentStale) {
-      currentStale = true
-      staleNotify()
+    const entry = getActiveEntry()
+    if (!entry.stale) {
+      entry.stale = true
+      if (entry === getActiveEntry()) {
+        currentStale = true
+        staleNotify()
+      }
     }
   }
 
   function dispose(): void {
-    _clearStaleTimer()
-    _inFlightPromise = null
+    for (const entry of entries.values()) {
+      _clearEntryStaleTimer(entry)
+      entry.inFlightPromise = null
+    }
   }
 
   const node: ResourceNode<TValue, TServices> = {
     id,
     name,
     autoLoad,
-    get status() {
-      return currentStatus
-    },
-    get value() {
-      return currentValue
-    },
-    get error() {
-      return currentError
-    },
-    get ready() {
-      return getReady()
-    },
-    get pending() {
-      return getPending()
-    },
-    get failed() {
-      return getFailed()
-    },
-    get stale() {
-      return getStale()
-    },
+    get status() { return currentStatus },
+    get value() { return currentValue },
+    get error() { return currentError },
+    get ready() { return getReady() },
+    get pending() { return getPending() },
+    get failed() { return getFailed() },
+    get stale() { return getStale() },
     load: executeLoad,
     reload: executeLoad,
     invalidate,
-    subscribe(fn: () => void) {
-      return statusSignal.subscribe(fn)
-    },
+    subscribe(fn: () => void) { return statusSignal.subscribe(fn) },
     dispose,
   }
 
