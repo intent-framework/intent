@@ -8,7 +8,7 @@
 
 > **Phase 1** (PR #119, `@intent-framework/core@0.1.0-alpha.8`): `cache.staleTime` and `cache.deduplicate`.  
 > **Phase 2** (PR #123, `@intent-framework/core@0.1.0-alpha.9`): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
-> **Phase 3** (PR #126, `@intent-framework/core@0.1.0-alpha.10`): `cacheTime` single-runtime in-memory eviction, per `ResourceNode`, per key.  
+> **Phase 3** (PR #127, `@intent-framework/core@0.1.0-alpha.10`): `cacheTime` single-runtime in-memory eviction, per `ResourceNode`, per key.  
 > **Phase 4+**: SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
 
 ---
@@ -764,7 +764,7 @@ When no `key` option is provided:
 
 ## Phase 3: CacheTime — Single-Runtime Design
 
-**Status:** Design (not yet implemented)  
+**Status:** Design (PR #126), implemented in `@intent-framework/core@0.1.0-alpha.10` (PR #127)  
 **Scope:** `cacheTime` option, in-memory entry retention/eviction within the lifetime of a single `ResourceNode`. No cross-navigation cache store. No SWR. No dependency-tracked keys. No server resources.
 
 ### Revisiting Phase 2 Q7
@@ -1261,7 +1261,7 @@ No changeset is needed for this proposal — it is design-only.
 | Backward compat | Full — all existing tests pass without modification |
 | New exports | `ResourceKey` type only |
 
-### Phase 3 (implemented in `@intent-framework/core@0.1.0-alpha.10`)
+### Phase 3 (implemented in `@intent-framework/core@0.1.0-alpha.10`, PR #127)
 
 - **`cacheTime`** — single-runtime in-memory entry retention/eviction
 - Per-key eviction within a single `ResourceNode`
