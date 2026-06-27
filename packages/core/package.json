@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "description": "Platformless semantic graph and runtime for Intent applications",
   "license": "MIT",
   "repository": {
