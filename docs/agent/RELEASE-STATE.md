@@ -4,10 +4,10 @@
 
 | Package | Version | Published | Notes |
 |---------|---------|-----------|-------|
-| `@intent-framework/core` | `0.1.0-alpha.9` | Yes | alpha prerelease |
-| `@intent-framework/dom` | `0.1.0-alpha.9` | Yes | alpha prerelease |
-| `@intent-framework/router` | `0.1.0-alpha.9` | Yes | alpha prerelease |
-| `@intent-framework/testing` | `0.1.0-alpha.9` | Yes | alpha prerelease |
+| `@intent-framework/core` | `0.1.0-alpha.10` | Yes | alpha prerelease |
+| `@intent-framework/dom` | `0.1.0-alpha.10` | Yes | alpha prerelease |
+| `@intent-framework/router` | `0.1.0-alpha.10` | Yes | alpha prerelease |
+| `@intent-framework/testing` | `0.1.0-alpha.10` | Yes | alpha prerelease |
 | `@intent-framework/server` | `0.1.0` | No | private workspace package |
 
 `@intent-framework/server` must remain `"private": true`. Never publish it.

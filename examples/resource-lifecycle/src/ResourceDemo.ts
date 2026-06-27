@@ -6,6 +6,8 @@ export let auditLogLoadCount = 0
 export let cachedTeamLoadCount = 0
 export let dedupeReportLoadCount = 0
 export let keyedTeamLoadCount = 0
+export let timeEvictTeamLoadCount = 0
+export let keyedTimeEvictLoadCount = 0
 
 export type Team = {
   id: string
@@ -77,6 +79,32 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
     cache: { key: ({ route }) => route.params.id },
   })
 
+  const timeEvictTeam = $.resource("timeEvictTeam", {
+    load: async ({ route }) => {
+      timeEvictTeamLoadCount++
+      return {
+        id: route.params.id ?? "default",
+        name: "TimeEvict",
+        members: 7,
+        version: timeEvictTeamLoadCount,
+      } satisfies Team
+    },
+    cache: { cacheTime: 1000 },
+  })
+
+  const keyedTimeEvict = $.resource("keyedTimeEvict", {
+    load: async ({ route }) => {
+      keyedTimeEvictLoadCount++
+      return {
+        id: route.params.id,
+        name: `Evict-${route.params.id}`,
+        members: 2,
+        version: keyedTimeEvictLoadCount,
+      } satisfies Team
+    },
+    cache: { key: ({ route }) => route.params.id, cacheTime: 1000 },
+  })
+
   const reloadTeam = $.act("Reload team")
     .does(async () => {
       await team.reload()
@@ -125,6 +153,24 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
       await keyedTeam.reload()
     })
 
+  const invalidateTimeEvict = $.act("Invalidate time-evict team")
+    .does(() => {
+      timeEvictTeam.invalidate()
+    })
+
+  const loadKeyedTimeEvictB = $.act("Load keyed time-evict (team_b)")
+    .does(async ({ navigate }) => {
+      await keyedTimeEvict.load({
+        route: { name: "demo", path: "/:id", params: { id: "team_b" } },
+        navigate,
+      })
+    })
+
+  const invalidateKeyedTimeEvict = $.act("Invalidate keyed time-evict")
+    .does(() => {
+      keyedTimeEvict.invalidate()
+    })
+
   $.surface("main").contains(
     reloadTeam,
     invalidateTeam,
@@ -135,5 +181,8 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
     loadDedupeReport,
     loadKeyedTeamB,
     reloadKeyedTeam,
+    invalidateTimeEvict,
+    loadKeyedTimeEvictB,
+    invalidateKeyedTimeEvict,
   )
 })

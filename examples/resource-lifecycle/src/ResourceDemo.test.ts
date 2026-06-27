@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { testScreen } from "@intent-framework/testing"
 import { createScreenRuntime, inspectScreen } from "@intent-framework/core"
-import { ResourceDemo, teamLoadCount, cachedTeamLoadCount, dedupeReportLoadCount, keyedTeamLoadCount } from "./ResourceDemo.js"
+import { ResourceDemo, teamLoadCount, cachedTeamLoadCount, dedupeReportLoadCount, keyedTeamLoadCount, timeEvictTeamLoadCount } from "./ResourceDemo.js"
 
 const testServices = {
   route: { name: "demo", path: "/:id", params: { id: "team_1" } },
@@ -157,6 +157,65 @@ describe("ResourceDemo", () => {
     runtime.dispose()
   })
 
+  // === cacheTime tests ===
+
+  it("invalidate keeps stale value before cacheTime expires", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const evict = runtime.resources.find(r => r.name === "timeEvictTeam")!
+    expect(evict.status).toBe("ready")
+    expect(evict.stale.current).toBe(false)
+    expect(evict.value).toBeDefined()
+    const val = evict.value
+    evict.invalidate()
+    expect(evict.stale.current).toBe(true)
+    expect(evict.value).toBe(val)
+    expect(evict.status).toBe("ready")
+    runtime.dispose()
+  })
+
+  it("cacheTime expiry resets active entry to idle", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const evict = runtime.resources.find(r => r.name === "timeEvictTeam")!
+    evict.invalidate()
+    expect(evict.status).toBe("ready")
+    expect(evict.stale.current).toBe(true)
+    await new Promise(r => setTimeout(r, 1100))
+    expect(evict.status).toBe("idle")
+    expect(evict.stale.current).toBe(false)
+    expect(evict.value).toBeUndefined()
+    runtime.dispose()
+  })
+
+  it("cacheTime works per key for keyed resource", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const evict = runtime.resources.find(r => r.name === "keyedTimeEvict")!
+    await evict.load({ route: { name: "demo", path: "/:id", params: { id: "team_b" } } })
+    expect(evict.status).toBe("ready")
+    evict.invalidate()
+    expect(evict.stale.current).toBe(true)
+    await new Promise(r => setTimeout(r, 1100))
+    expect(evict.status).toBe("idle")
+    expect(evict.stale.current).toBe(false)
+    runtime.dispose()
+  })
+
+  it("no-arg reload after cacheTime eviction reuses last context", async () => {
+    const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
+    await runtime.start()
+    const evict = runtime.resources.find(r => r.name === "timeEvictTeam")!
+    const before = timeEvictTeamLoadCount
+    evict.invalidate()
+    await new Promise(r => setTimeout(r, 1100))
+    expect(evict.status).toBe("idle")
+    await evict.reload()
+    expect(timeEvictTeamLoadCount).toBe(before + 1)
+    expect(evict.status).toBe("ready")
+    runtime.dispose()
+  })
+
   it("cache.key: no-arg reload reuses last active key", async () => {
     const runtime = createScreenRuntime(ResourceDemo, { services: testServices as any })
     await runtime.start()
@@ -176,7 +235,7 @@ describe("ResourceDemo", () => {
     await runtime.start()
     const graph = runtime.graph
     const resources = graph.resources
-    expect(resources).toHaveLength(6)
+    expect(resources).toHaveLength(8)
     const teamRes = resources.find(r => r.name === "team")!
     expect(teamRes.status).toBe("ready")
     expect(teamRes.hasValue).toBe(true)
