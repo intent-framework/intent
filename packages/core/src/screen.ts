@@ -26,7 +26,7 @@ export type ScreenBuilder<TServices extends object = DefaultScreenServices> = {
     config: {
       load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>)
       autoLoad?: boolean
-      cache?: ResourceCacheOptions
+      cache?: ResourceCacheOptions<TServices>
     },
   ) => ResourceRef<T, TServices>
 }
@@ -62,7 +62,7 @@ export function screen<TServices extends object = DefaultScreenServices>(
     act: (label) => new ActBuilder<TServices>(label),
     flow: (n) => new FlowBuilder(n),
     surface: (n) => new SurfaceBuilder(n),
-    resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean; cache?: ResourceCacheOptions }) => {
+    resource: <T>(n: string, config: { load: (() => Promise<T>) | ((context: ResourceLoadContext<TServices>) => Promise<T>); autoLoad?: boolean; cache?: ResourceCacheOptions<TServices> }) => {
       const baseId = `resource_${n}`
       const id = configs.some(c => c.id === baseId)
         ? nextSuffix(baseId, (id) => configs.some(c => c.id === id))

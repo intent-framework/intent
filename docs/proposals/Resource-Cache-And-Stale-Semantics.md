@@ -1,13 +1,13 @@
 # Resource Cache and Stale Semantics — Design Proposal
 
-**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 designed (cache.key)  
+**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 implemented (cache.key)  
 **Date:** 2026-06-27  
 **Author:** Big Pickle  
 **Affected package:** `@intent-framework/core`  
 **Related docs:** `docs/Resources.md`, `docs/Specification.md`
 
 > **Phase 1** (PR #119, `@intent-framework/core@0.1.0-alpha.8`): `cache.staleTime` and `cache.deduplicate`.  
-> **Phase 2 design** (this document): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
+> **Phase 2** (PR #123, `@intent-framework/core@0.1.0-alpha.9`): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
 > **Phase 3+**: `cacheTime`, SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
 
 ---
@@ -119,7 +119,9 @@ the same cached entry. When they produce different keys, they are independent.
 
 ```ts
 const team = $.resource("team", {
-  key: ({ route }) => route.params.teamId,
+  cache: {
+    key: ({ route }) => route.params.teamId,
+  },
   load: async ({ route }) => loadTeam(route.params.teamId),
 })
 ```
@@ -432,7 +434,7 @@ type ResourceCacheOptions = {
 - No new exports from the package
 - PR #119
 
-### Phase 2 — `cache.key` (recommended next slice)
+### Phase 2 — `cache.key` (implemented)
 
 **Scope:** `cache.key` only, scoped to one runtime and one `ResourceNode`.
 
@@ -722,7 +724,7 @@ When no `key` option is provided:
 #### Migration
 
 - **No migration required** for existing resources — the `key` option is opt-in.
-- Users who want parameterized resources add `key: (ctx) => ctx.route.params.id` to their resource config.
+- Users who want parameterized resources add `cache: { key: (ctx) => ctx.route.params.id }` to their resource config.
 - Users who had workarounds (e.g., creating separate resources for each parameter) can consolidate into a single keyed resource.
 - `deduplicate` defaults to `true` when `cache` is set (already the case from Phase 1).
 
@@ -736,10 +738,10 @@ When no `key` option is provided:
 
 #### Open Questions (Deferred from Phase 2)
 
-- **Key equality function** — should we use `JSON.stringify` (fast, no deps) or a deep equality utility (more correct for complex keys like arrays/objects)? Recommendation: use `JSON.stringify` for Phase 2. Array keys are supported by the type but should be used sparingly.
+- **Key equality function** — should we use `JSON.stringify` (fast, no deps) or a deep equality utility (more correct for complex keys like arrays/objects)? Recommendation: use `JSON.stringify` with a type-tagged encoder for Phase 2 (see `encodeResourceKey`). This preserves distinctions between `null`, `undefined`, `NaN`, `Infinity`, `-0`, and nested arrays. Array keys are supported by the type but should be used sparingly.
 - **Active key change without explicit load** — should the key be reactive (automatically reload when route params change)? This is dependency-tracked keys (Phase 6+). Phase 2 requires an explicit `load()`/`reload()` call to change the active key.
 - **Entry eviction policy** — without `cacheTime`, entries accumulate in the map indefinitely. For Phase 2 this is acceptable (the node is disposed when the runtime is disposed). Future phases should add LRU or time-based eviction.
-- **`cache.key` as a top-level config property vs nested under `cache`** — the existing convention nests under `cache`. Phase 2 follows this convention for consistency. This can be revisited if the team prefers flat.
+- **`cache.key` as a top-level config property vs nested under `cache`** — the existing convention nests under `cache`. Phase 2 follows this convention for consistency. The nested API is the approved design.
 - **Key type validation** — `ResourceKey` allows `string | number | boolean | null | undefined | ResourceKey[]`. Should we restrict further (e.g., disallow arrays in Phase 2)? Recommendation: keep the union type but document that string keys are preferred.
 
 ---
@@ -861,7 +863,12 @@ No changeset is needed for this proposal — it is design-only.
 - `cache.deduplicate` — in-flight load deduplication
 - Resources without `cache` options behave exactly as before
 
-### Phase 2 (next implementation — `cache.key`)
+### Phase 2 (implemented in `@intent-framework/core@0.1.0-alpha.9`)
+
+- `cache.key` — per-key resource entries within a single ResourceNode
+- Per-key value, status, error, stale flag, staleTime timer, and in-flight promise
+- ResourceRef proxies the active key entry
+- Non-keyed resources preserve backward compatibility
 
 | Aspect | Decision |
 |--------|----------|
