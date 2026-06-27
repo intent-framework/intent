@@ -281,7 +281,9 @@ The `ResourceRef` always reflects the **active key** entry — the key from the 
 
 ```ts
 const team = $.resource("team", {
-  key: ({ route }) => route.params.teamId,
+  cache: {
+    key: ({ route }) => route.params.teamId,
+  },
   load: async ({ route }) => loadTeam(route.params.teamId),
 })
 
@@ -301,7 +303,7 @@ team.value // team data for "abc" (reloaded)
 Key semantics:
 
 - `ResourceKey` type: `string | number | boolean | null | undefined | ResourceKey[]`
-- Keys are normalized via `JSON.stringify` for stable map lookups.
+- Keys are normalized via a type-tagged serializer for stable map lookups — preserving distinctions between `null`, `undefined`, `"null"`, `"undefined"`, `0`, `-0`, `NaN`, `Infinity`, `-Infinity`, and nested arrays.
 - Equivalent array content (e.g. `["a", "b"]`) maps to the same entry.
 - `no-arg reload()` uses the last context, therefore reloads the last active key.
 - `invalidate()` marks only the active entry stale.

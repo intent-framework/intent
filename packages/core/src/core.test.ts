@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { screen, inspectScreen, isCondition, createScreenRuntime, type NavigationService, type ActionExecutionContext } from "./index.js"
-import { createResourceNode } from "./resource.js"
+import { createResourceNode, type ResourceKey } from "./resource.js"
 
 async function loginUser(_params: { email: string; password: string }) {
   await Promise.resolve()
@@ -3898,5 +3898,155 @@ describe("resource cache phase 2 - key", () => {
     // Neither timer should fire after dispose
     expect(staleNotified).toBe(false)
     unsub()
+  })
+
+  // === Key serialization edge cases ===
+
+  it("null and undefined are distinct keys", async () => {
+    const resource = createResourceNode("test", "test", async (ctx: { v: null | undefined }) => {
+      return `val-${ctx.v}`
+    }, true, {
+      key: (ctx: { v: null | undefined }) => ctx.v,
+    })
+
+    await resource.load({ v: null })
+    expect(resource.value).toBe("val-null")
+
+    await resource.load({ v: undefined })
+    expect(resource.value).toBe("val-undefined")
+
+    // Switch back to null — distinct entry
+    await resource.load({ v: null })
+    expect(resource.value).toBe("val-null")
+  })
+
+  it('"null" string and null are distinct keys', async () => {
+    const resource = createResourceNode("test", "test", async (ctx: { v: string | null }) => {
+      return `val-${ctx.v}`
+    }, true, {
+      key: (ctx: { v: string | null }) => ctx.v,
+    })
+
+    await resource.load({ v: "null" })
+    expect(resource.value).toBe("val-null")
+
+    await resource.load({ v: null })
+    expect(resource.value).toBe("val-null")
+
+    // Switch back to "null" — distinct from null
+    await resource.load({ v: "null" })
+    expect(resource.value).toBe("val-null")
+  })
+
+  it('"undefined" string and undefined are distinct keys', async () => {
+    const resource = createResourceNode("test", "test", async (ctx: { v: string | undefined }) => {
+      return `val-${ctx.v}`
+    }, true, {
+      key: (ctx: { v: string | undefined }) => ctx.v,
+    })
+
+    await resource.load({ v: "undefined" })
+    expect(resource.value).toBe("val-undefined")
+
+    await resource.load({ v: undefined })
+    expect(resource.value).toBe("val-undefined")
+
+    // Switch back to "undefined" — distinct from undefined
+    await resource.load({ v: "undefined" })
+    expect(resource.value).toBe("val-undefined")
+  })
+
+  it("[null] and [undefined] are distinct keys", async () => {
+    const resource = createResourceNode("test", "test", async (ctx: { v: (null | undefined)[] }) => {
+      return `val-${ctx.v[0]}`
+    }, true, {
+      key: (ctx: { v: (null | undefined)[] }) => ctx.v,
+    })
+
+    await resource.load({ v: [null] })
+    expect(resource.value).toBe("val-null")
+
+    await resource.load({ v: [undefined] })
+    expect(resource.value).toBe("val-undefined")
+
+    // Switch back to [null] — distinct entry
+    await resource.load({ v: [null] })
+    expect(resource.value).toBe("val-null")
+  })
+
+  it("nested arrays with null/undefined distinctions", async () => {
+    let callCount = 0
+    const resource = createResourceNode("test", "test", async () => {
+      callCount++
+      return `val-${callCount}`
+    }, true, {
+      key: (ctx: { v: (ResourceKey)[] }) => ctx.v,
+    })
+
+    await resource.load({ v: [[null], [undefined]] })
+    expect(callCount).toBe(1)
+
+    await resource.load({ v: [[undefined], [null]] })
+    // Different nested structure → different key → loader invoked again
+    expect(callCount).toBe(2)
+  })
+
+  it("NaN and null are distinct keys", async () => {
+    const resource = createResourceNode("test", "test", async (ctx: { v: number | null }) => {
+      if (ctx.v === null) return "null-value"
+      return `num-${ctx.v}`
+    }, true, {
+      key: (ctx: { v: number | null }) => ctx.v,
+    })
+
+    await resource.load({ v: NaN })
+    // Note: resource load context delivers NaN as-is
+    expect(resource.value).toBe("num-NaN")
+
+    await resource.load({ v: null })
+    expect(resource.value).toBe("null-value")
+
+    // Switch back to NaN — distinct entry
+    await resource.load({ v: NaN })
+    expect(resource.value).toBe("num-NaN")
+  })
+
+  it("Infinity and null are distinct keys", async () => {
+    const resource = createResourceNode("test", "test", async (ctx: { v: number | null }) => {
+      if (ctx.v === null) return "null-value"
+      if (!isFinite(ctx.v as number)) return "inf-value"
+      return `num-${ctx.v}`
+    }, true, {
+      key: (ctx: { v: number | null }) => ctx.v,
+    })
+
+    await resource.load({ v: Infinity })
+    expect(resource.value).toBe("inf-value")
+
+    await resource.load({ v: null })
+    expect(resource.value).toBe("null-value")
+
+    // Switch back to Infinity — distinct entry
+    await resource.load({ v: Infinity })
+    expect(resource.value).toBe("inf-value")
+  })
+
+  it("equivalent nested array keys map to the same entry", async () => {
+    let callCount = 0
+    const resource = createResourceNode("test", "test", async (ctx: { v: string[][] }) => {
+      callCount++
+      return `val-${ctx.v[0]![0]}`
+    }, true, {
+      key: (ctx: { v: (ResourceKey)[] }) => ctx.v,
+    })
+
+    await resource.load({ v: [["a", "b"], ["c"]] })
+    expect(callCount).toBe(1)
+    expect(resource.value).toBe("val-a")
+
+    // Same nested array content → same key → updates same entry
+    await resource.load({ v: [["a", "b"], ["c"]] })
+    expect(callCount).toBe(2)
+    expect(resource.value).toBe("val-a")
   })
 })

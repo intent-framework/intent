@@ -139,8 +139,41 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     syncFromEntry(getActiveEntry())
   }
 
+  function encodeResourceKey(key: ResourceKey): unknown {
+    if (Array.isArray(key)) {
+      return ["array", key.map(encodeResourceKey)]
+    }
+
+    if (key === null) {
+      return ["null"]
+    }
+
+    if (key === undefined) {
+      return ["undefined"]
+    }
+
+    if (typeof key === "string") {
+      return ["string", key]
+    }
+
+    if (typeof key === "boolean") {
+      return ["boolean", key]
+    }
+
+    if (typeof key === "number") {
+      if (Number.isNaN(key)) return ["number", "NaN"]
+      if (key === Infinity) return ["number", "Infinity"]
+      if (key === -Infinity) return ["number", "-Infinity"]
+      if (Object.is(key, -0)) return ["number", "-0"]
+      return ["number", key]
+    }
+
+    const exhaustive: never = key
+    return exhaustive
+  }
+
   function normalizeKey(key: ResourceKey): string {
-    return JSON.stringify(key)
+    return JSON.stringify(encodeResourceKey(key))
   }
 
   function resolveKey(ctx?: ResourceLoadContext<TServices>): string {

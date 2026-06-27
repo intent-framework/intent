@@ -119,7 +119,9 @@ the same cached entry. When they produce different keys, they are independent.
 
 ```ts
 const team = $.resource("team", {
-  key: ({ route }) => route.params.teamId,
+  cache: {
+    key: ({ route }) => route.params.teamId,
+  },
   load: async ({ route }) => loadTeam(route.params.teamId),
 })
 ```
@@ -722,7 +724,7 @@ When no `key` option is provided:
 #### Migration
 
 - **No migration required** for existing resources — the `key` option is opt-in.
-- Users who want parameterized resources add `key: (ctx) => ctx.route.params.id` to their resource config.
+- Users who want parameterized resources add `cache: { key: (ctx) => ctx.route.params.id }` to their resource config.
 - Users who had workarounds (e.g., creating separate resources for each parameter) can consolidate into a single keyed resource.
 - `deduplicate` defaults to `true` when `cache` is set (already the case from Phase 1).
 
@@ -736,10 +738,10 @@ When no `key` option is provided:
 
 #### Open Questions (Deferred from Phase 2)
 
-- **Key equality function** — should we use `JSON.stringify` (fast, no deps) or a deep equality utility (more correct for complex keys like arrays/objects)? Recommendation: use `JSON.stringify` for Phase 2. Array keys are supported by the type but should be used sparingly.
+- **Key equality function** — should we use `JSON.stringify` (fast, no deps) or a deep equality utility (more correct for complex keys like arrays/objects)? Recommendation: use `JSON.stringify` with a type-tagged encoder for Phase 2 (see `encodeResourceKey`). This preserves distinctions between `null`, `undefined`, `NaN`, `Infinity`, `-0`, and nested arrays. Array keys are supported by the type but should be used sparingly.
 - **Active key change without explicit load** — should the key be reactive (automatically reload when route params change)? This is dependency-tracked keys (Phase 6+). Phase 2 requires an explicit `load()`/`reload()` call to change the active key.
 - **Entry eviction policy** — without `cacheTime`, entries accumulate in the map indefinitely. For Phase 2 this is acceptable (the node is disposed when the runtime is disposed). Future phases should add LRU or time-based eviction.
-- **`cache.key` as a top-level config property vs nested under `cache`** — the existing convention nests under `cache`. Phase 2 follows this convention for consistency. This can be revisited if the team prefers flat.
+- **`cache.key` as a top-level config property vs nested under `cache`** — the existing convention nests under `cache`. Phase 2 follows this convention for consistency. The nested API is the approved design.
 - **Key type validation** — `ResourceKey` allows `string | number | boolean | null | undefined | ResourceKey[]`. Should we restrict further (e.g., disallow arrays in Phase 2)? Recommendation: keep the union type but document that string keys are preferred.
 
 ---
