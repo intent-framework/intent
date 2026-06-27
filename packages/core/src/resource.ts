@@ -278,6 +278,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
 
   function executeLoad(context?: ResourceLoadContext<TServices>): Promise<void> {
     const key = resolveKey(context)
+    const prevActiveKey = _activeKey
     _activeKey = key
 
     let entry = entries.get(key)
@@ -289,6 +290,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     _clearEntryCacheTimer(entry)
 
     if (shouldDeduplicate && entry.inFlightPromise) {
+      if (key !== prevActiveKey) syncFromEntry(entry)
       return entry.inFlightPromise
     }
 
@@ -308,6 +310,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
         const result = await Promise.resolve(
           (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(loadContext)
         )
+        if (entries.get(key) !== entry) return
         entry!.value = result
         entry!.status = "ready"
         entry!.stale = false
@@ -316,6 +319,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
         staleNotify()
         _startEntryStaleTimer(entry!, key)
       } catch (e: unknown) {
+        if (entries.get(key) !== entry) return
         entry!.error = e
         entry!.status = "failed"
         entry!.stale = false

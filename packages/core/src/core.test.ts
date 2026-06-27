@@ -4611,4 +4611,140 @@ describe("resource cache phase 3 - cacheTime", () => {
     expect(resource.status).toBe("ready")
     expect(resource.value).toBe("data-a")
   })
+
+  it("resolving detached in-flight promise does not notify subscribers", async () => {
+    let resolveLoad!: (v: string) => void
+    const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      if (ctx.id === "a") return deferred
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 10,
+    })
+
+    // Track node-level and stale notifications
+    let notifyCount = 0
+    const unsub = resource.subscribe(() => { notifyCount++ })
+    let staleNotifyCount = 0
+    const staleUnsub = resource.stale.subscribe(() => { staleNotifyCount++ })
+
+    // Start loading "a" with a deferred promise
+    const loadAPromise = resource.load({ id: "a" })
+    await new Promise(r => setTimeout(r, 5))
+
+    // Invalidate "a" and switch to "b" — "a" becomes inactive
+    resource.invalidate()
+    await resource.load({ id: "b" })
+
+    // Wait for "a"'s cacheTime to fire (inactive eviction)
+    await new Promise(r => setTimeout(r, 20))
+
+    const notifyBefore = notifyCount
+    const staleBefore = staleNotifyCount
+
+    // Resolve "a"'s deferred — entry is detached, must be a no-op
+    resolveLoad("a-data")
+    await loadAPromise
+
+    expect(notifyCount).toBe(notifyBefore)
+    expect(staleNotifyCount).toBe(staleBefore)
+
+    unsub()
+    staleUnsub()
+  })
+
+  it("resolving detached in-flight promise does not start staleTime or cacheTime timers", async () => {
+    let resolveLoad!: (v: string) => void
+    const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+    let loadCountForA = 0
+
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      if (ctx.id === "a") {
+        loadCountForA++
+        if (loadCountForA === 1) return deferred
+      }
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 20,
+    })
+
+    // Start loading "a" with a deferred promise
+    const loadAPromise = resource.load({ id: "a" })
+    await new Promise(r => setTimeout(r, 5))
+
+    // Invalidate "a" and switch to "b" — "a" becomes inactive with cacheTime timer
+    resource.invalidate()
+    await resource.load({ id: "b" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data-b")
+
+    // Wait for "a"'s cacheTime to fire (inactive eviction)
+    await new Promise(r => setTimeout(r, 30))
+
+    // Resolve "a"'s deferred — entry is detached, no timers should start
+    resolveLoad("a-data")
+    await loadAPromise
+
+    // "b" is still healthy (no side effects from detached resolution)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data-b")
+
+    // "a" was not resurrected — loading it creates a fresh entry
+    await resource.load({ id: "a" })
+    expect(resource.value).toBe("data-a")
+
+    resource.dispose()
+  })
+
+  it("switching to a key with in-flight promise syncs state before dedupe return", async () => {
+    let resolveA!: (v: string) => void
+    const deferredA = new Promise<string>(resolve => { resolveA = resolve })
+    let resolveB!: (v: string) => void
+    const deferredB = new Promise<string>(resolve => { resolveB = resolve })
+
+    let callCount = 0
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      callCount++
+      if (ctx.id === "a") return deferredA
+      return deferredB
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      deduplicate: true,
+    })
+
+    // 1. Start load for key A and leave it pending
+    resource.load({ id: "a" })
+    await new Promise(r => setTimeout(r, 5))
+    expect(resource.status).toBe("pending")
+
+    // 2. Switch to key B and complete it
+    const loadB = resource.load({ id: "b" })
+    resolveB("b-data")
+    await loadB
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("b-data")
+    expect(callCount).toBe(2)
+
+    // 3. Call load for key A again while A is still in-flight (dedupe)
+    const loadA2 = resource.load({ id: "a" })
+
+    // 4. The node immediately shows key A pending, not key B ready
+    expect(resource.status).toBe("pending")
+    expect(resource.value).toBeUndefined()
+
+    // 5. When A resolves, node shows key A value
+    resolveA("a-data")
+    await loadA2
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("a-data")
+
+    // Regression: same-key dedup still calls loader once
+    expect(callCount).toBe(2)
+
+    // Regression: different-key loads ran independently (A=call 1, B=call 2)
+    // Already verified by callCount === 2
+  })
 })
