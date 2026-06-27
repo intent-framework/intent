@@ -1,6 +1,6 @@
 # Resource Cache and Stale Semantics — Design Proposal
 
-**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 implemented (cache.key)  
+**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 implemented (cache.key), Phase 3 designed (cacheTime single-runtime)  
 **Date:** 2026-06-27  
 **Author:** Big Pickle  
 **Affected package:** `@intent-framework/core`  
@@ -8,7 +8,8 @@
 
 > **Phase 1** (PR #119, `@intent-framework/core@0.1.0-alpha.8`): `cache.staleTime` and `cache.deduplicate`.  
 > **Phase 2** (PR #123, `@intent-framework/core@0.1.0-alpha.9`): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
-> **Phase 3+**: `cacheTime`, SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
+> **Phase 3** (PR #xxx, design): `cacheTime` single-runtime in-memory eviction, per `ResourceNode`, per key.  
+> **Phase 4+**: SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
 
 ---
 
@@ -63,7 +64,8 @@ semantics portion of that vision.
    way should resolve to a single in-flight promise.
 6. Define **cross-navigation cache survival** — optionally reuse resource data
    across runtime boundaries.
-7. Do **not** implement any of this. This is a design-only proposal.
+7. Implement incrementally per-phase. Each phase is self-contained and
+   backward-compatible. Remaining phases after Phase 3 remain design-only.
 
 ---
 
@@ -189,36 +191,41 @@ period.
 #### Proposal: `cacheTime` option
 
 ```ts
-cacheTime?: number  // milliseconds, default 0
+cacheTime?: number  // milliseconds, default undefined (no time-based eviction)
 ```
 
-`cacheTime` controls how long a resource value is retained after it becomes
-stale or after its runtime is disposed:
+`cacheTime` controls how long a stale resource value is retained before
+eviction:
 
 ```
 load() succeeds → value cached
-  ... staleTime elapses → stale: true
-  ... cacheTime elapses → value evicted, status → "idle" (or "pending" if SWR)
+  ... staleTime elapses → stale: true, cacheTime timer starts
+  ... cacheTime elapses → value evicted, status → "idle"
 ```
 
-If `cacheTime` is `0` (default), the value is kept while `stale` is true but
-evicted immediately when the resource is removed (runtime disposal) or when a
-new load needs to run.
+When `cacheTime` is `undefined` (default), stale entries are never evicted by
+time. They persist until an explicit `load()`/`reload()` call or node disposal.
+
+When `cacheTime` is `0`, stale entries are evicted on the next tick (immediate
+eviction on staleness). Positive numbers retain the stale value for N ms.
 
 **Effect on status:**
-- While a resource is stale and within `cacheTime`: `.status` remains `"ready"`,
+- While stale and within `cacheTime`: `.status` remains `"ready"`,
   `.value` returns data.
 - After `cacheTime` elapses without a successful reload: `.status` transitions
-  to `"idle"` (or starts reloading automatically, see SWR below).
-- A new `load()` call always starts fresh: status → `"pending"`, value →
-  `undefined`, cache timer cancelled.
+  to `"idle"`.
+- A new `load()` call: clears the cacheTime timer, sets status to `"pending"`,
+  clears value, calls loader.
+
+**Scope note (Phase 3):** cacheTime applies only within the lifetime of a
+single `ResourceNode`. Runtime disposal clears all entries regardless of
+cacheTime. Cross-navigation cache survival (retaining data across navigation)
+requires a cache store and is deferred to Phase 5+.
 
 **Rationale:** `cacheTime` exists as a separate concern from `staleTime`
 to support patterns like:
 - "Consider data stale after 5 minutes, but keep showing it for up to 30
   minutes while the user is on the screen."
-- "After navigating away, keep the data in memory for 10 minutes in case
-  the user navigates back."
 
 ### 4. Stale-While-Revalidate (SWR)
 
@@ -383,10 +390,10 @@ type ResourceCacheOptions = {
   staleTime?: number
 
   /**
-   * Time in milliseconds that a stale or disposed resource's value is
-   * retained before eviction. Default: 0 (evict immediately on stale
-   * transition or disposal).
+   * Time in milliseconds that a stale resource's value is retained
+   * before eviction. Default: undefined (no time-based eviction).
    * During cacheTime, .status remains "ready" and .value is available.
+   * Phase 3: single-runtime only — does not survive runtime disposal.
    */
   cacheTime?: number
 
@@ -416,9 +423,11 @@ type ResourceCacheOptions = {
 | `5m` | `30m` | unset | Stale after 5 min, value retained for 30 min of staleness |
 | `5m` | `30m` | `true` | Stale after 5 min → serve stale + background reload; value retained 30 min |
 | unset | unset | `true` | SWR on manual `invalidate()` only (no time-based staleness) |
-| unset | `10m` | unset | Value survives runtime disposal for up to 10 min (cross-navigation cache) |
+| unset | `10m` | unset | Value survives runtime disposal for up to 10 min (cross-navigation cache)* |
 | `5m` | `0` | `true` | Stale after 5 min → background reload; no retention if reload fails |
 | unset | unset | unset | with `deduplicate: true`: concurrent loads share one promise |
+
+<sup>\*</sup> Cross-navigation cache survival requires a cache store (Phase 5+). Not part of Phase 3. All other rows apply to Phase 3.
 
 ---
 
@@ -452,16 +461,23 @@ type ResourceCacheOptions = {
 - Provides the foundation for later phases (cacheTime, SWR, cross-navigation cache all operate per-key).
 - Safe to implement in a single PR because it does not require cache store, router integration, or new lifecycle concepts.
 
-### Phase 3 — `cacheTime`
+### Phase 3 — `cacheTime` (Single-Runtime, In-Memory)
 
-**Scope:** `cacheTime` option, still within a single runtime.
+**Scope:** `cacheTime` option, in-memory entry retention/eviction within the lifetime of a single `ResourceNode`. No cross-navigation cache store. No SWR. No dependency-tracked keys.
 
-- `cacheTime` controls how long a stale value is retained before eviction.
-- Without a cross-navigation cache store, `cacheTime` only applies within the lifetime of the runtime.
-- Keyed entries with `cacheTime` are evicted from the `Map` after the grace period.
-- `cacheTime` with a value of `0` (default) means evict stale entries immediately on the next load for a different key, or on a new load for the same key.
+- `cacheTime` is an optional time (ms) controlling how long a stale value is retained before eviction.
+- Default is `undefined` (no time-based eviction). `0` means evict immediately when stale.
+- cacheTime starts when an entry becomes stale (from `invalidate()`, action invalidation, or `staleTime` expiry).
+- Active entry eviction: `status` → `"idle"`, `value` → `undefined`, `error` → `undefined`, `stale` → `false`. Subscribers notified.
+- Inactive entry eviction: entry removed from internal `Map` silently. No subscriber notification.
+- Successful `load()`/`reload()` cancels the cacheTime timer, clears stale, restarts staleTime.
+- Failed `load()`/`reload()` does NOT start cacheTime — existing failure behavior is preserved.
+- Runtime `dispose()` clears all cacheTime timers and drops all entries.
+- Per-key: each entry in the `Map<ResourceKey, CacheEntry>` has its own independent cacheTime timer.
+- Works with or without `staleTime`.
+- Applies to non-keyed resources (single entry).
 
-**Note:** Full cross-navigation `cacheTime` (surviving runtime disposal) requires the cache store (Phase 4+).
+**Note:** Full cross-navigation `cacheTime` (surviving runtime disposal) requires the cache store (Phase 5+). Phase 3 is single-runtime only.
 
 ### Phase 4 — SWR (Stale-While-Revalidate)
 
@@ -746,6 +762,369 @@ When no `key` option is provided:
 
 ---
 
+## Phase 3: CacheTime — Single-Runtime Design
+
+**Status:** Design (not yet implemented)  
+**Scope:** `cacheTime` option, in-memory entry retention/eviction within the lifetime of a single `ResourceNode`. No cross-navigation cache store. No SWR. No dependency-tracked keys. No server resources.
+
+### Revisiting Phase 2 Q7
+
+Phase 2's design (Q7) recommended that `cacheTime` should wait for a cacheStore. Phase 3 re-evaluates this and finds that **single-runtime cacheTime is feasible and valuable** as a stepping stone:
+
+- `cacheTime` without a store provides **in-memory entry retention/eviction** within the lifetime of a `ResourceNode`.
+- This enables "stale data grace period" patterns: show stale data for N ms after it becomes stale, then clear it.
+- Cross-navigation survival (the original reason for requiring a cacheStore) remains future work.
+- Runtime disposal still clears all entries immediately — no ambiguity.
+
+**Decision:** Implement single-runtime `cacheTime` in Phase 3, deferring cross-navigation survival to Phase 5+.
+
+### Core Semantics
+
+`cacheTime` is optional, in milliseconds. Default: `undefined` (no time-based eviction).
+
+#### When cacheTime starts
+
+cacheTime starts when an entry transitions from non-stale to stale. This happens via:
+- Manual `invalidate()`
+- Action invalidation (calls `invalidate()` under the hood)
+- `staleTime` expiry
+
+#### What happens while stale and before cacheTime expires
+
+- `status` remains `"ready"`
+- `value` remains available
+- `stale` is `true`
+- The entry's cache eviction timer is running
+
+#### What happens when cacheTime expires (active entry)
+
+- `value` → `undefined`
+- `error` → `undefined`
+- `status` → `"idle"`
+- `stale` → `false`
+- Subscribers are notified
+- If an in-flight promise exists for this entry, it is left unchanged. When the promise resolves, it updates the entry state naturally (entry transitions from `"pending"` to the load outcome). If the entry was removed from the Map (inactive case), the resolved update is a no-op.
+
+#### What happens when cacheTime expires (inactive entry)
+
+- The entry is removed from the node's internal `Map`
+- No subscriber notification
+- If this key becomes active later, a fresh load begins (entry not found in Map)
+
+#### What a successful load/reload does
+
+- Clears `stale` → `false`
+- Clears any running cacheTime timer for that entry (no longer needed — entry is non-stale)
+- Restarts `staleTime` timer if configured
+
+#### What a failed load/reload does
+
+- Does NOT start cacheTime by itself
+- Preserves existing phase 1/2 failure behavior: `status` → `"failed"`, `stale` → `false`, `value` is `undefined` (cleared when load began)
+- The user must call `reload()` again to retry
+
+#### Interaction with deduplicate
+
+Orthogonal. Deduplicate controls in-flight promise sharing per key. cacheTime controls eviction per key. No direct interaction.
+
+#### Interaction with no-arg reload() and lastContext
+
+- `no-arg reload()` uses `lastContext` to derive the key
+- If the entry for that key has been evicted (cacheTime expired), `reload()` creates a fresh entry and loads from scratch
+- If the entry still exists (within cacheTime), `reload()` proceeds normally: clears the cacheTime timer, clears stale, sets `"pending"`, clears value, calls loader
+
+#### Default value
+
+- `undefined` (property omitted): no time-based eviction. The entry persists until node disposal or explicit load.
+- `0`: evict immediately when stale (timer fires on next event loop tick).
+- Positive number: evict after N ms of staleness.
+- `Infinity`: equivalent to `undefined` (no time-based eviction).
+
+#### Allowed without staleTime
+
+Yes. `cacheTime` is useful with only manual `invalidate()` patterns — e.g., "when I say this data is stale, keep it around for 30 seconds before discarding."
+
+#### Runtime dispose
+
+Clears all staleTime timers, cacheTime timers, and in-flight promises. Drops all entries. No cross-navigation survival.
+
+### Active vs Inactive Key Eviction
+
+| Scenario | Eviction behavior | Notify subscribers? |
+|----------|------------------|---------------------|
+| Active entry, cacheTime expires | Clear entry state (value, error, status, stale). Entry stays in Map as `"idle"`. | Yes |
+| Inactive entry, cacheTime expires | Remove entry from Map entirely. | No |
+| Entry in-flight, cacheTime expires | Leave in-flight promise alone. When it resolves, update entry if it still exists; no-op if removed. | Depends on active status at resolution time |
+| Active entry, `load()` called during cacheTime | Cancel cacheTime timer. Clear stale. Set `"pending"`. Clear value. Start fresh load. | Yes (transition to `"pending"`) |
+
+### Updated Interaction Matrix
+
+Append the following rows. Existing rows from the main Interaction Matrix remain valid but note: rows involving cross-navigation cache survival require a cache store (Phase 5+) and are not part of Phase 3.
+
+| staleTime | cacheTime | swr | Behavior (Phase 3 scope) |
+|-----------|-----------|-----|--------------------------|
+| unset | `30s` | unset | Manual `invalidate()` → stale for 30s, then evicted |
+| `5m` | `30s` | unset | Stale after 5m, stale value retained for 30s, then evicted |
+| `5m` | `0` | unset | Stale after 5m, stale value evicted on next tick |
+| `5m` | `30s` | unset | `reload()` during cacheTime → cache timer cleared, fresh load |
+| unset | unset | unset | No time-based eviction (current Phase 1/2 behavior) |
+
+---
+
+## Approved Phase 3 Implementation Slice
+
+### Design Decisions
+
+#### Q1: Can cacheTime be implemented safely before a cache store?
+
+**Answer:** Yes, but scoped to single-runtime in-memory eviction. Cross-navigation cache survival requires a cache store (Phase 5+). Single-runtime cacheTime provides value for "stale data grace period" patterns and establishes the eviction infrastructure for future phases.
+
+#### Q2: Does cacheTime start on staleness or on key switch?
+
+**Answer:** On staleness (when an entry becomes stale). Switching to a different key should not evict the previous key's entry — it remains available if the user switches back before its cacheTime expires.
+
+#### Q3: Should cacheTime evict the active entry silently or notify?
+
+**Answer:** Notify. The active entry's state change (`"ready"` → `"idle"`, value disappearance, stale reset) is visible to all subscribers via `ResourceRef`.
+
+#### Q4: Should cacheTime evict inactive entries silently or notify?
+
+**Answer:** Silently. Inactive entries are internal to the node. No subscriber should be notified about state changes they cannot observe.
+
+#### Q5: What should cacheTime default to?
+
+**Answer:** `undefined` (no time-based eviction). `0` means evict immediately when stale (next tick). Positive numbers mean evict after N ms of staleness. `Infinity` is equivalent to `undefined`.
+
+#### Q6: Should cacheTime be allowed without staleTime?
+
+**Answer:** Yes. cacheTime works with any source of staleness, including manual `invalidate()`.
+
+#### Q7: Should failed reload preserve the old stale value?
+
+**Answer:** No. Current Phase 1/2 behavior clears the value when a load starts. cacheTime does not change this — it only preserves the value if NO `load()`/`reload()` is explicitly called. This avoids complexity and keeps SWR (which would preserve the value during reload) for Phase 4.
+
+#### Q8: Should runtime dispose clear cacheTime timers?
+
+**Answer:** Yes. Runtime `dispose()` clears all staleTime timers, cacheTime timers, and in-flight promises. cacheTime does not extend entry lifetime beyond the node's lifetime.
+
+### Behavior Specification
+
+#### Type additions
+
+```ts
+export type ResourceCacheOptions<TServices extends object = DefaultScreenServices> = {
+  key?: (context: ResourceLoadContext<TServices>) => ResourceKey
+  staleTime?: number
+  cacheTime?: number   // ms, undefined = no time-based eviction
+  deduplicate?: boolean
+}
+```
+
+#### Entry type
+
+```ts
+type Entry = {
+  value: TValue | undefined
+  status: ResourceStatus
+  error: unknown
+  stale: boolean
+  staleTimer: ReturnType<typeof setTimeout> | null
+  cacheTimer: ReturnType<typeof setTimeout> | null   // NEW
+  inFlightPromise: Promise<void> | null
+}
+```
+
+#### CacheTime timer helpers
+
+```ts
+function _clearEntryCacheTimer(entry: Entry): void {
+  if (entry.cacheTimer != null) {
+    clearTimeout(entry.cacheTimer)
+    entry.cacheTimer = null
+  }
+}
+
+function _startEntryCacheTimer(entry: Entry, key: string): void {
+  _clearEntryCacheTimer(entry)
+  if (cache?.cacheTime != null && isFinite(cache.cacheTime)) {
+    entry.cacheTimer = setTimeout(() => {
+      if (entry === getActiveEntry()) {
+        // Active entry: clear state, notify
+        entry.value = undefined
+        entry.error = undefined
+        entry.status = "idle"
+        entry.stale = false
+        _clearEntryCacheTimer(entry)
+        syncFromActiveEntry()
+      } else {
+        // Inactive entry: remove from map silently
+        entries.delete(key)
+      }
+    }, cache.cacheTime)
+  }
+}
+```
+
+#### Changes to existing functions
+
+**`invalidate()` (add cacheTime start):**
+```
+if (!entry.stale) {
+  entry.stale = true
+  _startEntryCacheTimer(entry, _activeKey)   // NEW
+  // existing stale notify logic
+}
+```
+
+**`_startEntryStaleTimer` callback (add cacheTime start):**
+```
+if (!entry.stale) {
+  entry.stale = true
+  _startEntryCacheTimer(entry, key)          // NEW
+  // existing stale notify logic
+}
+```
+
+**`executeLoad()` start (cancel pending eviction):**
+```
+_clearEntryCacheTimer(entry)   // NEW — cancel eviction before fresh load
+// existing start-load logic
+```
+
+**`executeLoad()` success path (cancel eviction timer):**
+```
+_clearEntryCacheTimer(entry)   // NEW — success neutralizes eviction
+// existing success logic
+```
+
+**`dispose()` (clear all timers):**
+```
+for (const entry of entries.values()) {
+  _clearEntryStaleTimer(entry)
+  _clearEntryCacheTimer(entry)  // NEW
+  entry.inFlightPromise = null
+}
+```
+
+#### What does NOT change
+
+- `ResourceRef` — no changes. It proxies the node's active entry, which handles eviction internally.
+- `ScreenRuntime` — no changes. Dispose calls `node.dispose()` which clears all timers.
+- Non-keyed resources — they have a single entry; cacheTime works the same way.
+- `ResourceNode.load()` and `ResourceNode.reload()` signatures — unchanged.
+- `createResourceNode` signature — unchanged (new option is in `ResourceCacheOptions` which is already optional).
+
+---
+
+### Test Plan for Phase 3
+
+#### CacheTime basic
+
+1. Resource with `cacheTime: 50` — after `invalidate()`, value persists for ~50ms, then transitions to idle.
+2. Resource with `cacheTime: 0` — after `invalidate()`, value evicted on next tick.
+3. Resource without `cacheTime` — entry stays stale indefinitely after invalidate (no time-based eviction).
+
+#### CacheTime with staleTime
+
+4. Resource with `staleTime: 30, cacheTime: 50` — after staleTime fires, stale value persists for 50ms, then evicted.
+5. Resource with `staleTime: 50, cacheTime: 30` — stale value kept for 30ms after staleTime expiry, then evicted.
+6. Resource with `staleTime: 30, cacheTime: 200` — `reload()` called during cacheTime window: cache timer cleared, fresh load starts, new staleTime/cacheTime cycle begins after load.
+
+#### Active entry eviction
+
+7. Active entry evicted by cacheTime: `status` transitions from `"ready"` to `"idle"`, `value` from data to `undefined`, `stale` from `true` to `false`.
+8. `subscribe()` callback fires when active entry is evicted.
+9. `ResourceRef` reflects the post-eviction state (`status: "idle"`, `value: undefined`).
+
+#### Inactive entry eviction
+
+10. Keyed resource with keys "a" and "b" — load "a", invalidate "a", switch to "b" — cacheTime fires for "a" while inactive: no subscriber notification.
+11. After inactive entry "a" is evicted, switching back to key "a" triggers a fresh load (entry not found in Map).
+
+#### Reload interaction
+
+12. Stale entry within cacheTime: `reload()` cancels cacheTime timer, starts fresh load.
+13. Successful reload after cacheTime timer cancellation: entry is fresh (non-stale), new staleTime timer starts.
+14. Failed reload after cacheTime timer cancellation: entry is `"failed"`, stale is `false` (existing Phase 1/2 behavior preserved).
+
+#### Deduplicate interaction
+
+15. cacheTime and `deduplicate: true` — eviction does not affect deduplication (orthogonal concerns).
+16. cacheTime with concurrent loads — cacheTime timer is cleared when any load starts for that entry key.
+
+#### Invalidate interaction
+
+17. `invalidate()` on non-stale entry: stale → true, cacheTime timer starts.
+18. `invalidate()` on already-stale entry: no-op (cacheTime timer continues unaffected).
+19. `invalidate()` during cacheTime window: no-op (entry already stale, timer continues).
+
+#### Non-keyed resources
+
+20. Non-keyed resource with cacheTime: entry evicted after cacheTime from invalidate/staleTime expiry.
+21. Non-keyed resource without cacheTime: no time-based eviction (current behavior).
+
+#### Dispose
+
+22. `dispose()` clears all cacheTime timers for all entries.
+23. `dispose()` clears stale entries with active cacheTime timers (no late evictions after dispose).
+
+#### CacheTime edge cases
+
+24. cacheTime with no staleTime — only manual `invalidate()` triggers cacheTime timer.
+25. cacheTime: 0 with staleTime set — staleTime fires, stale is set, cacheTime=0 means evict on next tick.
+26. Multiple keys with different cacheTime values — each entry's timer runs independently.
+27. Switching between keys multiple times — each entry's cacheTime timer only starts when that entry becomes stale.
+
+#### TypeScript
+
+28. `cacheTime` accepts `number | undefined` (optional).
+29. Existing type-only tests continue to pass.
+
+---
+
+### Compatibility Notes
+
+#### Backward Compatibility
+
+- Resources without `cacheTime` (the default) behave identically before and after Phase 3.
+- Resources without any `cache` option behave identically.
+- `ResourceRef`, `ResourceNode`, `ScreenRuntime`, and `createResourceNode` signatures are backward compatible (the new `cacheTime` option is optional).
+- All existing tests pass without modification.
+- All examples compile and run without changes.
+
+#### Migration
+
+- **No migration required** for existing resources — `cacheTime` is opt-in.
+- Users who want "stale data grace period" add `cache: { cacheTime: 30000 }` to their resource config.
+- Users who set `cacheTime: 0` explicitly enable immediate eviction on staleness (aggressive setting).
+
+#### Interaction with Existing Features
+
+- **`invalidate()`** — now starts cacheTime timer (new behavior, but non-breaking because no existing code uses cacheTime).
+- **`staleTime`** — expiry now starts cacheTime timer (new behavior).
+- **`deduplicate`** — orthogonal, no change.
+- **`cache.key`** — each keyed entry has an independent cacheTime timer.
+- **`autoLoad`** — no interaction.
+- **Action invalidation** — calls `invalidate()` which starts cacheTime timer.
+- **`dispose()`** — clears all cacheTime timers (no change in visible behavior).
+
+#### Open Questions (Resolved for Phase 3)
+
+- **Should expired inactive entries be deleted from the Map?** Yes. This keeps the Map clean and avoids memory leaks.
+- **Shared timer wheel vs individual setTimeout?** `setTimeout` is fine for Phase 3 (typical entry count is small). A shared timer wheel could optimize many entries but is premature.
+- **Should cacheTime accept `Infinity`?** Yes, equivalent to `undefined` (no time-based eviction). The `isFinite()` check handles this.
+- **Should cacheTime be typed as `number | undefined`?** Yes, following the existing `staleTime` convention.
+- **Should cacheTime default to `0` (original proposal) or `undefined`?** `undefined`, to distinguish "no eviction" from "immediate eviction."
+
+#### Known Limitations (Phase 3)
+
+- `cacheTime` does not survive runtime disposal. Navigating away clears all entries.
+- `cacheTime` does not trigger automatic reload. That requires SWR (Phase 4).
+- No global or LRU eviction. Memory usage scales linearly with number of unique keys.
+- No cache size limits.
+
+---
+
 ## Implementation Sketch
 
 ### New types in `packages/core/src/resource.ts`
@@ -882,9 +1261,30 @@ No changeset is needed for this proposal — it is design-only.
 | Backward compat | Full — all existing tests pass without modification |
 | New exports | `ResourceKey` type only |
 
-### Phase 3+ (future, not yet implemented)
+### Phase 3 (designed but not yet implemented)
 
-- **Phase 3:** `cacheTime` — per-key retention period for stale values before eviction (single-runtime)
+- **`cacheTime`** — single-runtime in-memory entry retention/eviction
+- Per-key eviction within a single `ResourceNode`
+- Active entry eviction clears value/error/status/stale and notifies subscribers
+- Inactive entry eviction removes from Map silently
+- See "Phase 3: CacheTime — Single-Runtime Design" section above
+
+| Aspect | Decision |
+|--------|----------|
+| Scope | `cacheTime` only, single-runtime, per `ResourceNode`, per key |
+| Default | `undefined` (no time-based eviction) |
+| Timer start | On staleness (`invalidate()`, action invalidation, `staleTime` expiry) |
+| Timer cancel | Successful `load()`/`reload()`, or explicit `load()`/`reload()` start |
+| Active eviction | Clear entry state, notify subscribers |
+| Inactive eviction | Remove entry from Map, no notification |
+| Failed reload | Does NOT start cacheTime (preserves Phase 1/2 failure behavior) |
+| In-flight promise | Left unchanged on eviction; resolves to no-op if entry removed |
+| `dispose()` | Clears all cacheTime timers and all entries |
+| Cross-navigation survival | No — runtime disposal clears everything |
+| New exports | None (additive option on existing type) |
+
+### Phase 4+ (future, not yet implemented)
+
 - **Phase 4:** `swr` — stale-while-revalidate background refetching (requires cacheTime + cache.key)
 - **Phase 5+:** Cross-navigation cache store — `ResourceCacheStore` interface, `InMemoryResourceCache`, runtime integration
 - **Phase 6+:** Dependency-tracked keys — reactive key functions
