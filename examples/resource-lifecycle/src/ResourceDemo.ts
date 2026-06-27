@@ -3,6 +3,8 @@ import type { AppServices } from "./types.js"
 
 export let teamLoadCount = 0
 export let auditLogLoadCount = 0
+export let cachedTeamLoadCount = 0
+export let dedupeReportLoadCount = 0
 
 export type Team = {
   id: string
@@ -38,6 +40,29 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
     },
   })
 
+  const cachedTeam = $.resource("cachedTeam", {
+    load: async ({ route }) => {
+      cachedTeamLoadCount++
+      return {
+        id: route.params.id,
+        name: "Cached",
+        members: 5,
+        version: cachedTeamLoadCount,
+      } satisfies Team
+    },
+    cache: { staleTime: 50 },
+  })
+
+  const dedupeReport = $.resource("dedupeReport", {
+    load: async () => {
+      dedupeReportLoadCount++
+      await new Promise(r => setTimeout(r, 20))
+      return { summary: "ok" }
+    },
+    autoLoad: false,
+    cache: { deduplicate: true },
+  })
+
   const reloadTeam = $.act("Reload team")
     .does(async () => {
       await team.reload()
@@ -63,11 +88,23 @@ export const ResourceDemo = screen<AppServices>("Resource Demo", $ => {
       await auditLog.load()
     })
 
+  const reloadCachedTeam = $.act("Reload cached team")
+    .does(async () => {
+      await cachedTeam.reload()
+    })
+
+  const loadDedupeReport = $.act("Load dedupe report")
+    .does(async () => {
+      await dedupeReport.load()
+    })
+
   $.surface("main").contains(
     reloadTeam,
     invalidateTeam,
     saveTeam,
     brokenSave,
     loadAuditLog,
+    reloadCachedTeam,
+    loadDedupeReport,
   )
 })

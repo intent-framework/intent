@@ -1,6 +1,6 @@
 # Resource Lifecycle Example
 
-A focused demonstration of the full resource lifecycle in Intent — autoLoad, manual load, reload, invalidation, stale detection, failed state, and action-driven invalidation.
+A focused demonstration of the full resource lifecycle in Intent — autoLoad, manual load, reload, invalidation, stale detection, failed state, action-driven invalidation, and the cache options introduced in alpha.8.
 
 ## What it demonstrates
 
@@ -12,6 +12,8 @@ A focused demonstration of the full resource lifecycle in Intent — autoLoad, m
 - `.invalidates(resource)` on an action — marks resources stale on success
 - Resource "failed" status when a loader throws
 - Route-driven resource load context
+- `cache.staleTime` — resource transitions to stale automatically after a timeout (alpha.8)
+- `cache.deduplicate` — concurrent loads share the same in-flight promise (alpha.8)
 
 ## Run
 
@@ -28,11 +30,32 @@ Open the local URL printed by Vite. Use the browser console to inspect resource 
 pnpm test
 ```
 
-Tests cover every resource status transition: autoLoad, idle, pending, ready, stale, failed, and action-driven invalidation.
+Tests cover every resource status transition: autoLoad, idle, pending, ready, stale, failed, action-driven invalidation, and the alpha.8 cache options.
 
 ## Inspect
 
 - Watch the console log for resource load events and load counts
 - Each reload increments the team version counter
 - The "Broken save" action demonstrates a failed invalidation
+- `cache.staleTime` on the `cachedTeam` resource auto-transitions to stale after 50ms
+- `cache.deduplicate` on the `dedupeReport` resource shares concurrent load promises
 - Test file (`src/ResourceDemo.test.ts`) shows the full resource API surface via `@intent-framework/testing`
+
+## Cache options (alpha.8)
+
+```ts
+// staleTime — auto-stale after a timeout (ms)
+const cachedTeam = $.resource("cachedTeam", {
+  load: async () => loadTeam(),
+  cache: { staleTime: 50 },
+})
+
+// deduplicate — share in-flight promise between concurrent calls
+const dedupeReport = $.resource("dedupeReport", {
+  load: async () => loadReport(),
+  autoLoad: false,
+  cache: { deduplicate: true },
+})
+```
+
+When no `cache` object is set, existing behavior is preserved (no deduplication, no time-based staleness).
