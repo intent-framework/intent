@@ -1,13 +1,14 @@
 # Resource Cache and Stale Semantics — Design Proposal
 
-**Status:** Implemented (Phase 1: staleTime + deduplicate)  
-**Date:** 2026-06-26  
+**Status:** Phase 1 implemented (staleTime + deduplicate), Phase 2 designed (cache.key)  
+**Date:** 2026-06-27  
 **Author:** Big Pickle  
 **Affected package:** `@intent-framework/core`  
 **Related docs:** `docs/Resources.md`, `docs/Specification.md`
 
-> **Phase 1 implementation** (PR #119): `cache.staleTime` and `cache.deduplicate` are implemented in `@intent-framework/core@0.1.0-alpha.8`.  
-> Remaining features (cache.key, cacheTime, swr, cross-navigation cache) remain as proposal/future work.
+> **Phase 1** (PR #119, `@intent-framework/core@0.1.0-alpha.8`): `cache.staleTime` and `cache.deduplicate`.  
+> **Phase 2 design** (this document): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
+> **Phase 3+**: `cacheTime`, SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
 
 ---
 
@@ -419,53 +420,327 @@ type ResourceCacheOptions = {
 
 ---
 
-## Open Questions
+## Phase Plan
 
-1. **Should `ResourceConfig.cache` be a flat object on the config, or should
-   each option (key, staleTime, cacheTime, swr) be a top-level config key?**
-   This proposal groups them under `cache` for clarity, but they could also
-   be flat. Example: `$.resource("team", { load, key, staleTime: 300000 })`.
+### Phase 1 — Implemented (`@intent-framework/core@0.1.0-alpha.8`)
 
-2. **Should the in-memory cache store be part of `@intent-framework/core` or
-   a separate `@intent-framework/cache` package?** The store interface could
-   live in core; the default `InMemoryResourceCache` implementation could be
-   in core or a separate package. A separate package would allow alternative
-   implementations (e.g. `@intent-framework/cache-redis`, LRU-only, etc.).
+**Scope:** `cache.staleTime` + `cache.deduplicate`
 
-3. **How should `cacheTime` interact with runtime disposal during navigation?**
-   This proposal says the cache store holds entries after disposal. But who
-   owns the cache store? A global singleton, or per-app-tree? A global store
-   could cause memory leaks if the user navigates through many screens. A
-   per-tree store (owned by the router) is safer.
+- `staleTime` — time-based automatic staleness via setTimeout
+- `deduplicate` — in-flight load promise sharing
+- Resources without `cache` options behave exactly as before
+- No new exports from the package
+- PR #119
 
-4. **Should `swr: true` imply `deduplicate: true`** when not set? It seems
-   intuitive that background revalidation would deduplicate. If the user
-   calls `reload()` manually while an SWR background reload is in flight,
-   should it deduplicate or force a fresh load?
+### Phase 2 — `cache.key` (recommended next slice)
 
-5. **How should the SWR background reload handle errors?** Current behavior
-   on load failure: status → "failed", error set. With SWR, a background
-   reload failure should probably keep the old value and leave stale: true,
-   rather than transitioning to "failed". The UI would see "stale data
-   available, background refresh failed".
+**Scope:** `cache.key` only, scoped to one runtime and one `ResourceNode`.
 
-6. **Should `key` support dependency tracking** (like a derived signal) so
-   that when the key's dependencies change, the resource automatically
-   reloads? For example, if `key: ({ route }) => route.params.teamId`, and
-   the route param changes, the resource auto-reloads with the new key.
-   This is powerful but adds complexity — the key function would need to
-   be reactive.
+- Add `key?: (context: ResourceLoadContext<TServices>) => ResourceKey` to `ResourceCacheOptions`.
+- The `ResourceNode` internally maintains a `Map<ResourceKey, CacheEntry>`.
+- Each cache entry tracks its own value, status, stale state, error, stale timer, and in-flight promise.
+- `deduplicate` dedupes by active key (not by a single global promise).
+- `no-arg reload()` uses `lastContext` → last key.
+- No cross-runtime cache. No `cacheTime`. No SWR.
+- All existing resources without `cache.key` behave identically to today (the node stores one entry keyed by `null` or the resource name).
 
-7. **What about resource status?** The current four states (idle, pending,
-   ready, failed) may need a fifth: `"stale-while-revalidate"` to distinguish
-   "showing fresh data" from "showing stale data while refetching". However,
-   this can also be derived from `.status === "ready" && .stale === true`.
+**Rationale:** cache.key is:
+- Purely additive — does not break existing behavior.
+- Enables parameterized resources (different route params → different keys).
+- Provides the foundation for later phases (cacheTime, SWR, cross-navigation cache all operate per-key).
+- Safe to implement in a single PR because it does not require cache store, router integration, or new lifecycle concepts.
 
-8. **Should `cacheTime` extend beyond the screen's lifetime?** If a user
-   navigates from Screen A to Screen B and back, should Screen A's resources
-   still be cached? This requires the cache store to survive screen disposal.
-   With a per-route-tree cache store, navigating back to a previously visited
-   screen within the same tree would find the cached entry.
+### Phase 3 — `cacheTime`
+
+**Scope:** `cacheTime` option, still within a single runtime.
+
+- `cacheTime` controls how long a stale value is retained before eviction.
+- Without a cross-navigation cache store, `cacheTime` only applies within the lifetime of the runtime.
+- Keyed entries with `cacheTime` are evicted from the `Map` after the grace period.
+- `cacheTime` with a value of `0` (default) means evict stale entries immediately on the next load for a different key, or on a new load for the same key.
+
+**Note:** Full cross-navigation `cacheTime` (surviving runtime disposal) requires the cache store (Phase 4+).
+
+### Phase 4 — SWR (Stale-While-Revalidate)
+
+**Scope:** `swr` option.
+
+- Requires `cacheTime` (Phase 3) to make sense — SWR needs a retained value to serve while revalidating.
+- Benefits from `cache.key` (Phase 2) to scope the background reload.
+- SWR without a cache store is limited to single-runtime scenarios.
+
+### Phase 5+ — Cross-Navigation Cache Store
+
+**Scope:** `ResourceCacheStore` interface, `InMemoryResourceCache`, runtime integration.
+
+- Depends on all prior phases — the store is per-key, has staleTime/cacheTime semantics, and supports SWR.
+- Ownership, eviction policy, and memory management are open design questions.
+- Likely requires a new package (`@intent-framework/cache`) or integration with `@intent-framework/router`.
+
+### Phase 6+ — Dependency-Tracked Keys
+
+**Scope:** Reactive key functions that auto-reload when dependencies change.
+
+- Requires Phase 2 + a reactive system (signals) integrated into the key function.
+- Significant complexity. Deferred until core signal integration patterns are proven.
+
+---
+
+## Approved Next Implementation Slice — Phase 2: `cache.key`
+
+### Design Decisions
+
+#### Q1: Should phase 2 be cache.key or cacheTime?
+
+**Answer: cache.key.** cache.key is purely additive — it adds the ability to have multiple cache entries within one resource node without changing behavior for existing (non-keyed) resources. cacheTime, by contrast, introduces eviction lifecycle and interacts with cross-navigation cache. cache.key is the prerequisite for all later phases.
+
+#### Q2: Can cache.key be implemented without cross-navigation cache storage?
+
+**Answer: Yes.** cache.key operates within a single `ResourceNode` within a single runtime. Multiple keyed entries coexist in the node's internal `Map`. Cross-navigation storage (surviving runtime disposal) is a separate concern that builds on top of per-key entries.
+
+#### Q3: What is the behavior of a single ResourceRef when the key changes?
+
+**Answer:** The `ResourceRef` remains connected to the same `ResourceNode`. The node's "active key" is determined by calling `key(context)` on each `load()`/`reload()` call. When the key changes:
+
+1. If an entry for the new key already exists in the node's map, the node switches to that entry (serving its cached value/status).
+2. If no entry exists, the node transitions to `pending`, calls the loader, and stores the result under the new key.
+3. The `ResourceRef` continues to proxy whatever the active entry shows.
+
+This means a single ref can show different parameter results without creating multiple runtimes. The ref's `.value`, `.status`, `.stale`, etc., always reflect the entry for the active key.
+
+#### Q4: Does each key map to a separate node internally?
+
+**Answer: No.** One `ResourceNode` maintains a `Map<ResourceKey, CacheEntry>`. The entries are internal to the node. From the outside, the `ResourceRef` and the runtime see a single `ResourceNode` — they do not need to know about keying. This keeps the runtime API unchanged.
+
+```ts
+// Internal structure of a keyed ResourceNode:
+// Map<string, CacheEntry>
+//   "abc" → { value: TeamData, status: "ready", stale: false, ... }
+//   "xyz" → { value: TeamData, status: "ready", stale: true, ... }
+// activeKey: "abc"  ← determines what .value, .status, etc. return
+```
+
+#### Q5: How does keying interact with lastContext and no-arg reload()?
+
+**Answer:** `no-arg reload()` uses `lastContext` to derive the key. Since `lastContext` stores the full context from the last `load()`/`reload()` call, calling the key function with it produces the last active key. This preserves the existing contract — `reload()` without args reloads the same resource with the same parameters.
+
+```ts
+// First load with context
+await team.load({ route: { params: { teamId: "abc" } } })
+// lastContext = { route: { params: { teamId: "abc" } } }
+// activeKey = key(lastContext) = "abc"
+
+// No-arg reload reuses lastContext
+await team.reload()
+// activeKey = key(lastContext) = "abc" (same as before)
+```
+
+If the caller wants a different key, they pass explicit context: `reload({ route: { params: { teamId: "xyz" } } })`.
+
+#### Q6: How does deduplicate behave once cache.key exists?
+
+**Answer:** Deduplication is per-key. Each keyed entry has its own `_inFlightPromise`. Concurrent `load()` calls with the same key share one loader invocation. Concurrent `load()` calls with different keys each invoke the loader independently.
+
+```ts
+const resource = createResourceNode("team", "team", loader, true, {
+  key: ctx => ctx.route.params.teamId,
+  deduplicate: true,
+})
+
+// These share one promise (same key "abc"):
+await Promise.all([
+  resource.load({ route: { params: { teamId: "abc" } } }),
+  resource.load({ route: { params: { teamId: "abc" } } }),
+])
+
+// This runs independently (different key "xyz"):
+await resource.load({ route: { params: { teamId: "xyz" } } })
+```
+
+For non-keyed resources, `key` is `undefined` and the entry key defaults to `null` (or the resource name). Deduplication for non-keyed resources is unchanged from Phase 1.
+
+#### Q7: Should cacheTime exist before a cacheStore, or only with one?
+
+**Answer: cacheTime should only be implemented alongside a cacheStore.** Without a cross-navigation store, `cacheTime` has limited value — it only controls eviction within a single runtime's lifetime. The runtime already clears entries on `dispose()`, so the meaningful use of `cacheTime` (surviving navigation) requires a store. Phase 3 can implement single-runtime `cacheTime` as a stepping stone, but the full value comes in Phase 5+.
+
+#### Q8: Who owns cross-navigation cache storage?
+
+**Answer: Undetermined — future work.** Candidates:
+
+- **`@intent-framework/router`** — the router naturally manages navigation lifecycle and could own per-route-tree cache stores.
+- **`@intent-framework/core`** — own the interface only; leave implementations to other packages.
+- **`@intent-framework/cache`** (new package) — own the interface + default `InMemoryResourceCache` implementation.
+- **Application-level** — users provide a `cacheStore` to `createScreenRuntime()`.
+
+This question is explicitly deferred until Phase 5+ design begins.
+
+#### Q9: Should swr wait until cache.key and cacheTime exist?
+
+**Answer: Yes.** SWR depends on:
+- `cache.key` — to know which entry to revalidate.
+- `cacheTime` — to have a retained value to serve during revalidation.
+
+Implementing SWR before both would produce an incomplete or misleading API. SWR is Phase 4.
+
+#### Q10: What is the smallest next runtime PR that preserves existing resource behavior?
+
+**Answer: Phase 2 — `cache.key` only.** The implementation:
+- Adds `key?: (context: ResourceLoadContext<TServices>) => ResourceKey` to `ResourceCacheOptions`.
+- Converts `ResourceNode` from single-slot storage to `Map<ResourceKey, CacheEntry>`.
+- Non-keyed resources store one entry keyed by `null` (or by resource name as sentinel).
+- No new exports from the package.
+- All existing tests pass unchanged.
+- All existing examples unchanged.
+- No changeset needed (type addition only; no behavioral change for existing code).
+
+---
+
+### Behavior Specification for Phase 2
+
+#### Type Additions
+
+```ts
+export type ResourceKey = string | number | boolean | null | undefined | ResourceKey[]
+
+export type ResourceCacheOptions<TServices extends object = DefaultScreenServices> = {
+  key?: (context: ResourceLoadContext<TServices>) => ResourceKey
+  staleTime?: number
+  deduplicate?: boolean
+}
+```
+
+`key` is added alongside existing `staleTime` and `deduplicate`. It is also added to `ResourceConfig` if the current convention keeps `cache` as a nested object.
+
+#### Key Derivation
+
+- On each `load()` or `reload()` call with a context, call `key(context)` to derive the active key.
+- On `no-arg reload()`, call `key(lastContext)`.
+- If no `key` function is provided, use a sentinel key (`null` or `""`) — equivalent to today's single-entry behavior.
+- Key equality is determined by deep equality (`JSON.stringify` or a fast deep-equal utility).
+
+#### Entry Lifecycle
+
+Each entry in the `Map` tracks:
+
+```ts
+type CacheEntry<TValue> = {
+  value: TValue | undefined
+  status: ResourceStatus
+  error: unknown
+  stale: boolean
+  inFlightPromise: Promise<void> | null
+  staleTimer: ReturnType<typeof setTimeout> | null
+  lastContext: ResourceLoadContext<TServices> | undefined
+}
+```
+
+- **Entry creation:** When `load()` is called with a key not in the map, create a new entry in `"idle"` status, then transition to `"pending"` and start the loader.
+- **Entry reuse:** When `load()` is called with a key already in the map:
+  - If `deduplicate` is true and the entry has an in-flight promise, return it.
+  - If the entry is `"ready"` and not stale, return immediately (no loader call).
+  - If the entry is stale, reload (call loader again).
+- **Entry eviction:** Entries are never evicted during Phase 2 (no `cacheTime`). They persist for the lifetime of the `ResourceNode`. Future phases will add eviction.
+- **Entry on dispose:** When `node.dispose()` is called, clear all timers and in-flight promises in the map. Entries are discarded (they do not survive the node's lifetime).
+
+#### Active Key Visibility
+
+The `ResourceNode` exposes the state of the **active entry only**:
+
+- `.value` — value of the entry for `activeKey`
+- `.status` — status of the entry for `activeKey`
+- `.error` — error of the entry for `activeKey`
+- `.stale` — stale condition of the entry for `activeKey`
+- `.load()`, `.reload()` — operate on the entry for the key derived from the provided context (or `lastContext`)
+
+The `ResourceRef` connected to this node proxies whatever the node exposes. The ref does not need to know about keying.
+
+#### No-Key Backward Compatibility
+
+When no `key` option is provided:
+
+- The node creates one entry keyed by `null`.
+- The node stores `lastContext` (unchanged from today).
+- `deduplicate` uses the single entry's `_inFlightPromise` (unchanged from Phase 1).
+- `staleTime` timer is on the single entry (unchanged from Phase 1).
+- Behavior is identical to the current implementation.
+
+---
+
+### Test Plan for Phase 2
+
+#### Unit Tests (in `packages/core/src/core.test.ts`)
+
+**Key derivation tests:**
+1. Resource without `key` keeps existing behavior (single entry, no key awareness).
+2. Resource with `key` derives key from context on `load(context)`.
+3. Resource with `key` derives key from `lastContext` on `no-arg reload()`.
+4. Resource with `key` and no prior context gets empty context for key derivation (graceful fallback).
+
+**Multi-entry tests:**
+5. Two `load()` calls with different keys create independent entries.
+6. Each entry independently tracks its own status, value, and error.
+7. Loading key "abc" to ready, then loading key "xyz", then switching back to "abc" via context — the value for "abc" is still available without re-fetching.
+8. Entries with `staleTime` each have independent timers.
+
+**Key change tests:**
+9. Loading with key "abc", then loading with key "xyz" — the active key switches to "xyz", `.value` reflects "xyz"'s entry, `.status` reflects "xyz"'s entry.
+10. `no-arg reload()` after loading key "abc" reloads the "abc" entry (via `lastContext`).
+
+**Deduplication with keying:**
+11. Concurrent `load()` calls with the same key are deduplicated (one loader call).
+12. Concurrent `load()` calls with different keys are NOT deduplicated (two loader calls).
+13. `deduplicate: false` with keying — each load runs independently per key.
+
+**Error handling:**
+14. One key's entry can be in `"failed"` while another key's entry for the same resource is `"ready"`.
+15. Retry after failure is per-key: failing key "abc" does not affect key "xyz"'s ability to load.
+
+**Ref proxying:**
+16. `ResourceRef.proxy` correctly reflects the active entry's value, status, and conditions regardless of which key is active.
+17. `ResourceRef.subscribe` fires when the active entry changes (including when switching keys via a new load).
+
+**Runtime integration:**
+18. `ScreenRuntime.start()` with a keyed resource — autoload with runtime services produces the correct key.
+19. `ScreenRuntime.dispose()` clears all entries in the keyed node.
+
+**TypeScript:**
+20. `cache.key` function receives correctly typed context.
+21. Existing type-only tests continue to pass.
+
+---
+
+### Compatibility Notes
+
+#### Backward Compatibility
+
+- Resources without `cache.key` behave identically before and after Phase 2.
+- Resources without any `cache` option behave identically.
+- `ResourceRef`, `ResourceNode`, `ScreenRuntime`, and `createResourceNode` signatures are backward compatible (the new `key` option is optional).
+- All existing tests pass without modification.
+- All examples compile and run without changes.
+
+#### Migration
+
+- **No migration required** for existing resources — the `key` option is opt-in.
+- Users who want parameterized resources add `key: (ctx) => ctx.route.params.id` to their resource config.
+- Users who had workarounds (e.g., creating separate resources for each parameter) can consolidate into a single keyed resource.
+- `deduplicate` defaults to `true` when `cache` is set (already the case from Phase 1).
+
+#### Interaction with Existing Features
+
+- **`invalidate()`** — marks the active entry as stale. Other entries in the map are unaffected.
+- **`autoLoad`** — autoload uses runtime services to derive the key. Works naturally.
+- **Action invalidation** — `act.invalidates(resource)` marks the active entry stale. If the key changes, the new key's entry needs separate invalidation.
+- **`staleTime`** — each entry has its own timer. Timers are independent per-key.
+- **`deduplicate`** — per-key as described above. Existing single-entry deduplication is a special case of per-key deduplication with one key.
+
+#### Open Questions (Deferred from Phase 2)
+
+- **Key equality function** — should we use `JSON.stringify` (fast, no deps) or a deep equality utility (more correct for complex keys like arrays/objects)? Recommendation: use `JSON.stringify` for Phase 2. Array keys are supported by the type but should be used sparingly.
+- **Active key change without explicit load** — should the key be reactive (automatically reload when route params change)? This is dependency-tracked keys (Phase 6+). Phase 2 requires an explicit `load()`/`reload()` call to change the active key.
+- **Entry eviction policy** — without `cacheTime`, entries accumulate in the map indefinitely. For Phase 2 this is acceptable (the node is disposed when the runtime is disposed). Future phases should add LRU or time-based eviction.
+- **`cache.key` as a top-level config property vs nested under `cache`** — the existing convention nests under `cache`. Phase 2 follows this convention for consistency. This can be revisited if the team prefers flat.
+- **Key type validation** — `ResourceKey` allows `string | number | boolean | null | undefined | ResourceKey[]`. Should we restrict further (e.g., disallow arrays in Phase 2)? Recommendation: keep the union type but document that string keys are preferred.
 
 ---
 
@@ -586,14 +861,24 @@ No changeset is needed for this proposal — it is design-only.
 - `cache.deduplicate` — in-flight load deduplication
 - Resources without `cache` options behave exactly as before
 
-### Future (not yet implemented)
+### Phase 2 (next implementation — `cache.key`)
 
-- `cache.key` — cache key function for parameterized resources
-- `cacheTime` — retention period for stale values before eviction
-- `swr` — stale-while-revalidate background refetching
-- Cross-navigation cache store (InMemoryResourceCache)
-- Dependency-tracked keys
-- Streaming resources
-- SSR hydration
-- Optimistic updates
-- Server resources
+| Aspect | Decision |
+|--------|----------|
+| Scope | `cache.key` only, scoped to one runtime + one `ResourceNode` |
+| Internal storage | `Map<ResourceKey, CacheEntry>` within `ResourceNode` |
+| Key derivation | `key(context)` on load/reload; `key(lastContext)` on no-arg reload |
+| Deduplication | Per-key (each entry has its own in-flight promise) |
+| staletime | Per-key (each entry has its own timer) |
+| Active key | Determined by last `load()`/`reload()` context |
+| Non-keyed resources | Store one entry under sentinel key (`null`) — behavior unchanged |
+| Backward compat | Full — all existing tests pass without modification |
+| New exports | `ResourceKey` type only |
+
+### Phase 3+ (future, not yet implemented)
+
+- **Phase 3:** `cacheTime` — per-key retention period for stale values before eviction (single-runtime)
+- **Phase 4:** `swr` — stale-while-revalidate background refetching (requires cacheTime + cache.key)
+- **Phase 5+:** Cross-navigation cache store — `ResourceCacheStore` interface, `InMemoryResourceCache`, runtime integration
+- **Phase 6+:** Dependency-tracked keys — reactive key functions
+- **Future (separate proposals):** Streaming resources, SSR hydration, Suspense integration, Optimistic updates, Server resources
