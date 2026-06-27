@@ -35,6 +35,7 @@ export type AnyResourceNode = ResourceNode<unknown, any>
 export type ResourceCacheOptions<TServices extends object = DefaultScreenServices> = {
   key?: (context: ResourceLoadContext<TServices>) => ResourceKey
   staleTime?: number
+  cacheTime?: number
   deduplicate?: boolean
 }
 
@@ -75,6 +76,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     error: unknown
     stale: boolean
     staleTimer: ReturnType<typeof setTimeout> | null
+    cacheTimer: ReturnType<typeof setTimeout> | null
     inFlightPromise: Promise<void> | null
   }
 
@@ -85,6 +87,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
       error: undefined,
       stale: false,
       staleTimer: null,
+      cacheTimer: null,
       inFlightPromise: null,
     }
   }
@@ -190,18 +193,45 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     }
   }
 
-  function _startEntryStaleTimer(entry: Entry): void {
+  function _startEntryStaleTimer(entry: Entry, key: string): void {
     _clearEntryStaleTimer(entry)
     if (cache?.staleTime != null && isFinite(cache.staleTime)) {
       entry.staleTimer = setTimeout(() => {
         if (!entry.stale) {
           entry.stale = true
+          _startEntryCacheTimer(entry, key)
           if (entry === getActiveEntry()) {
             currentStale = true
             staleNotify()
           }
         }
       }, cache.staleTime)
+    }
+  }
+
+  // --- Cache timer helpers ---
+  function _clearEntryCacheTimer(entry: Entry): void {
+    if (entry.cacheTimer != null) {
+      clearTimeout(entry.cacheTimer)
+      entry.cacheTimer = null
+    }
+  }
+
+  function _startEntryCacheTimer(entry: Entry, key: string): void {
+    _clearEntryCacheTimer(entry)
+    if (cache?.cacheTime != null && isFinite(cache.cacheTime)) {
+      entry.cacheTimer = setTimeout(() => {
+        if (entry === getActiveEntry()) {
+          entry.value = undefined
+          entry.error = undefined
+          entry.status = "idle"
+          entry.stale = false
+          _clearEntryCacheTimer(entry)
+          syncFromActiveEntry()
+        } else {
+          entries.delete(key)
+        }
+      }, cache.cacheTime)
     }
   }
 
@@ -248,6 +278,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
 
   function executeLoad(context?: ResourceLoadContext<TServices>): Promise<void> {
     const key = resolveKey(context)
+    const prevActiveKey = _activeKey
     _activeKey = key
 
     let entry = entries.get(key)
@@ -256,7 +287,10 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
       entries.set(key, entry)
     }
 
+    _clearEntryCacheTimer(entry)
+
     if (shouldDeduplicate && entry.inFlightPromise) {
+      if (key !== prevActiveKey) syncFromEntry(entry)
       return entry.inFlightPromise
     }
 
@@ -276,13 +310,16 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
         const result = await Promise.resolve(
           (loader as (ctx: ResourceLoadContext<TServices>) => TValue | Promise<TValue>)(loadContext)
         )
+        if (entries.get(key) !== entry) return
         entry!.value = result
         entry!.status = "ready"
         entry!.stale = false
+        _clearEntryCacheTimer(entry!)
         if (entry === getActiveEntry()) syncFromEntry(entry!)
         staleNotify()
-        _startEntryStaleTimer(entry!)
+        _startEntryStaleTimer(entry!, key)
       } catch (e: unknown) {
+        if (entries.get(key) !== entry) return
         entry!.error = e
         entry!.status = "failed"
         entry!.stale = false
@@ -301,6 +338,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
     const entry = getActiveEntry()
     if (!entry.stale) {
       entry.stale = true
+      _startEntryCacheTimer(entry, _activeKey)
       if (entry === getActiveEntry()) {
         currentStale = true
         staleNotify()
@@ -311,6 +349,7 @@ export function createResourceNode<TValue, TServices extends object = DefaultScr
   function dispose(): void {
     for (const entry of entries.values()) {
       _clearEntryStaleTimer(entry)
+      _clearEntryCacheTimer(entry)
       entry.inFlightPromise = null
     }
   }
