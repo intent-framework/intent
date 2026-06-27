@@ -24,6 +24,7 @@ The current repository proves the core shape:
 - Runtime-scoped resources
 - Resource reload and invalidation
 - Resource cache phase 2 (staleTime, deduplicate, cache.key, ResourceKey)
+- Resource cache phase 3 (cacheTime — single-runtime stale value retention and eviction)
 - Independent executable actions
 - Keyboard Enter default action
 - Accessible Enter hints
@@ -40,17 +41,17 @@ It is not production-ready yet. The goal right now is to keep the foundation sma
 Intent is available as experimental alpha packages on npm:
 
 ```sh
-pnpm add @intent-framework/core@0.1.0-alpha.9 @intent-framework/dom@0.1.0-alpha.9 @intent-framework/router@0.1.0-alpha.9 @intent-framework/testing@0.1.0-alpha.9
+pnpm add @intent-framework/core@0.1.0-alpha.10 @intent-framework/dom@0.1.0-alpha.10 @intent-framework/router@0.1.0-alpha.10 @intent-framework/testing@0.1.0-alpha.10
 ```
 
 ```sh
-npm install @intent-framework/core@0.1.0-alpha.9 @intent-framework/dom@0.1.0-alpha.9 @intent-framework/router@0.1.0-alpha.9 @intent-framework/testing@0.1.0-alpha.9
+npm install @intent-framework/core@0.1.0-alpha.10 @intent-framework/dom@0.1.0-alpha.10 @intent-framework/router@0.1.0-alpha.10 @intent-framework/testing@0.1.0-alpha.10
 ```
 
 The quickstart pins the current alpha version so examples match the published APIs.
 
 ```txt
-Current alpha: v0.1.0-alpha.9
+Current alpha: v0.1.0-alpha.10
 First public alpha: v0.1.0-alpha.0
 GitHub Releases: https://github.com/intent-framework/intent/releases
 ```
@@ -255,7 +256,7 @@ The repository includes five runnable examples, each demonstrating a different s
 |---------|---------------------|
 | [`canonical-invite`](examples/canonical-invite) | Minimal screen: text ask, primary action, validation, blocked reasons, feedback, `inspectScreen()`. Matches the Quickstart one-to-one. |
 | [`choice-form`](examples/choice-form) | All state kinds (text, choice, boolean) and ask kinds (`asChoice()`, `asSecret()`, `hint()`), multiple surfaces per screen, flow diagnostics, full test coverage. |
-| [`resource-lifecycle`](examples/resource-lifecycle) | Full resource lifecycle: autoLoad, manual load, reload, invalidation, stale detection, failed state, action-driven invalidation with `.invalidates()`. |
+| [`resource-lifecycle`](examples/resource-lifecycle) | Full resource lifecycle: autoLoad, manual load, reload, invalidation, stale detection, failed state, action-driven invalidation with `.invalidates()`, staleTime, cache.key, cacheTime. |
 | [`secret-vault`](examples/secret-vault) | Multi-step flows (3+ steps), `asSecret()` + `private()`, `BooleanState` toggles, multi-screen router app, flow diagnostics. |
 | [`web-basic`](examples/web-basic) | Multi-screen team invite demo with router, resources, diagnostics panel, feedback, and keyboard default action. |
 
@@ -347,7 +348,7 @@ Current limitations include:
 * No native renderer yet
 * No SSR story yet
 * No backend persistence yet
-* Resource cache is phase 2 (staleTime, deduplicate, cache.key); cacheTime, swr, and cross-navigation cache are future
+* Resource cache is phase 3 (staleTime, deduplicate, cache.key, cacheTime); swr and cross-navigation cache are future
 * No DevTools package yet
 * Automated version PR workflow and manual publish workflow are set up (Changesets configured)
 * Demo side panels use manual DOM

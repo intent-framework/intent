@@ -20,7 +20,7 @@
   </head>
   <body>
     <h1>Intent: Resource Lifecycle</h1>
-    <p>Demonstrates autoLoad, manual load, reload, invalidation, stale state, failed state, and action-driven invalidation.</p>
+    <p>Demonstrates autoLoad, manual load, reload, invalidation, stale state, failed state, action-driven invalidation, staleTime, cache.key, and cacheTime.</p>
     <div id="root"></div>
     <h2>Resource Status</h2>
     <pre id="resource-status">Loading...</pre>
@@ -39,6 +39,9 @@
         <li>A failed loader produces <code>failed</code> status and error.</li>
         <li>A failed action does not invalidate its targeted resources.</li>
         <li>Route context is available to resource loaders.</li>
+        <li><code>cache.cacheTime</code> retains stale value until eviction timeout.</li>
+        <li>After <code>cacheTime</code> expiry, stale resource transitions from <code>ready</code> to <code>idle</code>.</li>
+        <li>Keyed resources each have independent <code>cacheTime</code> timers.</li>
       </ul>
     </div>
     <script type="module" src="/src/main.ts"></script>
