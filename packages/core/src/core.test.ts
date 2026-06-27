@@ -4050,3 +4050,565 @@ describe("resource cache phase 2 - key", () => {
     expect(resource.value).toBe("val-a")
   })
 })
+
+describe("resource cache phase 3 - cacheTime", () => {
+  // === cacheTime basic ===
+
+  it("cacheTime does nothing when unset", async () => {
+    const resource = createResourceNode("team", "team", async () => "data")
+    await resource.load()
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+    await new Promise(r => setTimeout(r, 50))
+    // Entry stays stale indefinitely (no cacheTime)
+    expect(resource.stale.current).toBe(true)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+  })
+
+  it("cacheTime starts on manual invalidate() and evicts after timeout", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 30 })
+    await resource.load()
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+
+    // Wait for cacheTime to expire
+    await new Promise(r => setTimeout(r, 50))
+    expect(resource.status).toBe("idle")
+    expect(resource.value).toBeUndefined()
+    expect(resource.error).toBeUndefined()
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("cacheTime starts on staleTime expiry", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { staleTime: 20, cacheTime: 30 })
+    await resource.load()
+    expect(resource.stale.current).toBe(false)
+
+    // Wait for staleTime to fire
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.stale.current).toBe(true)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+
+    // Wait for cacheTime to expire
+    await new Promise(r => setTimeout(r, 40))
+    expect(resource.status).toBe("idle")
+    expect(resource.value).toBeUndefined()
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("cacheTime applies to non-keyed resources", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 20 })
+    await resource.load()
+    resource.invalidate()
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.status).toBe("idle")
+    expect(resource.value).toBeUndefined()
+  })
+
+  it("cacheTime applies per key for keyed resources", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 20,
+    })
+
+    await resource.load({ id: "a" })
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    // Switch to key "b" — "a" is now inactive with a cacheTime timer
+    await resource.load({ id: "b" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data-b")
+
+    // Wait for "a"'s cacheTime to expire (inactive eviction)
+    await new Promise(r => setTimeout(r, 30))
+
+    // Key "b" is unaffected
+    await resource.load({ id: "b" })
+    expect(resource.value).toBe("data-b")
+
+    // Switching back to "a" creates a fresh load (entry was evicted)
+    await resource.load({ id: "a" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data-a")
+  })
+
+  // === stale value remains available ===
+
+  it("stale value remains available before cacheTime expires", async () => {
+    const resource = createResourceNode("team", "team", async () => "hello", true, { cacheTime: 100 })
+    await resource.load()
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("hello")
+  })
+
+  // === active entry eviction ===
+
+  it("active entry eviction sets status idle, clears value, error, stale", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 20 })
+    await resource.load()
+    resource.invalidate()
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.status).toBe("idle")
+    expect(resource.value).toBeUndefined()
+    expect(resource.error).toBeUndefined()
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("active entry eviction notifies subscribers", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 20 })
+    await resource.load()
+
+    const statuses: string[] = []
+    const unsub = resource.subscribe(() => {
+      statuses.push(resource.status)
+    })
+
+    resource.invalidate()
+    await new Promise(r => setTimeout(r, 30))
+
+    expect(statuses).toContain("idle")
+    unsub()
+  })
+
+  // === inactive keyed entry eviction ===
+
+  it("inactive keyed entry eviction removes only that entry", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 20,
+    })
+
+    await resource.load({ id: "a" })
+    resource.invalidate()
+
+    // Load key "b" — "a" becomes inactive with cacheTime timer
+    await resource.load({ id: "b" })
+    expect(resource.value).toBe("data-b")
+
+    // Wait for "a"'s cacheTime
+    await new Promise(r => setTimeout(r, 30))
+
+    // "b" is still healthy
+    await resource.load({ id: "b" })
+    expect(resource.value).toBe("data-b")
+
+    // Switching back to "a" triggers a fresh load (entry was evicted)
+    await resource.load({ id: "a" })
+    expect(resource.value).toBe("data-a")
+  })
+
+  it("inactive keyed entry eviction does not notify subscribers", async () => {
+    let notifyCount = 0
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 20,
+    })
+
+    await resource.load({ id: "a" })
+    resource.invalidate()
+
+    const unsub = resource.subscribe(() => { notifyCount++ })
+
+    // Load key "b" — "a" becomes inactive
+    await resource.load({ id: "b" })
+    const countBefore = notifyCount
+
+    // Wait for "a"'s cacheTime to fire (inactive — no notification)
+    await new Promise(r => setTimeout(r, 30))
+    expect(notifyCount).toBe(countBefore)
+
+    unsub()
+  })
+
+  it("loading an evicted inactive key creates a fresh entry", async () => {
+    let callCount = 0
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      callCount++
+      return `data-${ctx.id}-${callCount}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 20,
+    })
+
+    await resource.load({ id: "a" })
+    expect(callCount).toBe(1)
+    resource.invalidate()
+
+    // Switch to "b"
+    await resource.load({ id: "b" })
+    expect(callCount).toBe(2)
+
+    // Wait for "a"'s cacheTime
+    await new Promise(r => setTimeout(r, 30))
+
+    // Load "a" again — should be a fresh load
+    await resource.load({ id: "a" })
+    expect(callCount).toBe(3)
+    expect(resource.value).toBe("data-a-3")
+  })
+
+  // === reload interaction ===
+
+  it("successful reload clears cacheTime timer and entry stays ready", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 50 })
+    await resource.load()
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    // Reload before cacheTime expires
+    await resource.reload()
+    expect(resource.stale.current).toBe(false)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+
+    // Wait past original cacheTime — entry should not be evicted since timer was cleared
+    await new Promise(r => setTimeout(r, 60))
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data")
+  })
+
+  it("reload after stale before cacheTime expires cancels eviction and reloads", async () => {
+    let loadCount = 0
+    const resource = createResourceNode("team", "team", async () => {
+      loadCount++
+      return `data${loadCount}`
+    }, true, { cacheTime: 100 })
+
+    await resource.load()
+    expect(loadCount).toBe(1)
+
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    // Reload during cacheTime window
+    await resource.reload()
+    expect(loadCount).toBe(2)
+    expect(resource.value).toBe("data2")
+    expect(resource.stale.current).toBe(false)
+
+    // Wait past original cacheTime — entry should not be evicted
+    await new Promise(r => setTimeout(r, 120))
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data2")
+  })
+
+  // === failed load ===
+
+  it("failed load does not start cacheTime", async () => {
+    const resource = createResourceNode("team", "team", async () => {
+      throw new Error("fail")
+    }, true, { cacheTime: 20 })
+
+    await resource.load()
+    expect(resource.status).toBe("failed")
+
+    // Wait — should not become idle (cacheTime never started)
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.status).toBe("failed")
+    expect(resource.stale.current).toBe(false)
+  })
+
+  it("failed reload preserves existing failure behavior", async () => {
+    let callCount = 0
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      throw new Error("fail")
+    }, true, { cacheTime: 20 })
+
+    await resource.load()
+    expect(resource.status).toBe("failed")
+    expect(callCount).toBe(1)
+
+    // Reload — should try again and fail again
+    await resource.reload()
+    expect(resource.status).toBe("failed")
+    expect(callCount).toBe(2)
+
+    // Wait — cacheTime should NOT have been started
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.status).toBe("failed")
+  })
+
+  // === invalidate interaction ===
+
+  it("invalidate before cacheTime expiry does not create duplicate timers", async () => {
+    let notifyCount = 0
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 100 })
+    await resource.load()
+
+    const unsub = resource.subscribe(() => { notifyCount++ })
+
+    resource.invalidate()
+    const countAfterFirst = notifyCount
+
+    // Invalidate again while already stale — should be no-op
+    resource.invalidate()
+    expect(notifyCount).toBe(countAfterFirst)
+
+    // Manually check entry state
+    expect(resource.stale.current).toBe(true)
+
+    unsub()
+  })
+
+  // === repeated staleTime cycles ===
+
+  it("repeated staleTime cycles do not leak timers", async () => {
+    let loadCount = 0
+    const resource = createResourceNode("team", "team", async () => {
+      loadCount++
+      return `data${loadCount}`
+    }, true, { staleTime: 20, cacheTime: 100 })
+
+    await resource.load()
+    expect(loadCount).toBe(1)
+
+    // Wait for staleTime to fire
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.stale.current).toBe(true)
+
+    // Reload — timer cycle resets
+    await resource.reload()
+    expect(resource.stale.current).toBe(false)
+    expect(loadCount).toBe(2)
+
+    // Wait for staleTime again
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.stale.current).toBe(true)
+
+    // Reload again — still works, no leaked timers
+    await resource.reload()
+    expect(loadCount).toBe(3)
+    expect(resource.stale.current).toBe(false)
+  })
+
+  // === deduplicate interaction ===
+
+  it("deduplicate still works before cacheTime expiry", async () => {
+    let callCount = 0
+    let resolveLoad!: (v: string) => void
+    const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      return deferred
+    }, true, { cacheTime: 100, deduplicate: true })
+
+    const p1 = resource.load()
+    resource.invalidate()
+    const p2 = resource.load()
+
+    // Both load calls should see the same in-flight promise (deduped)
+    resolveLoad("result")
+    await p1
+    await p2
+    expect(callCount).toBe(1)
+    expect(resource.status).toBe("ready")
+  })
+
+  it("deduplicate still works after active entry eviction", async () => {
+    let callCount = 0
+    let resolveLoad!: (v: string) => void
+    const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+
+    const resource = createResourceNode("team", "team", async () => {
+      callCount++
+      if (callCount === 1) return "first"
+      return deferred
+    }, true, { cacheTime: 10, deduplicate: true })
+
+    await resource.load()
+    expect(callCount).toBe(1)
+    expect(resource.value).toBe("first")
+
+    resource.invalidate()
+
+    // Wait for eviction
+    await new Promise(r => setTimeout(r, 20))
+    expect(resource.status).toBe("idle")
+
+    // Fresh load — should work with deduplicate
+    const p1 = resource.load()
+    const p2 = resource.load()
+
+    resolveLoad("fresh")
+    await Promise.all([p1, p2])
+    expect(callCount).toBe(2)
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("fresh")
+  })
+
+  // === no-arg reload after eviction ===
+
+  it("no-arg reload after active eviction uses lastContext and reloads the last key", async () => {
+    let lastCtx: unknown = undefined
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      lastCtx = ctx
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 10,
+    })
+
+    await resource.load({ id: "abc" })
+    expect(resource.value).toBe("data-abc")
+
+    resource.invalidate()
+    await new Promise(r => setTimeout(r, 20))
+    expect(resource.status).toBe("idle")
+
+    // No-arg reload should use lastContext → key "abc"
+    await resource.reload()
+    expect(lastCtx).toHaveProperty("id", "abc")
+    expect(resource.value).toBe("data-abc")
+    expect(resource.status).toBe("ready")
+  })
+
+  // === dispose ===
+
+  it("dispose clears all cacheTime timers", async () => {
+    let notified = false
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 20 })
+    await resource.load()
+    resource.invalidate()
+
+    const unsub = resource.subscribe(() => { notified = true })
+
+    resource.dispose()
+
+    // Wait past cacheTime — eviction should not fire after dispose
+    await new Promise(r => setTimeout(r, 30))
+    expect(notified).toBe(false)
+    unsub()
+  })
+
+  it("dispose prevents late eviction notifications", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 10 })
+    await resource.load()
+    resource.invalidate()
+
+    resource.dispose()
+    // No error/crash — dispose clears everything cleanly
+  })
+
+  // === cacheTime without staleTime ===
+
+  it("cacheTime works without staleTime (manual invalidate only)", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 20 })
+    await resource.load()
+    expect(resource.stale.current).toBe(false)
+
+    // No staleTime — cacheTime not started until manual invalidate
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.stale.current).toBe(false)
+
+    // Manual invalidate triggers cacheTime
+    resource.invalidate()
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.status).toBe("idle")
+    expect(resource.value).toBeUndefined()
+  })
+
+  // === cacheTime: 0 ===
+
+  it("cacheTime: 0 evicts on next tick", async () => {
+    const resource = createResourceNode("team", "team", async () => "data", true, { cacheTime: 0 })
+    await resource.load()
+    resource.invalidate()
+
+    // cacheTime: 0 should evict on the next tick
+    await new Promise(r => setTimeout(r, 10))
+    expect(resource.status).toBe("idle")
+    expect(resource.value).toBeUndefined()
+  })
+
+  // === keyed active eviction isolation ===
+
+  it("keyed active eviction does not evict other keys", async () => {
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 20,
+    })
+
+    await resource.load({ id: "a" })
+    await resource.load({ id: "b" })
+
+    // Invalidate active key "b"
+    resource.invalidate()
+    expect(resource.stale.current).toBe(true)
+
+    // Wait for "b"'s cacheTime (active eviction)
+    await new Promise(r => setTimeout(r, 30))
+    expect(resource.status).toBe("idle")
+
+    // Switch to "a" — should still be ready
+    await resource.load({ id: "a" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data-a")
+  })
+
+  // === in-flight promise after eviction ===
+
+  it("in-flight promise resolving after inactive eviction does not resurrect entry", async () => {
+    let resolveLoad!: (v: string) => void
+    const deferred = new Promise<string>(resolve => { resolveLoad = resolve })
+    let loadCountForA = 0
+
+    const resource = createResourceNode("team", "team", async (ctx: { id: string }) => {
+      if (ctx.id === "a") {
+        loadCountForA++
+        if (loadCountForA === 1) return deferred
+      }
+      return `data-${ctx.id}`
+    }, true, {
+      key: (ctx: { id: string }) => ctx.id,
+      cacheTime: 10,
+    })
+
+    // Start loading "a" with a deferred promise
+    const loadAPromise = resource.load({ id: "a" })
+
+    // Wait a bit to let the in-flight promise be stored
+    await new Promise(r => setTimeout(r, 5))
+    expect(resource.status).toBe("pending")
+
+    // Invalidate "a" and switch to "b" — "a" becomes inactive
+    resource.invalidate()
+    await resource.load({ id: "b" })
+
+    // Wait for "a"'s cacheTime to fire (inactive eviction — entry removed from Map)
+    await new Promise(r => setTimeout(r, 20))
+
+    // Now resolve "a"'s deferred promise
+    resolveLoad("a-data")
+    await loadAPromise
+
+    // "a" entry was removed from Map, resolution should not resurrect it
+    // Switch back to "a" — should start a fresh load
+    await resource.load({ id: "a" })
+    expect(resource.status).toBe("ready")
+    expect(resource.value).toBe("data-a")
+  })
+})

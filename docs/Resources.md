@@ -251,7 +251,7 @@ On failure, `error` contains the error message and `status` is `"failed"`.
 
 See the [Inspect Screen and Diagnostics Guide](Inspect-Screen.md) for more detail.
 
-## Cache options (Phase 1 + Phase 2)
+## Cache options (Phase 1 + Phase 2 + Phase 3)
 
 Resources support optional `cache` configuration:
 
@@ -260,7 +260,8 @@ const team = $.resource("team", {
   load: async ({ route }) => loadTeam(route.params.teamId),
   cache: {
     key: ({ route }) => route.params.teamId,  // optional, derive cache key from context
-    staleTime: 5_000,                          // ms (optional, default: Infinity)
+    staleTime: 5_000,                          // ms (optional, default: undefined)
+    cacheTime: 30_000,                         // ms (optional, default: undefined, no time-based eviction)
     deduplicate: true,                         // boolean (optional, default: true when cache is set)
   },
 })
@@ -275,6 +276,7 @@ const team = $.resource("team", {
 - status (idle/pending/ready/failed)
 - stale flag
 - staleTime timer
+- cacheTime timer
 - in-flight promise (for deduplication)
 
 The `ResourceRef` always reflects the **active key** entry — the key from the most recent `load()` or `reload()` call.
@@ -309,12 +311,12 @@ Key semantics:
 - `invalidate()` marks only the active entry stale.
 - `cache.deduplicate` deduplicates per active key.
 - `cache.staleTime` timers are per key.
+- `cache.cacheTime` timers are per key.
 - Resources without `cache.key` behave exactly as before (single-entry behavior).
 
-Scope limitations (Phase 2):
+Scope limitations (Phase 2 + Phase 3):
 
 - **Single-runtime only.** Keyed entries live in one `ResourceNode` within one `ScreenRuntime`.
-- **No `cacheTime`.** Entries persist for the node's lifetime. No time-based eviction.
 - **No SWR.** Stale data must be explicitly reloaded.
 - **No cross-navigation cache.** Disposing the runtime clears all entries.
 - **No dependency-tracked keys.** Key is derived from context at load time; automatically reacting to context changes is future work.
@@ -336,6 +338,42 @@ Behavior:
 - **`dispose()`** clears all stale timers and prevents late notifications.
 - **With `cache.key`**, each key has an independent stale timer.
 
+### cacheTime (Phase 3)
+
+`cache.cacheTime` is an optional number in milliseconds controlling how long a stale entry's value is retained before eviction. Default is `undefined` (no time-based eviction).
+
+`cacheTime` starts when an entry becomes stale — from `invalidate()`, action invalidation, or `staleTime` expiry.
+
+Before `cacheTime` expires:
+- `status` remains `"ready"`
+- `value` remains available
+- `stale` is `true`
+
+When `cacheTime` expires (active entry eviction):
+- `status` → `"idle"`
+- `value` → `undefined`
+- `error` → `undefined`
+- `stale` → `false`
+- Subscribers are notified
+
+When `cacheTime` expires (inactive keyed entry eviction):
+- Entry is removed from the internal map
+- No subscriber notification
+
+Behavior:
+- **`load()`/`reload()`** clears the cacheTime timer, clears stale, starts a fresh load.
+- **Successful load** clears the cacheTime timer (no longer stale).
+- **Failed load** does NOT start cacheTime (preserves existing failure behavior).
+- **`dispose()`** clears all cacheTime timers.
+- **With `cache.key`**, each key has an independent cacheTime timer.
+- **Works without `staleTime`** — manual `invalidate()` is sufficient to start cacheTime.
+- **`cacheTime: 0`** evicts on the next event loop tick after staleness.
+
+Scope limitations (Phase 3):
+- **Single-runtime only.** cacheTime does not survive runtime disposal.
+- **No SWR.** Eviction does not trigger automatic reload.
+- **No cross-navigation cache.** Disposing the runtime clears all entries.
+
 ### deduplicate
 
 `cache.deduplicate` is an optional boolean. When `true`, concurrent `load()` and `reload()` calls while a load is already pending share the same in-flight promise:
@@ -354,7 +392,6 @@ When `cache` is not set at all, deduplication is disabled to preserve backward c
 
 The following cache options remain as future work and are **not yet supported**:
 
-- **`cacheTime`** — retention period for stale values before eviction
 - **`swr`** — stale-while-revalidate background refreshing
 - **Cross-navigation cache store** — persistent cache across screen navigations
 - **Dependency-tracked keys** — automatic key derivation and reload when context changes without explicit load/reload
@@ -364,7 +401,6 @@ The following cache options remain as future work and are **not yet supported**:
 Resources are intentionally limited:
 
 - **No global cache.** Each runtime owns its resource nodes. There is no shared cache between runtimes.
-- **No `cacheTime`.** There is no time-based retention of stale values beyond `staleTime` transitions. Keyed entries persist for the node's lifetime.
 - **No stale-while-revalidate (SWR).** Stale resources stay stale until explicitly reloaded.
 - **No Suspense integration.** Resources do not integrate with React Suspense or any other framework's loading boundaries.
 - **No server framework integration yet.** Resources live on screen definitions and runtimes. Server-side resource hydration is not implemented.
