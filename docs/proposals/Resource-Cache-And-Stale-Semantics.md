@@ -7,7 +7,7 @@
 **Related docs:** `docs/Resources.md`, `docs/Specification.md`
 
 > **Phase 1** (PR #119, `@intent-framework/core@0.1.0-alpha.8`): `cache.staleTime` and `cache.deduplicate`.  
-> **Phase 2** (PR #TBD, `@intent-framework/core@0.1.0-alpha.9`): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
+> **Phase 2** (PR #123, `@intent-framework/core@0.1.0-alpha.9`): `cache.key` only, scoped to one runtime and one `ResourceNode`.  
 > **Phase 3+**: `cacheTime`, SWR, cross-navigation cache store, dependency-tracked keys. These remain design-only until implementation begins.
 
 ---
